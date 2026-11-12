@@ -135,7 +135,8 @@ public class VoyageTests
         Assert.Empty(lie.FoundOutBy);
         var trust = mara.Trust;
 
-        v.Assign(mara, v.FindFault("")!, patch: false);
+        // Patched, so the work finishes whatever the parts: a failed repair on the last part now stops it.
+        v.Assign(mara, v.FindFault("")!, patch: true);
         FinishAlert(v);
         Assert.True(lie.FoundOutBy.ContainsKey("mara"));
         Assert.True(mara.Trust <= trust - Tuning.LieTrust);

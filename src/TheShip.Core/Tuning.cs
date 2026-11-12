@@ -22,9 +22,9 @@ public static class Tuning
     public const int StartParts = 2;
     /// <summary>A failed repair burns a spare part too.</summary>
     public const bool FailedRepairSpendsPart = true;
-    /// <summary>Each sleeper's death chance when a patched pod controller gives way at the last drift.</summary>
     /// <summary>Years the arrival slips when the navigation fix was only a patch at the last drift.</summary>
     public const double NavPatchArrivalSlipYears = 9;
+    /// <summary>Each sleeper's death chance when a patched pod controller gives way at the last drift.</summary>
     public const double PatchFailDeathChance = 0.15;
     public const double ThawRiskPerWear = 0.012;
     public const double ThawInjury = 25;

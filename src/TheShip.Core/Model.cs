@@ -228,6 +228,9 @@ public sealed class Fault
     /// <summary>The name without the "Old patch gives way" prefix.</summary>
     public string PlainName => Plain(Name);
 
+    /// <summary>How the crew say it: "coolant leak", or "coolant leak again" for a patch that gave way.</summary>
+    public string CrewName => Plain(Name).ToLowerInvariant() + (Name.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase) ? " again" : "");
+
     /// <summary>A returning fault; <paramref name="name"/> is the plain name, the prefix is added once.</summary>
     public Fault Again(string id, string name) => new()
     {

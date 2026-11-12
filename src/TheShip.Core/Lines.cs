@@ -46,6 +46,7 @@ public static class Lines
             "work_done" => Pick(rng, Cap(detail) + " is done.", "That's " + detail + " fixed."),
             "work_patched" => Cap(detail) + " is patched. It will hold for now, not for good.",
             "work_failed" => Pick(rng, "It didn't take. I'm going again.", "That failed. I need more time on " + detail + "."),
+            "work_no_parts" => "That was the last spare part. I can't finish " + detail + " without one. Patch it or leave it.",
             "injured" => "I'm hurt. That was your call.",
             "noticed_dose" => "My dosimeter is red. Nobody told me that bay was hot.",
             "found" => Pick(rng, "I went and looked. " + Cap(detail) + ".", "I checked for myself: " + detail + "."),

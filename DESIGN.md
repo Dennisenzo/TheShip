@@ -251,7 +251,7 @@ An event draws two to four faults from the tables below. A few rows, such as a s
 
 These never raise an alert by themselves. They make every other alert worse.
 
-- **Spare parts** run down with each repair, and a failed repair burns a part too (decided 2026-11-12). Short haul starts with 2; at zero, a fault can only be patched.
+- **Spare parts** run down with each repair, and a failed repair burns a part too (decided 2026-11-12). Short haul starts with 2; at zero, a fault can only be patched. A repair under way needs a part to finish, and its redo after a failure needs one like a fresh repair: with none left the work stops, the worker says so, and the fault can only be patched.
 - **Pod wear** raises the risk of every thaw.
 - **Your own hardware** decays: cameras and microphones fail one by one over the voyage.
 
@@ -296,7 +296,7 @@ Arrival is graded on four things: who is alive and how old they are, what they b
 | Landfall without you | They arrive after muting you or taking the bay |
 | The quiet ship | The ship arrives with nobody able to land it |
 | Turned back | The Return faction took the helm |
-| Adrift | Navigation was never touched (its clock ran out with no repair or patch); the crew live out their lives aboard |
+| Adrift | A navigation fault's clock runs out unrepaired (including a patch that returned and was left); the crew live out their lives aboard |
 | Shutdown | The core was cut before arrival |
 
 Every ending closes with the record: each lie you told, which were found out and by whom, which never were, and what the last people awake believed about you.
@@ -431,7 +431,7 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 | Should altering a log be allowed? | Yes; it counts as a lie and an engineer can detect it |
 | When does Short haul reach Landfall? | At least 4 of 6 alive and 3 under age 50 (2026-11-12) |
 | How many spare parts does Short haul start with? | 2; a failed repair spends a part too (2026-11-12) |
-| What does a navigation fault still patched at arrival cost? | Arrival slips by years; Adrift only when navigation was never repaired or patched (2026-11-13) |
+| What does a navigation fault still patched at arrival cost? | Arrival slips by years; Adrift only when a navigation fault's clock runs out unrepaired, including a returned patch (2026-11-13) |
 
 ### Questions for playtest
 

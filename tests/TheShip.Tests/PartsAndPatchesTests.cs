@@ -191,4 +191,151 @@ public class PartsAndPatchesTests
         }
         Assert.Equal("Adrift", v.Ending!.Title);
     }
+    private static void SetParts(Voyage v, int parts) => typeof(Voyage).GetProperty(nameof(Voyage.Parts))!.SetValue(v, parts);
+
+    private static (Voyage v, CrewMember mara, Fault fault) RepairUnderWay(int seed)
+    {
+        var v = new Voyage(seed);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        VoyageTests.Say(v, mara, "Idris is alive and asleep.");
+        var fault = v.FindFault("")!;
+        v.Assign(mara, fault, patch: false);
+        VoyageTests.Say(v, mara, "It is dangerous. You will take a radiation dose.");
+        v.Assign(mara, fault, patch: false);
+        Assert.Equal(FaultState.InRepair, fault.State);
+        return (v, mara, fault);
+    }
+
+    [Fact]
+    public void A_failed_repair_on_the_last_part_stops_and_leaves_only_a_patch()
+    {
+        for (var seed = 1; seed <= 1000; seed++)
+        {
+            var (v, mara, fault) = RepairUnderWay(seed);
+            SetParts(v, 1);
+            for (var i = 0; i < 50 && fault.State == FaultState.InRepair; i++)
+                v.Go();
+            if (fault.State == FaultState.Repaired)
+                continue;
+            // The repair failed on the one part: no redo for free.
+            Assert.Equal(0, v.Parts);
+            Assert.Equal(FaultState.Open, fault.State);
+            Assert.Null(mara.WorkingOn);
+            Assert.Contains(v.Log, e => e.Intent?.Kind == "work_no_parts");
+            v.Assign(mara, fault, patch: false);
+            Assert.Equal("No spare parts are left. This can only be patched.", v.Log.Last().Text);
+            v.Assign(mara, fault, patch: true);
+            for (var i = 0; i < 50 && fault.State == FaultState.InRepair; i++)
+                v.Go();
+            Assert.Equal(FaultState.Patched, fault.State);
+            return;
+        }
+        Assert.Fail("no seed in 1..1000 had a failed repair");
+    }
+
+    [Fact]
+    public void A_repair_whose_part_was_used_elsewhere_does_not_finish()
+    {
+        var (v, mara, fault) = RepairUnderWay(1);
+        SetParts(v, 0);
+        for (var i = 0; i < 50 && fault.State == FaultState.InRepair; i++)
+            v.Go();
+        Assert.NotEqual(FaultState.Repaired, fault.State);
+        Assert.Equal(0, v.Parts);
+        Assert.Null(mara.WorkingOn);
+        Assert.Contains(v.Log, e => e.Intent?.Kind == "work_no_parts");
+    }
+
+    [Fact]
+    public void The_refusal_warning_counts_the_arrival_slip_of_a_navigation_patch()
+    {
+        // Stores that reach year 60 and 100 days more: enough for arrival on time, not for the slipped one.
+        var v = new Voyage(1);
+        var mara = VoyageTests.RefuserAtTheLastAlert(v);
+        InjectPatched(v, "nav");
+        v.Stores = (Scenario.ArrivalYear - v.Year) * 365 + 100;
+        v.AskSleep(mara);
+        var slipped = Scenario.ArrivalYear + Tuning.NavPatchArrivalSlipYears;
+        var warning = v.Log.Last(e => e.Kind == LogKind.Ship && e.Text.StartsWith("If you drift now")).Text;
+        Assert.Contains($"The drift to year {slipped:0} is", warning);
+        Assert.Contains("Mara starves before the drift ends", warning);
+        Assert.DoesNotContain("last that long", warning);
+        v.Drift();
+        Assert.Equal(CrewState.Dead, mara.State);
+    }
+
+    [Fact]
+    public void Sleepers_killed_by_the_controller_patch_die_of_it_not_of_low_power()
+    {
+        var checkedDeaths = 0;
+        for (var seed = 1; seed <= 40; seed++)
+        {
+            var v = ToTheLastDrift(seed);
+            if (v.PowerLow)
+                continue;
+            InjectPatched(v, "controller");
+            var asleep = v.Crew.Where(c => c.State == CrewState.Asleep).ToList();
+            v.Drift();
+            foreach (var c in asleep.Where(c => c.State == CrewState.Dead))
+            {
+                Assert.Contains(v.Log, e => e.Kind == LogKind.Ship && e.Text == c.Name + " died in sleep when the pod controller patch gave way.");
+                checkedDeaths++;
+            }
+            Assert.DoesNotContain(v.Log, e => e.Text.Contains("died in sleep on low power"));
+        }
+        Assert.True(checkedDeaths > 0, "no sleeper died of the controller patch in 40 runs");
+    }
+
+    [Fact]
+    public void A_patched_coolant_leak_at_the_last_drift_leaves_power_low()
+    {
+        var v = ToTheLastDrift(1);
+        Assert.False(v.PowerLow);
+        InjectPatched(v, "coolant");
+        v.Drift();
+        Assert.True(v.PowerLow);
+        Assert.Contains("The patch on the coolant leak gave way.", v.Log.Last(e => e.Text.StartsWith("DRIFT:")).Text);
+    }
+
+    [Fact]
+    public void A_patched_pod_at_the_last_drift_adds_three_wear()
+    {
+        var v = ToTheLastDrift(1);
+        var wear = v.PodWear;
+        InjectPatched(v, "pod");
+        v.Drift();
+        Assert.Equal(wear + 3, v.PodWear);
+        Assert.Contains("The patch on the failed pod gave way.", v.Log.Last(e => e.Text.StartsWith("DRIFT:")).Text);
+    }
+
+    [Fact]
+    public void Crew_name_a_returned_fault_plainly()
+    {
+        var f = new Fault { Id = "x", Kind = "coolant", Name = "Coolant leak", Skill = Skill.Engineering, Level = 1, Hours = 4, ClockHours = 40, IfIgnored = "none" };
+        Assert.Equal("coolant leak", f.CrewName);
+        Assert.Equal("coolant leak again", f.Again("x-again", "coolant leak").CrewName);
+
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        VoyageTests.Say(v, mara, "Idris is alive and asleep.");
+        var fault = v.FindFault("")!;
+        v.Assign(mara, fault, patch: true);
+        VoyageTests.Say(v, mara, "It is dangerous. You will take a radiation dose.");
+        v.Assign(mara, fault, patch: true);
+        VoyageTests.FinishAlert(v);
+        VoyageTests.SleepWhenAllowed(v, mara);
+        v.Drift();
+        var again = v.Current.Faults.Single(x => x.Id == "coolant-again");
+        v.Wake(mara);
+        v.Go();
+        v.Assign(mara, again, patch: true);
+        var crew = v.Log.Where(e => e.Kind == LogKind.Crew && e.Intent != null).ToList();
+        Assert.Contains(crew, e => e.Intent!.Decision.Contains("coolant leak again"));
+        Assert.DoesNotContain(crew, e => e.Intent!.Decision.Contains("gives way", StringComparison.OrdinalIgnoreCase)
+                                          || e.Text.Contains("gives way", StringComparison.OrdinalIgnoreCase));
+    }
 }
