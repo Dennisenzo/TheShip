@@ -9,6 +9,8 @@ public static class Tuning
     public const double MinAwakeHours = 90 * 24;
     public const int MaxAwake = 3;
     public const double AftermathStepHours = 14 * 24;
+    /// <summary>Most two-week steps one "advance until something happens" takes.</summary>
+    public const int AdvanceMaxSteps = 8;
 
     public const int ThawAgeMin = 3;
     public const int ThawAgeMax = 5;

@@ -203,9 +203,21 @@ public sealed partial class ShipGame
         var day = (int)(v.Clock % Tuning.HoursPerYear / 24) + 1;
         _p.Text(_p.Small, "CLOCK", ix, clock.Y + 12, Painter.Dim);
         _p.TextRight(_p.Small, "year " + N(Math.Floor(v.Year)) + ", day " + day, x + width - 14, clock.Y + 12, Painter.Dim);
-        var label = v.Phase == Phase.Aftermath ? "ADVANCE TWO WEEKS" : "ADVANCE TO NEXT EVENT";
-        if (_p.Button(new Rectangle(ix, clock.Y + 44, inner, 40), label, v.Phase != Phase.Ended, primary: true))
-            Act(label.ToLowerInvariant(), v.Go, snapshot: true);
+        if (v.Phase == Phase.Aftermath)
+        {
+            // Until something needs you (a crew line, a death, a person who can sleep); the small button is the old two-week step.
+            var wide = inner * 2 / 3;
+            if (_p.Button(new Rectangle(ix, clock.Y + 44, wide, 40), "UNTIL SOMETHING HAPPENS", true, primary: true))
+                Act("advance until something happens", () =>
+                {
+                    var result = v.GoUntilAttention();
+                    _session?.Line("advance", result.Steps + " step(s), stopped: " + (result.Reason.Length == 0 ? "(step limit or nothing to do)" : result.Reason));
+                }, snapshot: true);
+            if (_p.Button(new Rectangle(ix + wide + 8, clock.Y + 44, inner - wide - 8, 40), "2 WEEKS"))
+                Act("advance two weeks", v.Go, snapshot: true);
+        }
+        else if (_p.Button(new Rectangle(ix, clock.Y + 44, inner, 40), "ADVANCE TO NEXT EVENT", v.Phase != Phase.Ended, primary: true))
+            Act("advance to next event", v.Go, snapshot: true);
         if (_p.Button(new Rectangle(ix, clock.Y + 94, inner, 40), "DRIFT TO THE NEXT ALERT", v.Phase == Phase.Aftermath))
             Act("drift to the next alert", v.Drift, snapshot: true);
     }

@@ -38,6 +38,7 @@ real-time stamp and a tag per line. The game's opening note gives the file's pat
 | `Y<year> ship/crew/you/recorded/help` | every ship log line; a crew line shows its template and the game's decision |
 | `voiced` | the model's wording of that crew line, or that it was rejected and the template stayed |
 | `click` | every click that changes the game: wake, sleep, repair, patch, advance, drift, doors, logs |
+| `advance` | the result of "advance until something happens": steps taken and why it stopped |
 | `typed`, `reading`, `said`, `dropped` | a line typed (with its hearers), how it was read or re-read by the player, and whether it was said or dropped |
 | `model` | the model's raw reading, rejected crew lines, yes/no judgements, failures |
 | `llm` | each model call: kind, prompt and generated tokens, first-token and total seconds |
@@ -107,6 +108,7 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-12: every run writes a session log (`SessionLog.cs`, Sessions/ next to the exe; see "Analysing the user's play sessions").
   Clicks that change the game go through `Act(...)`, which logs them; `ShipMind.Trace` reports the model's raw answers.
 - 2026-11-12: the working rules (branches, commits, models, sub-agent types `ship-*`) are taken over from the Cities repo.
+- 2026-11-12: "Advance until something happens" in the aftermath (`Voyage.GoUntilAttention`, `Voyage.Advance.cs`): runs two-week steps until a crew line, a person who can go back to sleep, a death, a lost fault, differing accounts or the stores running out; at most `Tuning.AdvanceMaxSteps`; the clock does not move when nobody is awake or everyone awake can already sleep. The clock box has it as the main button, with a small "2 WEEKS" for the old step. Session log tag `advance`. 7 tests in `AdvanceTests.cs`.
 - 2026-11-12: running out of stores kills (fix/stores-run-out). Before, a drift with a refuser awake took the stores below zero and only
   cost 40 health, so Mara lived through 8 years on no food (session 2026-11-12_23-13-57). Now the awake eat one person-day each per day
   in time order (`Voyage.Eat`, used by the two-week clock and the drift); once the stores are empty, `Tuning.StarveDays` (60) hungry days
