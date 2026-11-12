@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TheShip.AI/TheShip.AI.csproj" />
+    <Project Path="src/TheShip.Core/TheShip.Core.csproj" />
+    <Project Path="src/TheShip.Game/TheShip.Game.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TheShip.Tests/TheShip.Tests.csproj" />
+  </Folder>
+</Solution>

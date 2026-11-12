@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>TheShip.Game</RootNamespace>
+    <AssemblyName>TheShip</AssemblyName>
+    <!-- Needed so NuGet copies the native llama.cpp (Vulkan/CPU) DLLs on a plain build/run. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TheShip.Core\TheShip.Core.csproj" />
+    <ProjectReference Include="..\TheShip.AI\TheShip.AI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- DesktopGL (SDL2 + OpenGL), as in Cities. -->
+    <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.6" />
+    <!-- Runtime TTF rendering (Zlib), so no MGCB content pipeline is needed. -->
+    <PackageReference Include="FontStashSharp.MonoGame" Version="1.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Bundled font (Share Tech Mono, OFL-1.1) with its licence. -->
+    <None Include="Content\Fonts\*" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Every downloaded model is copied next to the exe; pick one with the llm option. -->
+    <None Include="Content\Models\llm\*.gguf" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Content\Models\llm\README.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

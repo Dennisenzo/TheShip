@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+*.user
+# Downloaded model weights (multi-GB): see src/TheShip.Game/Content/Models/llm/README.txt
+/src/TheShip.Game/Content/Models/**/*.gguf
+*.part
+/dist/
+.claude/

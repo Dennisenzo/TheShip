@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>TheShip.AI</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TheShip.Core\TheShip.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TheShip.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Same local-model stack and versions as the Cities repo: llama.cpp through LLamaSharp. -->
+    <PackageReference Include="LLamaSharp" Version="0.30.0" />
+    <!-- Vulkan GPU backend: works on NVIDIA, AMD and Intel with only the driver's Vulkan runtime. It depends on
+         LLamaSharp.Backend.Cpu and brings it in as the no-GPU fallback - don't reference Cpu directly. -->
+    <PackageReference Include="LLamaSharp.Backend.Vulkan.Windows" Version="0.30.0" />
+  </ItemGroup>
+
+</Project>
