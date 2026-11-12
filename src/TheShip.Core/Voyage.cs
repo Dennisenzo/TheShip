@@ -140,6 +140,7 @@ public sealed partial class Voyage
             Intent = new CrewIntent(kind, decision),
         };
         Log.Add(entry);
+        Attend(c.Name + " has something to say");
         CrewSpoke?.Invoke(entry);
     }
 
@@ -168,6 +169,7 @@ public sealed partial class Voyage
         c.State = CrewState.Dead;
         c.WorkingOn = null;
         _facts["alive:" + c.Id].Truth = "dead";
+        Attend(c.Name + " died");
         if (!quiet)
             Ship(c.Name + " " + how + ".");
     }

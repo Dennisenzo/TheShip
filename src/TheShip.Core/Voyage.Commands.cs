@@ -119,8 +119,11 @@ public sealed partial class Voyage
         }
         Clock += hours;
         if (storesOut is { } outAt)
+        {
+            Attend("the stores ran out");
             Ship($"The stores ran out in year {Math.Floor((start + outAt) / Tuning.HoursPerYear):0}. Whoever is awake now goes hungry: "
                  + $"{Tuning.StarveDays:0} days without food kills.");
+        }
         foreach (var (c, at) in starved.OrderBy(kv => kv.Value))
             Kill(c, $"starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}");
     }
@@ -356,6 +359,7 @@ public sealed partial class Voyage
     private void Lose(Fault f)
     {
         f.State = FaultState.Lost;
+        Attend("the clock ran out on " + f.Name);
         foreach (var w in Workers(f).ToList())
             w.WorkingOn = null;
         Ship(f.Name + ": the clock ran out. " + Cap(f.IfIgnored) + ".");

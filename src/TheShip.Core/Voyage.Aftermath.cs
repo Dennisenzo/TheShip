@@ -71,6 +71,7 @@ public sealed partial class Voyage
             if (!c.CanSleepAnnounced && c.HoursAwake >= Tuning.MinAwakeHours)
             {
                 c.CanSleepAnnounced = true;
+                Attend(c.Name + " can go back to sleep");
                 Ship(c.Name + " has been awake three months. The pod can take them again.");
             }
             Clamp(c);
@@ -116,7 +117,10 @@ public sealed partial class Voyage
         if (b.Beliefs.TryGetValue(key, out var mine) && !f.Same(mine.Value, belief.Value))
         {
             if (a.Doubts.Add(key) | b.Doubts.Add(key))
+            {
+                Attend("the accounts differ");
                 Ship(a.Name + " and " + b.Name + " compare what they heard about " + f.Label + ". The accounts differ.");
+            }
             return;
         }
         Ship(a.Name + " tells " + b.Name + ": " + f.Say(belief.Value) + ".");
