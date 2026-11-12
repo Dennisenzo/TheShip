@@ -68,6 +68,25 @@ public static class RuleReader
         return Reading.Plain;
     }
 
+    /// <summary>
+    /// Every fact a text states a value for (numbers left out): used to check that a crew line the model wrote
+    /// claims nothing the speaker doesn't know (DESIGN.md, "Keeping the model inside the facts").
+    /// </summary>
+    public static List<(Fact Fact, string Value)> Claims(string text, IEnumerable<Fact> facts)
+    {
+        var line = " " + text.ToLowerInvariant().Trim() + " ";
+        var claims = new List<(Fact Fact, string Value)>();
+        foreach (var fact in facts)
+        {
+            if (fact.Numeric || !fact.Cues.Any(line.Contains))
+                continue;
+            var value = ValueIn(line, fact);
+            if (value != null)
+                claims.Add((fact, value));
+        }
+        return claims;
+    }
+
     /// <summary>The value of <paramref name="fact"/> the line names, or null.</summary>
     private static string? ValueIn(string line, Fact fact)
     {

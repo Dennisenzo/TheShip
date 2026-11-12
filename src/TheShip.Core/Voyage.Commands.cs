@@ -159,6 +159,10 @@ public sealed partial class Voyage
                                                 && s.Hearers.Contains(c.Id) && !s.PromiseKept.ContainsKey(c.Id)))
             ResolvePromise(s, c, kept: false);
 
+        // Woken for a fault, they know there was one.
+        if (Current.Faults.Count > 0)
+            Learn(c, "alert:" + Current.Number, "happened", "evidence");
+
         // They see who else is up.
         foreach (var other in Awake.Where(o => o != c).ToList())
         {

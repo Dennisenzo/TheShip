@@ -269,6 +269,8 @@ public sealed class LogEntry
     public string Text { get; set; }
     public string? CrewId { get; init; }
     public CrewIntent? Intent { get; init; }
+    /// <summary>The model is still wording this line; show a placeholder until it is done.</summary>
+    public bool Pending { get; set; }
 }
 
 public enum Phase { Alert, Aftermath, Ended }
