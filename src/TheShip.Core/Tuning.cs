@@ -1,0 +1,60 @@
+namespace TheShip.Core;
+
+/// <summary>Every number that tunes the game, in one place.</summary>
+public static class Tuning
+{
+    public const double HoursPerYear = 8760;
+    public const double ThawHours = 6;
+    /// <summary>Three months awake before a pod can take a person again.</summary>
+    public const double MinAwakeHours = 90 * 24;
+    public const int MaxAwake = 3;
+    public const double AftermathStepHours = 14 * 24;
+
+    public const int ThawAgeMin = 3;
+    public const int ThawAgeMax = 5;
+    /// <summary>One year of ageing per ten years asleep.</summary>
+    public const double SleepAgeing = 0.1;
+    public const double WorkingAge = 65;
+
+    public const double StartStores = 1500;     // person-days
+    public const int StartParts = 3;
+    public const double ThawRiskPerWear = 0.012;
+    public const double ThawInjury = 25;
+    public const double PowerLowDeathChance = 0.10;
+    public const int PodsWornAt = 8;
+    public const double StoresShortAt = 300;
+    public const int PartsShortAt = 1;
+
+    /// <summary>A number counts as true within this distance (the date, in years).</summary>
+    public const double NumberTolerance = 1;
+
+    // Trust
+    public const double LieTrust = 25;
+    public const double LieMattersExtra = 10;
+    public const double AlteredLogTrust = 30;
+    public const double HardTruthTrust = 8;
+    public const double PromiseMade = 2;
+    public const double PromiseKept = 10;
+    public const double PromiseBroken = 15;
+    public const double RequestGranted = 6;
+    public const double RequestIgnored = 4;
+    public const double HurtByOrder = 10;
+    public const double Dodge = 3;
+    public const double LogGap = 5;
+    public const double ConfirmedTruth = 3;
+    public const double DoubtThreshold = 55;
+
+    // Repairs
+    public const double RepairBaseChance = 0.8;
+    public const double RepairPerSkill = 0.12;
+    public const double RepairInjuryChance = 0.15;
+    public const double RepairInjury = 20;
+    public const double DangerDose = 15;
+    public const double UnskilledRate = 0.5;
+    public const double PatchRate = 2;
+    public const double EngineerSpotsAlteredLog = 0.6;
+
+    // Ending (Short haul: 6 crew)
+    public const int LandfallAlive = 3;
+    public const int LandfallWorkingAge = 2;
+}

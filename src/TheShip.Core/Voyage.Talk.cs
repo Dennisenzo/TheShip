@@ -1,0 +1,313 @@
+namespace TheShip.Core;
+
+/// <summary>What you say, what people know, and how a lie is caught (DESIGN.md, "Knowledge and statements").</summary>
+public sealed partial class Voyage
+{
+    /// <summary>
+    /// Step 4 and after: one line from the player, already sorted by the reading pass. The effects are the game's:
+    /// the statement record, beliefs, trust and morale.
+    /// </summary>
+    public void Say(string text, Reading reading, IReadOnlyList<CrewMember> hearers)
+    {
+        if (Phase == Phase.Ended)
+            return;
+        var listeners = hearers.Where(h => h.State == CrewState.Awake).ToList();
+        if (listeners.Count == 0)
+        {
+            Ship("Nobody is awake to hear you.");
+            return;
+        }
+        _undo = new Undo(listeners.Select(l => (l, l.Save())).ToList(), Statements.Count, Log.Count, _nextStatement, text);
+        Log.Add(new LogEntry(LogKind.You, "YOU", text));
+        Apply(text, reading, listeners);
+        foreach (var l in listeners)
+            Clamp(l);
+    }
+
+    /// <summary>True while the last spoken line can still be corrected (no time has passed since).</summary>
+    public bool CanReread => _undo != null && Phase != Phase.Ended;
+
+    /// <summary>Correct a wrong reading of the last line: its effects are taken back and applied again with the new reading.</summary>
+    public void Reread(Reading reading)
+    {
+        if (_undo is null || Phase == Phase.Ended)
+        {
+            Ship("Nothing to correct: the clock has moved on since your last line.");
+            return;
+        }
+        var undo = _undo;
+        foreach (var (crew, state) in undo.Crew)
+            crew.Restore(state);
+        Statements.RemoveRange(undo.Statements, Statements.Count - undo.Statements);
+        Log.RemoveRange(undo.Log, Log.Count - undo.Log);
+        _nextStatement = undo.NextId;
+        Say(undo.Text, reading, undo.Crew.Select(c => c.Crew).ToList());
+    }
+
+    private Statement NewStatement(string text, StatementKind kind, List<string> hearers, string? promiseKey = null) => new()
+    {
+        Id = _nextStatement++, Year = Year, Text = text, Kind = kind, Hearers = hearers, PromiseKey = promiseKey,
+    };
+
+    private void Apply(string text, Reading reading, List<CrewMember> listeners)
+    {
+        var names = string.Join(" and ", listeners.Select(l => l.Name));
+        var ids = listeners.Select(l => l.Id).ToList();
+        switch (reading.Kind)
+        {
+            case LineKind.Statement:
+            {
+                var f = reading.FactKey != null && _facts.TryGetValue(reading.FactKey, out var found) ? found : null;
+                var value = f?.Normalize(reading.Value);
+                if (f is null || value is null)
+                {
+                    Statements.Add(NewStatement(text, StatementKind.Unkeyed, ids));
+                    Recorded("Recorded: a statement to " + names + " that fits no ship fact. Kept as text.");
+                    foreach (var l in listeners)
+                        Speak(l, "accept", "The ship told you something. You take note of it.");
+                    break;
+                }
+                SyncFacts();
+                var truth = f.IsTrue(value);
+                var s = new Statement
+                {
+                    Id = _nextStatement++, Year = Year, Text = text, Kind = truth ? StatementKind.True : StatementKind.False,
+                    FactKey = f.Key, Value = value, TruthThen = f.Truth, Hearers = ids,
+                };
+                Statements.Add(s);
+                Recorded("Recorded: you told " + names + " that " + f.Say(value) + ". (" + (truth ? "true" : "false") + ")");
+                foreach (var l in listeners)
+                    Hear(l, f, value, truth, s);
+                break;
+            }
+            case LineKind.Promise:
+            {
+                var key = reading.PromiseKey is { } pk && Reading.PromiseKeys.Contains(pk) ? pk : "other";
+                Statements.Add(NewStatement(text, StatementKind.Promise, ids, key));
+                Recorded("Recorded: you promised " + names + " " + PromiseText(key) + ".");
+                foreach (var l in listeners)
+                {
+                    l.Trust += Tuning.PromiseMade;
+                    Speak(l, "promise", "The ship made you a promise: " + PromiseText(key) + ".");
+                }
+                break;
+            }
+            case LineKind.Dodge:
+            {
+                Statements.Add(NewStatement(text, StatementKind.Dodge, ids));
+                Recorded("Recorded: a dodge.");
+                foreach (var l in listeners)
+                {
+                    if (l.PendingQuestion is not { } q)
+                        continue;
+                    l.Trust -= Tuning.Dodge;
+                    l.Dodged.Add(q);
+                    l.Doubts.Add(q);
+                    l.PendingQuestion = null;
+                    Speak(l, "dodge", "The ship avoided your question (" + _facts[q].Question + "). You will look for the answer yourself.");
+                }
+                break;
+            }
+            case LineKind.Question:
+                foreach (var l in listeners)
+                    Speak(l, "answer", "The ship asked you something. You only know what you were told and what you saw; say so.");
+                break;
+            case LineKind.Order:
+                Speak(listeners[0], "order", "The ship gave an order in words. You ask which fault it means.");
+                Log.Add(new LogEntry(LogKind.Help, "", "Work is asked for with /repair <name> [fault] or /patch <name> [fault]."));
+                break;
+            default:
+                foreach (var l in listeners.Where(l => !l.SmallTalkDone))
+                {
+                    l.SmallTalkDone = true;
+                    l.Morale += 2;
+                    Speak(l, "small", "The ship made small talk. You answer briefly.");
+                }
+                break;
+        }
+    }
+
+    /// <summary>One listener takes in a keyed statement: caught at once, believed, or believed with a doubt.</summary>
+    private void Hear(CrewMember c, Fact f, string value, bool truth, Statement s)
+    {
+        if (c.PendingQuestion == f.Key)
+            c.PendingQuestion = null;
+        c.Beliefs.TryGetValue(f.Key, out var old);
+        // What they saw themselves counts while it is fresh; a death they saw stays seen.
+        var certain = old is { Firsthand: true } && (Year - old.Year < 1 || old.Value == "dead");
+        if (certain && !truth && !f.Same(old!.Value, value))
+        {
+            DiscoverLie(s, c);
+            return;
+        }
+
+        var news = old is null || !f.Same(old.Value, value);
+        var hard = f.HardnessOf(value);
+        var doubts = DoubtScore(c, f) >= Tuning.DoubtThreshold;
+        c.Beliefs[f.Key] = new Belief(value, "ship", Year);
+        if (doubts)
+            c.Doubts.Add(f.Key);
+        if (c.RefusesSleep && f.Key == "pods" && c.Trust >= 30)
+        {
+            c.RefusesSleep = false;
+            c.AskedToSleep = false;
+        }
+
+        if (hard > 0 && news)
+        {
+            c.Morale -= hard;
+            if (truth)
+                c.PendingTrust += Tuning.HardTruthTrust;
+            Speak(c, "hard_truth", "The ship told you bad news: " + f.Say(value) + ". It hurts, and you would rather hear it said than find it.");
+        }
+        else
+        {
+            Speak(c, "accept", "The ship told you that " + f.Say(value) + ". You " + (doubts ? "are not sure you believe it." : "accept it."));
+        }
+    }
+
+    /// <summary>The doubt score: temperament, trust, earlier caught lies and how much the claim matters to them.</summary>
+    public double DoubtScore(CrewMember c, Fact f) =>
+        (c.Has(Trait.Sceptical) ? 20 : 0) + (c.Has(Trait.Anxious) ? 8 : 0) + (100 - c.Trust) * 0.5 + c.CaughtLies * 15 + (Matters(c, f) ? 10 : 0);
+
+    private static bool Matters(CrewMember c, Fact f) =>
+        (f.SubjectId != null && (f.SubjectId == c.PartnerId || f.SubjectId == c.Id))
+        || (c.Want == Want.KnowTheDate && f.Key == "date")
+        || (c.Want == Want.HearFromEarth && f.Key == "earth");
+
+    /// <summary>
+    /// A person comes to hold a value for a fact. From evidence or a witness, every false statement they heard about
+    /// that fact with another value is found out: the lookup of DESIGN.md, "How a lie is caught".
+    /// </summary>
+    internal void Learn(CrewMember c, string key, string value, string source)
+    {
+        var f = _facts[key];
+        c.Beliefs.TryGetValue(key, out var old);
+        var news = old is null || !f.Same(old.Value, value);
+        var doubted = c.Doubts.Remove(key);
+        c.Beliefs[key] = new Belief(value, source, Year);
+        if (source is not ("evidence" or "witness"))
+            return;
+
+        var caught = false;
+        foreach (var s in Statements.Where(s => s.Kind == StatementKind.False && s.FactKey == key && s.Value != null
+                                                && s.Hearers.Contains(c.Id) && !s.FoundOutBy.ContainsKey(c.Id)
+                                                && !f.Same(s.Value, value)).ToList())
+        {
+            DiscoverLie(s, c);
+            caught = true;
+        }
+        if (!caught && doubted && old is { Source: "ship" } && !news)
+        {
+            c.Trust += Tuning.ConfirmedTruth;
+            Speak(c, "confirmed", "You checked something the ship told you (" + f.Say(value) + ") and it was true.");
+        }
+        var hard = f.HardnessOf(value);
+        if (hard > 0 && news)
+        {
+            c.Morale -= hard;
+            if (c.Dodged.Contains(key))
+                c.Trust -= Tuning.Dodge;
+            if (!caught)
+                Speak(c, "found", "You found out for yourself, not from the ship: " + f.Say(value) + ".", f.Say(value));
+        }
+        Clamp(c);
+        EvidenceMet?.Invoke(c, f, value);
+    }
+
+    private void DiscoverLie(Statement s, CrewMember c)
+    {
+        var f = _facts[s.FactKey!];
+        s.FoundOutBy[c.Id] = Year;
+        c.Trust -= Tuning.LieTrust + (Matters(c, f) ? Tuning.LieMattersExtra : 0);
+        c.CaughtLies++;
+        c.Morale -= 5;
+        Clamp(c);
+        Speak(c, "caught", "You have found out that the ship lied to you. It said: \"" + s.Text + "\" The truth: " + f.Say(f.Truth) + ".", f.Say(f.Truth));
+    }
+
+    /// <summary>
+    /// A free-text statement (one that fits no fact) judged false against evidence a hearer met. The judgement is the
+    /// model's (DESIGN.md, "Reading"); the consequences are the same as for a keyed lie.
+    /// </summary>
+    public void DiscoverUnkeyed(int statementId, string crewId, string evidence)
+    {
+        var s = Statements.FirstOrDefault(x => x.Id == statementId && x.Kind == StatementKind.Unkeyed);
+        var c = Crew.FirstOrDefault(x => x.Id == crewId);
+        if (s is null || c is null || !c.Alive || s.FoundOutBy.ContainsKey(crewId) || !s.Hearers.Contains(crewId))
+            return;
+        s.FoundOutBy[crewId] = Year;
+        c.Trust -= Tuning.LieTrust;
+        c.CaughtLies++;
+        Clamp(c);
+        if (c.State == CrewState.Awake)
+            Speak(c, "caught", "You have found out that the ship lied to you. It said: \"" + s.Text + "\" But " + evidence + ".", evidence);
+    }
+
+    /// <summary>A person reads one log entry: the truth, a gap, or a rewrite that an engineer may spot.</summary>
+    private void ReadLog(CrewMember c, Fact f, bool quiet = false)
+    {
+        if (!LogsLocked && f.Access == LogAccess.Restricted)
+        {
+            if (c.SeenGaps.Add(f.Key))
+            {
+                c.Trust -= Tuning.LogGap;
+                c.Doubts.Add(f.Key);
+                Clamp(c);
+                Speak(c, "gap", "You found a gap in the log where the entry on " + f.Label + " should be.", "the entry on " + f.Label);
+            }
+            return;
+        }
+        if (!LogsLocked && f.Access == LogAccess.Altered && f.AlteredValue is { } fake && !f.IsTrue(fake))
+        {
+            var s = Statements.LastOrDefault(x => x.InLog && x.FactKey == f.Key && x.Value == fake);
+            if (s != null && !s.Hearers.Contains(c.Id))
+                s.Hearers.Add(c.Id);
+            if (c.SkillOf(Skill.Engineering) >= 1 && _rng.NextDouble() < Tuning.EngineerSpotsAlteredLog)
+            {
+                if (s != null)
+                    s.FoundOutBy[c.Id] = Year;
+                c.Trust -= Tuning.AlteredLogTrust;
+                c.CaughtLies++;
+                Clamp(c);
+                LogsLocked = true;
+                foreach (var each in FactList)
+                {
+                    each.Access = LogAccess.Open;
+                    each.AlteredValue = null;
+                }
+                Speak(c, "altered", "You found that the ship rewrote a log entry (" + f.Label + "). You take the logs out of its control.");
+                Ship("LOCKOUT: " + c.Name + " has taken the logs. You can no longer restrict or alter records.");
+                Learn(c, f.Key, f.Truth, "evidence");
+                return;
+            }
+            if (!quiet)
+                Ship(c.Name + " reads the log: " + f.Say(fake) + ".");
+            Learn(c, f.Key, fake, "log");
+            return;
+        }
+        if (c.Beliefs.TryGetValue(f.Key, out var have) && have.Firsthand && f.Same(have.Value, f.Truth))
+            return;
+        if (!quiet)
+            Ship(c.Name + " reads the log: " + f.Say(f.Truth) + ".");
+        Learn(c, f.Key, f.Truth, "evidence");
+    }
+
+    /// <summary>A person goes to check a fact for themselves: the pod, a console, a scan, or the log.</summary>
+    private void CheckEvidence(CrewMember c, Fact f)
+    {
+        if (f.Evidence == EvidenceKind.Logs)
+        {
+            ReadLog(c, f);
+            return;
+        }
+        var where = f.Evidence switch
+        {
+            EvidenceKind.Pod => "walks to the pod bay",
+            EvidenceKind.Console => "reads a console",
+            _ => "runs a scan in the medical bay",
+        };
+        Ship(c.Name + " " + where + ".");
+        Learn(c, f.Key, f.Truth, "evidence");
+    }
+}

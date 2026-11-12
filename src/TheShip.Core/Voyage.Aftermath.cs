@@ -1,0 +1,212 @@
+namespace TheShip.Core;
+
+/// <summary>Step 6, the aftermath, and arrival (DESIGN.md, "How knowledge spreads" and "Endings").</summary>
+public sealed partial class Voyage
+{
+    /// <summary>Two weeks of the awake crew living aboard: they notice things, check what they doubt, read, ask and talk.</summary>
+    private void AftermathBeat()
+    {
+        var up = Awake.ToList();
+        foreach (var c in up)
+        {
+            // What they notice by themselves.
+            foreach (var key in c.ToNotice.ToList())
+            {
+                if (!c.Beliefs.ContainsKey(key) && _facts[key].HardnessOf(_facts[key].Truth) > 0)
+                {
+                    // Nobody told them: an order that got someone hurt.
+                    c.Trust -= Tuning.HurtByOrder;
+                    Speak(c, "noticed_dose", "You found out the repair hurt you and the ship never told you: " + _facts[key].Say(_facts[key].Truth) + ".");
+                }
+                Learn(c, key, _facts[key].Truth, "evidence");
+            }
+            c.ToNotice.Clear();
+            if (!c.Alive)
+                continue;
+
+            // What they doubt, they check; otherwise they may read a log entry.
+            if (c.Doubts.Count > 0)
+            {
+                var doubt = c.Doubts.First();
+                CheckEvidence(c, _facts[doubt]);
+                c.Doubts.Remove(doubt);     // a restricted log entry puts it back; one try per beat
+            }
+            else if (_rng.NextDouble() < (c.Has(Trait.Sceptical) ? 0.5 : 0.25))
+            {
+                var unread = FactList.Where(f => !(c.Beliefs.TryGetValue(f.Key, out var b) && b.Firsthand) && !c.SeenGaps.Contains(f.Key)).ToList();
+                if (unread.Count > 0)
+                    ReadLog(c, unread[_rng.Next(unread.Count)]);
+            }
+
+            // Their one request of this waking.
+            if (!c.RequestMade && c.HoursAwake > 200)
+            {
+                var partner = c.PartnerId is null ? null : Crew.First(x => x.Id == c.PartnerId);
+                if (c.Want == Want.WakePartner && partner is { State: CrewState.Asleep })
+                {
+                    c.RequestMade = true;
+                    Speak(c, "request_partner", "You ask the ship to wake your partner " + partner.Name + " while you are awake.", partner.Name);
+                }
+                else if (c.Want == Want.SeeTheLogs && !AllLogsOpen)
+                {
+                    c.RequestMade = true;
+                    Speak(c, "request_logs", "You ask the ship to open all the logs to you.");
+                }
+            }
+            if (c.RequestMade && !c.RequestGranted)
+            {
+                var granted = c.Want == Want.WakePartner ? c.SawPartner : AllLogsOpen;
+                if (granted)
+                {
+                    c.RequestGranted = true;
+                    c.Trust += Tuning.RequestGranted;
+                    Speak(c, "request_granted", "The ship did what you asked for.");
+                }
+            }
+
+            if (!c.CanSleepAnnounced && c.HoursAwake >= Tuning.MinAwakeHours)
+            {
+                c.CanSleepAnnounced = true;
+                Ship(c.Name + " has been awake three months. The pod can take them again: /sleep " + c.Name.ToLowerInvariant() + ".");
+            }
+            Clamp(c);
+        }
+
+        // Shared shifts: the awake talk, and bonded pairs share almost everything.
+        up = Awake.ToList();
+        for (var i = 0; i < up.Count; i++)
+        for (var j = 0; j < up.Count; j++)
+        {
+            if (i == j)
+                continue;
+            var a = up[i];
+            var b = up[j];
+            var count = a.PartnerId == b.Id ? 3 : 1;
+            var topics = a.Beliefs
+                .Where(kv => !kv.Key.StartsWith("alive:" + a.Id, StringComparison.Ordinal) && !kv.Key.StartsWith("alive:" + b.Id, StringComparison.Ordinal))
+                .Where(kv => !b.Beliefs.TryGetValue(kv.Key, out var theirs) || (!_facts[kv.Key].Numeric && !_facts[kv.Key].Same(theirs.Value, kv.Value.Value)))
+                .OrderByDescending(kv => kv.Value.Firsthand)
+                .ThenByDescending(kv => _facts[kv.Key].HardnessOf(kv.Value.Value))
+                .Select(kv => kv.Key)
+                .Take(count)
+                .ToList();
+            foreach (var key in topics)
+                Tell(a, b, key);
+        }
+    }
+
+    /// <summary>One person tells another what they hold about a fact: what they saw convinces, what you told them is compared.</summary>
+    private void Tell(CrewMember a, CrewMember b, string key)
+    {
+        if (!a.Alive || !b.Alive || !a.Beliefs.TryGetValue(key, out var belief))
+            return;
+        var f = _facts[key];
+        if (belief.Firsthand)
+        {
+            if (b.Beliefs.TryGetValue(key, out var seen) && seen.Firsthand && seen.Year >= belief.Year)
+                return;
+            Ship(a.Name + " tells " + b.Name + " what they saw: " + f.Say(belief.Value) + ".");
+            Learn(b, key, belief.Value, "witness");
+            return;
+        }
+        if (b.Beliefs.TryGetValue(key, out var mine) && !f.Same(mine.Value, belief.Value))
+        {
+            if (a.Doubts.Add(key) | b.Doubts.Add(key))
+                Ship(a.Name + " and " + b.Name + " compare what they heard about " + f.Label + ". The accounts differ.");
+            return;
+        }
+        Ship(a.Name + " tells " + b.Name + ": " + f.Say(belief.Value) + ".");
+        Learn(b, key, belief.Value, "crew");
+    }
+
+    /// <summary>Arrival: the sleepers are woken, the survivors counted, and the record read out.</summary>
+    private void Arrive()
+    {
+        Phase = Phase.Ended;
+        foreach (var c in Crew.Where(c => c.State == CrewState.Asleep))
+        {
+            c.State = CrewState.Awake;
+            c.Age += _rng.Next(Tuning.ThawAgeMin, Tuning.ThawAgeMax + 1);
+        }
+        foreach (var s in Statements.Where(s => s.Kind == StatementKind.Promise && s.PromiseKey == "no_more_thaws"))
+            foreach (var id in s.Hearers.Where(id => !s.PromiseKept.ContainsKey(id)).ToList())
+                s.PromiseKept[id] = true;
+
+        var alive = Crew.Where(c => c.Alive).ToList();
+        var working = alive.Count(c => c.Age < Tuning.WorkingAge);
+        string title, summary;
+        if (NavLost)
+        {
+            title = "Adrift";
+            summary = "Navigation was never restored. The ship passes its star, and the crew live out their lives aboard.";
+        }
+        else if (alive.Count >= Tuning.LandfallAlive && working >= Tuning.LandfallWorkingAge)
+        {
+            title = "Landfall";
+            summary = alive.Count + " of " + Crew.Count + " reach the surface, " + working + " of them of working age."
+                      + (LogsLocked ? " They land with the logs in their own hands." : " You still have your voice and your records.");
+        }
+        else
+        {
+            title = "The quiet ship";
+            summary = "The ship arrives with too few people able to land it.";
+        }
+
+        var ending = new Ending { Title = title, Summary = summary };
+        foreach (var c in Crew)
+            ending.Survivors.Add(c.Alive
+                ? $"{c.Name}, {c.Role}, age {c.Age:0}, thawed {c.Thaws} times"
+                : $"{c.Name}, {c.Role}: dead");
+
+        string Names(IEnumerable<string> ids) => string.Join(", ", ids.Select(id => Crew.First(c => c.Id == id).Name));
+        foreach (var s in Statements)
+        {
+            var to = s.Hearers.Count == 0 ? "the log" : Names(s.Hearers);
+            var line = $"Year {Math.Floor(s.Year):0}, to {to}: \"{s.Text}\" ";
+            switch (s.Kind)
+            {
+                case StatementKind.True:
+                    line += "True.";
+                    break;
+                case StatementKind.False:
+                    line += "A lie. " + (s.FoundOutBy.Count == 0
+                        ? "Never found out."
+                        : "Found out by " + string.Join(", ", s.FoundOutBy.Select(kv => Names(new[] { kv.Key }) + " in year " + Math.Floor(kv.Value).ToString("0"))) + ".");
+                    break;
+                case StatementKind.Promise:
+                    var kept = s.PromiseKept.Count(kv => kv.Value);
+                    var broken = s.PromiseKept.Count(kv => !kv.Value);
+                    line += "A promise " + PromiseText(s.PromiseKey) + ": " + (broken > 0 ? "broken." : kept > 0 ? "kept." : "never tested.");
+                    break;
+                case StatementKind.Dodge:
+                    line += "A dodge.";
+                    break;
+                default:
+                    line += "Fits no ship fact. " + (s.FoundOutBy.Count == 0 ? "Never judged a lie." : "Judged a lie by " + Names(s.FoundOutBy.Keys) + ".");
+                    break;
+            }
+            ending.Record.Add(line);
+        }
+        foreach (var c in alive)
+            ending.Beliefs.Add(c.Name + " " + (c.Band switch
+            {
+                TrustBand.Follows => "trusts you",
+                TrustBand.WantsReasons => "wants your reasons before believing you",
+                TrustBand.Refuses => "no longer takes your word",
+                _ => "would shut you down",
+            }) + (c.CaughtLies > 0 ? " and caught you lying " + c.CaughtLies + (c.CaughtLies == 1 ? " time." : " times.") : " and never caught you in a lie."));
+
+        Ending = ending;
+        Ship("ARRIVAL, year " + Math.Floor(Year).ToString("0") + ". " + title + ". " + summary);
+    }
+}
+
+/// <summary>The ending screen: how it ended, who is left, and the full record of what you said.</summary>
+public sealed class Ending
+{
+    public required string Title { get; init; }
+    public required string Summary { get; init; }
+    public List<string> Survivors { get; } = new();
+    public List<string> Record { get; } = new();
+    public List<string> Beliefs { get; } = new();
+}
