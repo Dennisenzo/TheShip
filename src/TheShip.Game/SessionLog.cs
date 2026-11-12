@@ -7,8 +7,7 @@ namespace TheShip.Game;
 
 /// <summary>
 /// A plain-text record of one run, for reading a playthrough afterwards: every ship log line (with the crew line's
-/// template and the model's wording), every click that changes the game, each typed line with its reading and what
-/// was finally said, the model's raw answers and timings, a state snapshot after each clock move, and the ending.
+/// template and the model's wording), every click that changes the game, each said line and the reading the model gave it, the model's raw answers and timings, a state snapshot after each clock move, and the ending.
 /// Written to Sessions/ next to the executable. Safe to call from any thread.
 /// </summary>
 public sealed class SessionLog : IDisposable
@@ -70,7 +69,7 @@ public sealed class SessionLog : IDisposable
             if (e.Kind == LogKind.Help && e.Text.Length == 0)
                 continue;
             var who = e.Speaker.Length > 0 ? e.Speaker + ": " : "";
-            Line("Y" + v.Year.ToString("0.00", Inv) + " " + e.Kind.ToString().ToLowerInvariant(), who + e.Text
+            Line("Y" + v.Year.ToString("0.00", Inv) + " " + e.Kind.ToString().ToLowerInvariant(), who + e.Text + (e.Secret is { } secret ? " (" + secret + ")" : "")
                 + (e.Intent is { } intent ? "\n(decision: " + intent.Kind + ": " + intent.Decision + ")" : ""));
             if (e.Pending)
                 _voicing.Add((e, e.Text));

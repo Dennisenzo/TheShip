@@ -170,4 +170,25 @@ public class CrewVoiceTests
         mara.Beliefs["alive:idris"] = new Belief("alive", "ship", 6);
         Assert.Contains("Idris is your partner", Prompts.CrewSystem(mara, v));
     }
+
+    [Xunit.FactAttribute]
+    public void A_line_said_at_once_carries_its_hearers_from_the_moment_it_is_typed()
+    {
+        var v = new Voyage(1);
+        var lin = v.Find("lin")!;
+        var mara = v.Find("mara")!;
+        v.Wake(lin);
+        v.Go();
+        // Typed to Lin and Mara while Mara is still in her pod: the entry is in the log at once and only Lin heard it.
+        var entry = v.BeginSay("The pumps are holding.", [lin, mara]);
+        Assert.True(entry.Unread);
+        Assert.Equal(["lin"], entry.Hearers);
+        var intent = new CrewIntent("comply", "You agree to take on the coolant leak.");
+        Assert.Contains("The ship: The pumps are holding.", Prompts.CrewUser(intent, lin, v));
+        Assert.DoesNotContain("The pumps are holding", Prompts.CrewUser(intent, mara, v));
+        // The reading arrives: the same entry, no second YOU line.
+        v.Say("The pumps are holding.", new Reading(LineKind.Plain), [lin, mara], entry);
+        Assert.False(entry.Unread);
+        Assert.Same(entry, Assert.Single(v.Log, e => e.Kind == LogKind.You));
+    }
 }

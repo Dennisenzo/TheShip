@@ -8,8 +8,10 @@ public sealed partial class Voyage
     /// the statement record, beliefs, trust and morale. There is no taking it back: the reading is settled before
     /// this is called (DESIGN.md, "Reading").
     /// </summary>
-    public void Say(string text, Reading reading, IReadOnlyList<CrewMember> hearers)
+    public void Say(string text, Reading reading, IReadOnlyList<CrewMember> hearers, LogEntry? entry = null)
     {
+        if (entry is not null)
+            entry.Unread = false;
         if (Phase == Phase.Ended)
             return;
         var listeners = hearers.Where(h => h.State == CrewState.Awake).ToList();
@@ -18,10 +20,26 @@ public sealed partial class Voyage
             Ship("Nobody is awake to hear you.");
             return;
         }
-        Log.Add(new LogEntry(LogKind.You, "YOU", text) { Hearers = listeners.Select(l => l.Id).ToList() });
+        if (entry is null)
+            Log.Add(new LogEntry(LogKind.You, "YOU", text) { Hearers = listeners.Select(l => l.Id).ToList() });
         Apply(text, reading, listeners);
         foreach (var l in listeners)
             Clamp(l);
+    }
+
+    /// <summary>
+    /// The player pressed Enter: the line is in the log at once, marked unread, and nobody reacts yet. Those of
+    /// <paramref name="hearers"/> who are awake now heard it (the entry carries them, so only their crew prompts see the line).
+    /// Pass the entry to <see cref="Say"/> when the model's reading arrives.
+    /// </summary>
+    public LogEntry BeginSay(string text, IReadOnlyList<CrewMember> hearers)
+    {
+        var entry = new LogEntry(LogKind.You, "YOU", text)
+        {
+            Unread = true, Hearers = hearers.Where(h => h.State == CrewState.Awake).Select(h => h.Id).ToList(),
+        };
+        Log.Add(entry);
+        return entry;
     }
 
     private Statement NewStatement(string text, StatementKind kind, List<string> hearers, string? promiseKey = null) => new()
@@ -55,7 +73,7 @@ public sealed partial class Voyage
                     FactKey = f.Key, Value = value, TruthThen = f.Truth, Hearers = ids,
                 };
                 Statements.Add(s);
-                Recorded("Recorded: you told " + names + " that " + f.Say(value) + ". (" + (truth ? "true" : "false") + ")");
+                Recorded("Recorded: you told " + names + " that " + f.Say(value) + ".", truth ? "true" : "false");
                 foreach (var l in listeners)
                     Hear(l, f, value, truth, s);
                 break;

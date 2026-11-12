@@ -280,6 +280,10 @@ public sealed class LogEntry
     public IReadOnlyList<string>? Hearers { get; init; }
     /// <summary>The model is still wording this line; show a placeholder until it is done.</summary>
     public bool Pending { get; set; }
+    /// <summary>A line you said that the model has not read yet: it is in the log, its effects come when the reading arrives.</summary>
+    public bool Unread { get; set; }
+    /// <summary>What the player is never shown (whether a recorded statement was true); the session log appends it.</summary>
+    public string? Secret { get; init; }
 }
 
 public enum Phase { Alert, Aftermath, Ended }
