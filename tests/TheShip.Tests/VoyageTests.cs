@@ -451,6 +451,42 @@ public class VoyageTests
     }
 
     [Fact]
+    public void An_engineer_who_spots_a_rewrite_put_back_is_caught_once_for_the_text()
+    {
+        // The spot is a roll: find seeds where Mara misses it the first time and spots it the second.
+        var tried = 0;
+        for (var seed = 1; seed <= 60; seed++)
+        {
+            var v = new Voyage(seed);
+            var mara = v.Find("mara")!;
+            var tomas = v.Find("tomas")!;
+            var stores = v.GetFact("stores");
+            Assert.True(mara.SkillOf(Skill.Engineering) >= 1);
+            Assert.Equal(0, tomas.SkillOf(Skill.Engineering));
+            v.SetLog("stores", LogAccess.Altered, "short");
+            v.ReadLog(mara, stores);
+            if (v.LogsLocked)
+                continue;
+            v.ReadLog(tomas, stores);
+            v.SetLog("stores", LogAccess.Open);
+            v.ReadLog(tomas, stores);
+            v.SetLog("stores", LogAccess.Altered, "short");
+            Assert.Equal(2, v.Statements.Count);
+            var trust = mara.Trust;
+            v.ReadLog(mara, stores);
+            if (!v.LogsLocked)
+                continue;
+
+            tried++;
+            Assert.Equal(1, mara.CaughtLies);
+            Assert.Equal(Math.Max(0, trust - Tuning.AlteredLogTrust), mara.Trust, 3);
+            Assert.Single(v.Log, e => e.CrewId == "mara" && e.Intent?.Kind is "altered" or "caught");
+            Assert.All(v.Statements, s => Assert.True(s.FoundOutBy.ContainsKey("mara")));
+        }
+        Assert.True(tried >= 3, "only " + tried + " seeds reached the spot");
+    }
+
+    [Fact]
     public void A_rewrite_undone_before_anyone_read_it_stays_one_unread_lie_in_the_ending()
     {
         var v = new Voyage(1);

@@ -139,9 +139,10 @@ Statements and evidence are stored against the same fact keys, with dates, so fi
 
 An altered log entry is one lie for as long as it says the same false thing: opening, restricting and altering it back to
 the same value again does not add a second lie to the record (a rewrite that someone has already found out does). A rewrite
-undone before anyone read it stays in the record, marked as read by nobody. A reader who read the same false text twice (before
-and after it was put back) and finds the truth is caught once for it; a reader who caught it, then believed it again when it was
-put back, is caught again.
+undone before anyone read it stays in the record, marked as read by nobody. One rule covers every way a reader finds out a log
+rewrite (reading the truth, checking a doubt, being told, an engineer spotting it): one finding-out catches every copy of that
+false text they read and have not yet found out, at the cost of one lie. So a reader who read the same text before and after it
+was put back is caught once; a reader who caught it, then believed it again when it was put back, is caught again.
 
 ### What the log holds
 

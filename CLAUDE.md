@@ -131,6 +131,9 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   statements caught in the same finding-out; a reader who caught a rewrite, believed it again when it was put back and finds out
   again is caught again (trust, CaughtLies, crew line). The early-sleep offer has its own flag (`EarlySleepAnnounced`), reset when
   the offer lapses, so the three-month line still comes (and stops the advance) after the stores last again. 2 regression tests.
+  Follow-up: one rule for every path into a log finding-out (`Voyage.FindOutLogText`, used by `DiscoverLie` and the engineer's
+  spot): it marks every unfound copy of that text the reader read, so an engineer spotting a rewrite put back is no longer also
+  charged for the older copy. 1 regression test (seed loop over the 0.6 spot roll).
 
 - 2026-11-12: balance harness (`tests/TheShip.Tests/BalanceBots.cs`, `BalanceTests.cs`, `[Trait("Category","Balance")]`): honest, careless and liar bots play whole voyages over seeds 1..200 through the public `Voyage` API and print a table (Landfall rate, endings, deaths, causes, ages, trust, lies) to the test output and `balance-report.txt`. Run: `dotnet test --filter Category=Balance` (about 5 s). Measures only; the 25-75% honest Landfall target test is skipped until tuning. Builds; passes.
 
