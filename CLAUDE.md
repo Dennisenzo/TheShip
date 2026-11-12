@@ -116,6 +116,12 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   per click (a reader is caught once); nobody reads log entries about alerts that haven't happened or about their own life;
   a log entry that changed since someone read it is unread again; "the spare parts are gone" at 0 parts; the ending lists
   the whole crew ("crew:" in the session log), with an unread log rewrite marked "Nobody read it.".
+- 2026-11-12: stores follow-ups (fix/stores-followups). Shorter wakings: when the stores can't feed everyone awake through a person's
+  three months (empty, or too low), the minimum is waived and they can be asked to sleep early (`Voyage.CanSleepNow`, the SLEEP button,
+  a SHIP line in the aftermath); the Wake click warns when the stores are empty or too low for a full waking. Before, every waking
+  onto empty stores was fatal (60 hungry days < 90-day minimum). A reader who read the same false log text twice (a rewrite put back
+  after someone else found it out) is caught once, not twice. Repair work is credited to a worker only until they starve. The
+  refusal warning says when the hungry days fall short of the 60 that kill, and names who starves. 5 regression tests.
 
 ### Built
 
@@ -147,7 +153,9 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
 
 - Up to three people awake; alert 4 (the signal) has no fault and can be drifted past with nobody woken.
 - Losing the navigation fault ends the run as "Adrift" (no arrival slip of years).
-- Stores run out as hunger only, no shorter wakings: once they are empty, whoever is awake dies after `Tuning.StarveDays` (60 days).
+- Shorter wakings are all or nothing: the three-month minimum is waived as soon as the stores can't feed everyone up through a
+  person's remaining three months (`Voyage.CanSleepNow`); there is no rationing. Once the stores are empty, whoever stays awake dies
+  after `Tuning.StarveDays` (60 days).
 - "Landfall without you" can't happen: the logs are the only lockout.
 - Terminal notes and paper notes are not in. The drift report is complete because no sensors are lost yet.
 - Doors: only locking has an effect. Open and closed look different and behave the same. Nobody reacts to being locked in.

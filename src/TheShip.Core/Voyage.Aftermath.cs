@@ -73,6 +73,11 @@ public sealed partial class Voyage
                 c.CanSleepAnnounced = true;
                 Ship(c.Name + " has been awake three months. The pod can take them again.");
             }
+            else if (!c.CanSleepAnnounced && CanSleepNow(c))
+            {
+                c.CanSleepAnnounced = true;
+                Ship("The stores won't last " + c.Name + " three months awake. The pod can take them back early.");
+            }
             Clamp(c);
         }
 

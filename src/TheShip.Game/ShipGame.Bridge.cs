@@ -486,7 +486,7 @@ public sealed partial class ShipGame
             }
             else if (c.State == CrewState.Awake)
             {
-                var can = c.HoursAwake >= Tuning.MinAwakeHours;
+                var can = v.CanSleepNow(c);
                 var days = N(Math.Ceiling((Tuning.MinAwakeHours - c.HoursAwake) / 24));
                 if (_p.Button(act, can ? "SLEEP" : "in " + days + " d", can && !ended))
                     Act("ask " + person.Name + " to sleep", () => v.AskSleep(person));

@@ -1,4 +1,3 @@
-
 namespace TheShip.Core;
 
 /// <summary>The player's direct controls and the clock (DESIGN.md, "Direct control" and "The eight steps").</summary>
@@ -23,7 +22,31 @@ public sealed partial class Voyage
         c.State = CrewState.Thawing;
         c.ThawDoneAt = Clock + Tuning.ThawHours;
         Ship("Thaw started for " + c.Name + ". Six hours. Advance the clock.");
+        if (Stores <= 0)
+            Ship(FormattableString.Invariant($"The stores are empty: {c.Name} goes hungry from the start, and {Tuning.StarveDays:0} days without food kills. ")
+                 + "The pod can take " + c.Name + " back early.");
+        else if (StoresTooLowFor(c))
+        {
+            var mouths = Crew.Count(x => x.State is CrewState.Awake or CrewState.Thawing);
+            Ship(FormattableString.Invariant($"The stores ({Stores:0} person-days) feed the {mouths} awake about {Stores / mouths:0} days, short of a three-month waking. ")
+                 + "The pod can take " + c.Name + " back early.");
+        }
     }
+
+    /// <summary>
+    /// Whether the stores run out before this person has been awake three months, with everyone who is up now eating.
+    /// Then the three-month minimum is waived: shorter wakings, before hunger (DESIGN.md, "What every decision spends").
+    /// </summary>
+    private bool StoresTooLowFor(CrewMember c)
+    {
+        var mouths = Math.Max(1, Crew.Count(x => x.State is CrewState.Awake or CrewState.Thawing));
+        var left = Tuning.MinAwakeHours - (c.State == CrewState.Awake ? c.HoursAwake : 0);
+        return Stores * 24 / mouths < left;
+    }
+
+    /// <summary>Whether the pod can take this person now: three months awake, or stores too low to last that long.</summary>
+    public bool CanSleepNow(CrewMember c) =>
+        c.State == CrewState.Awake && (c.HoursAwake >= Tuning.MinAwakeHours || StoresTooLowFor(c));
 
     /// <summary>Move the clock to the next thing that happens.</summary>
     public void Go()
@@ -41,9 +64,11 @@ public sealed partial class Voyage
 
     private bool Staffed(Fault f) => Workers(f).Count() >= f.People;
 
-    private double Rate(Fault f)
+    private double Rate(Fault f) => Rate(f, Workers(f));
+
+    private static double Rate(Fault f, IEnumerable<CrewMember> team)
     {
-        var skilled = Workers(f).Any(w => w.SkillOf(f.Skill) >= f.Level);
+        var skilled = team.Any(w => w.SkillOf(f.Skill) >= f.Level);
         return (skilled ? 1 : Tuning.UnskilledRate) * (f.Patching ? Tuning.PatchRate : 1);
     }
 
@@ -106,11 +131,12 @@ public sealed partial class Voyage
     /// <summary>Time passes: the awake age and eat, staffed repairs progress.</summary>
     private void Pass(double hours)
     {
-        foreach (var f in Current.Faults.Where(f => f.State == FaultState.InRepair && Staffed(f)))
-            f.Progress += hours * Rate(f);
         var start = Clock;
         var awake = Awake.ToList();
         var (storesOut, starved) = Eat(awake, hours);
+        // A worker who starves in this span works only until they die.
+        foreach (var f in Current.Faults.Where(f => f.State == FaultState.InRepair && Staffed(f)))
+            f.Progress += Work(f, hours, starved);
         foreach (var c in awake)
         {
             var lived = starved.TryGetValue(c, out var at) ? at : hours;
@@ -120,9 +146,28 @@ public sealed partial class Voyage
         Clock += hours;
         if (storesOut is { } outAt)
             Ship($"The stores ran out in year {Math.Floor((start + outAt) / Tuning.HoursPerYear):0}. Whoever is awake now goes hungry: "
-                 + $"{Tuning.StarveDays:0} days without food kills.");
+                 + $"{Tuning.StarveDays:0} days without food kills. The pods can take them back early.");
         foreach (var (c, at) in starved.OrderBy(kv => kv.Value))
             Kill(c, $"starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}");
+    }
+
+    /// <summary>
+    /// Hours of progress a staffed repair makes in <paramref name="hours"/>, counting each worker only until they die
+    /// (<paramref name="died"/>: hours from now). The work stops when the team falls short of the people it needs.
+    /// </summary>
+    private double Work(Fault f, double hours, IReadOnlyDictionary<CrewMember, double> died)
+    {
+        var done = 0.0;
+        var from = 0.0;
+        foreach (var to in died.Values.Where(t => t < hours).Append(hours).Distinct().Order())
+        {
+            var team = Workers(f).Where(w => !died.TryGetValue(w, out var at) || at > from).ToList();
+            if (team.Count < f.People)
+                break;
+            done += (to - from) * Rate(f, team);
+            from = to;
+        }
+        return done;
     }
 
     /// <summary>
@@ -397,7 +442,7 @@ public sealed partial class Voyage
             Ship(c.Name + " is not awake.");
             return;
         }
-        if (c.HoursAwake < Tuning.MinAwakeHours)
+        if (!CanSleepNow(c))
         {
             Ship("The pod can't take " + c.Name + " yet: " + Hours(Tuning.MinAwakeHours - c.HoursAwake) + " to go.");
             return;
@@ -438,12 +483,23 @@ public sealed partial class Voyage
         var last = AlertIndex >= Alerts.Count - 1;
         var target = last ? Scenario.ArrivalYear : Alerts[AlertIndex + 1].Year;
         var years = Math.Max(0, target - Year);
-        var names = up.Count == 1 ? up[0].Name : string.Join(", ", up.Take(up.Count - 1).Select(c => c.Name)) + " and " + up[^1].Name;
+        static string And(IReadOnlyList<CrewMember> people) => people.Count == 1
+            ? people[0].Name
+            : string.Join(", ", people.Take(people.Count - 1).Select(c => c.Name)) + " and " + people[^1].Name;
+        var names = And(up);
         var lasts = Stores / up.Count / 365;
         var one = up.Count == 1;
-        var outlook = lasts >= years
-            ? "last that long."
-            : FormattableString.Invariant($"last about {lasts:0.#} years, then {Tuning.StarveDays:0} days without food kills.");
+        // The same sums as the drift's Eat: who goes hungry for how long, and who dies of it before the drift ends.
+        var hungryHours = years * Tuning.HoursPerYear - Stores * 24 / up.Count;
+        var starve = up.Where(c => hungryHours >= Tuning.StarveDays * 24 - c.HoursHungry).ToList();
+        string outlook;
+        if (hungryHours <= 0)
+            outlook = "last that long.";
+        else if (starve.Count == 0)
+            outlook = FormattableString.Invariant($"last about {lasts:0.#} years. The last {Math.Max(1, Math.Round(hungryHours / 24)):0} days go hungry, short of the {Tuning.StarveDays:0} that kill.");
+        else
+            outlook = FormattableString.Invariant($"last about {lasts:0.#} years, then {Tuning.StarveDays:0} days without food kills: ")
+                      + And(starve) + (starve.Count == 1 ? " starves" : " starve") + " before the drift ends.";
         Ship(FormattableString.Invariant($"If you drift now, {names} {(one ? "stays" : "stay")} awake through it and {(one ? "eats" : "eat")} the stores. ")
              + FormattableString.Invariant($"The drift to year {target} is {years:0.#} years; the stores ({Stores:0} person-days) ") + outlook);
     }
