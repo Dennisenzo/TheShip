@@ -155,8 +155,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
 
     private void Start(ILlmProvider llm, string note)
     {
-        _voyage = new Voyage(_options.Seed);
-        _session = new SessionLog("seed " + _options.Seed + ", model " + llm.Name + " on " + llm.Backend);
+        _voyage = new Voyage(_options.Seed, Variation.Draw(_options.Seed));
+        _session = new SessionLog("seed " + _options.Seed + ", variation " + _voyage.Variation + ", model " + llm.Name + " on " + llm.Backend);
         llm.CallCompleted += s => _session.Line("llm", s.Kind + ": " + s.PromptTokens + " prompt tokens, " + s.GeneratedTokens
                                                        + " generated, first token " + s.FirstToken.TotalSeconds.ToString("0.00") + " s, total "
                                                        + s.Total.TotalSeconds.ToString("0.00") + " s" + (s.TrimmedTurns > 0 ? ", trimmed " + s.TrimmedTurns : ""));

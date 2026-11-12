@@ -214,6 +214,10 @@ public sealed class Fault
     public string Section { get; set; } = "";
     /// <summary>The fact about the harm the repair does to whoever does it.</summary>
     public string? DangerFact { get; init; }
+    /// <summary>Ignoring it ends or cripples the voyage (coolant: power and pods; navigation: the course); a pod or controller fault only wears the ship.</summary>
+    public bool Critical { get; init; }
+    /// <summary>The crew member the fault is about (the person in a failed pod, a sick patient), if any.</summary>
+    public string? SubjectId { get; set; }
 
     public FaultState State { get; set; } = FaultState.Open;
     public double Progress { get; set; }
@@ -235,14 +239,14 @@ public sealed class Fault
     public Fault Again(string id, string name) => new()
     {
         Id = id, Kind = Kind, Name = Prefix + Plain(name).ToLowerInvariant(), Skill = Skill, Level = Level, People = People, Hours = Hours,
-        ClockHours = ClockHours / 2, IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact, Section = Section
+        ClockHours = ClockHours / 2, IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact, Section = Section, Critical = Critical, SubjectId = SubjectId
     };
 }
 
 public sealed class Alert
 {
     public required int Number { get; init; }
-    public required int Year { get; init; }
+    public required int Year { get; set; }
     public required string Title { get; init; }
     public required string Report { get; init; }
     public List<Fault> Faults { get; init; } = new();

@@ -42,15 +42,20 @@ public sealed partial class Voyage
     /// <summary>A person saw evidence for a fact (for judging free-text statements against it).</summary>
     public event Action<CrewMember, Fact, string>? EvidenceMet;
 
-    public Voyage(int seed)
+    public Variation Variation { get; }
+
+    public Voyage(int seed) : this(seed, Variation.Classic) { }
+
+    public Voyage(int seed, Variation variation)
     {
+        Variation = variation;
         _rng = new Random(seed);
-        var crew = Scenario.Crew();
+        var crew = Scenario.Crew(variation);
         Crew = crew;
         var facts = Scenario.Facts(crew);
         FactList = facts;
         _facts = facts.ToDictionary(f => f.Key);
-        Alerts = Scenario.Alerts();
+        Alerts = Scenario.Alerts(variation);
 
         Log.Add(new LogEntry(LogKind.Ship, "SHIP", "Departure. Six people in cold sleep, sixty years to arrival. You have a voice, doors, lights and logs. You have no hands."));
         var years = Alerts[0].Year;
@@ -197,7 +202,8 @@ public sealed partial class Voyage
         if (alert.Number == 2)
         {
             // Scripted: the death in sleep takes someone with a partner aboard if it can.
-            var victim = Crew.Where(c => c.State == CrewState.Asleep).OrderByDescending(c => c.PartnerId != null && c.Id == "idris").ThenBy(c => c.Id).FirstOrDefault();
+            var victim = Crew.FirstOrDefault(c => c.State == CrewState.Asleep && c.Id == Variation.Alert2Victim)
+                         ?? Crew.Where(c => c.State == CrewState.Asleep).OrderBy(c => c.Id).FirstOrDefault();
             if (victim != null)
             {
                 Kill(victim, "died in sleep when the pod failed");
@@ -207,6 +213,7 @@ public sealed partial class Voyage
                 {
                     f.ExposureFact = "alive:" + victim.Id;
                     f.Section = ShipPlan.Pod(victim.Id).Bank;
+                    f.SubjectId = victim.Id;
                 }
             }
         }

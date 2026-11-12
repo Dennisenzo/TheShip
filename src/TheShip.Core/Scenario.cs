@@ -8,7 +8,7 @@ public static class Scenario
 {
     public const int ArrivalYear = 60;
 
-    public static List<CrewMember> Crew() => new()
+    public static List<CrewMember> Crew(Variation? variation = null) => new()
     {
         Person("mara", "Mara", "engineer", 34, 58, Want.WakePartner, "idris",
             new[] { Trait.Steady, Trait.Sceptical }, (Skill.Engineering, 3), (Skill.Navigation, 1)),
@@ -147,7 +147,16 @@ public static class Scenario
         Hardness = new() { [bad] = hardness }, Evidence = evidence,
     };
 
-    public static List<Alert> Alerts() => new()
+    public static List<Alert> Alerts(Variation? variation = null)
+    {
+        var jitter = (variation ?? Variation.Classic).YearJitter;
+        var alerts = BaseAlerts();
+        for (var i = 0; i < alerts.Count; i++)
+            alerts[i].Year += jitter[i];
+        return alerts;
+    }
+
+    private static List<Alert> BaseAlerts() => new()
     {
         new Alert
         {
@@ -158,7 +167,7 @@ public static class Scenario
                 new Fault
                 {
                     Id = "coolant", Kind = "coolant", Name = "Coolant leak", Skill = Skill.Engineering, Level = 2, Hours = 8, ClockHours = 30,
-                    IfIgnored = "power drops and the pods are at risk", DangerFact = "dose", Section = "coolant",
+                    Critical = true, IfIgnored = "power drops and the pods are at risk", DangerFact = "dose", Section = "coolant",
                 },
             },
         },
@@ -184,7 +193,7 @@ public static class Scenario
                 new Fault
                 {
                     Id = "nav", Kind = "nav", Name = "Navigation drift", Skill = Skill.Navigation, Level = 2, People = 2, Hours = 12, ClockHours = 720,
-                    IfIgnored = "the ship never finds its course again", ExposureFact = "date", Section = "helm",
+                    Critical = true, IfIgnored = "the ship never finds its course again", ExposureFact = "date", Section = "helm",
                 },
             },
         },

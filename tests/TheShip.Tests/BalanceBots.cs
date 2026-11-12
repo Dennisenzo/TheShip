@@ -36,7 +36,7 @@ public sealed class BalanceBot
     /// <summary>The finished voyage itself, for looking at its log.</summary>
     public static Voyage PlayVoyage(int seed, BotKind kind)
     {
-        var v = new Voyage(seed);
+        var v = new Voyage(seed, Variation.Draw(seed));
         new BalanceBot(v, kind).Run();
         return v;
     }
