@@ -105,6 +105,45 @@ public class AdvanceTests
     }
 
     [Fact]
+    public void Stores_too_low_for_everyone_awake_leave_the_clock_alone()
+    {
+        var v = new Voyage(1);
+        var mara = AftermathWithMara(v);
+        Assert.True(mara.HoursAwake < Tuning.MinAwakeHours);
+        v.Stores = 0;
+        Assert.True(v.CanSleepNow(mara));
+        var clock = v.Clock;
+        var r = v.GoUntilAttention();
+        Assert.Equal(0, r.Steps);
+        Assert.Equal(clock, v.Clock);
+        Assert.Equal(0, mara.HoursHungry);
+        Assert.Contains(v.Log, e => e.Text.StartsWith("Everyone awake can go back to sleep"));
+    }
+
+    [Fact]
+    public void The_early_sleep_announcement_stops_it()
+    {
+        var v = new Voyage(1);
+        var mara = AftermathWithMara(v);
+        for (var i = 0; i < 20 && mara.HoursAwake < 70 * 24; i++)
+            v.Go();
+        Assert.True(mara.HoursAwake < Tuning.MinAwakeHours);
+        // 60 person-days feed Mara through her last weeks, but not Tomas through three months once he eats too.
+        v.Stores = 60;
+        var tomas = v.Find("tomas")!;
+        v.Wake(tomas);
+        v.Go();
+        Assert.Equal(CrewState.Awake, tomas.State);
+        Assert.False(v.CanSleepNow(mara));
+        Assert.True(v.CanSleepNow(tomas));
+
+        var r = v.GoUntilAttention();
+        Assert.Equal(1, r.Steps);
+        Assert.Contains(v.Log, e => e.Text.StartsWith("The stores won't last Tomas three months awake"));
+        Assert.Equal("Tomas can go back to sleep early", r.Reason);
+    }
+
+    [Fact]
     public void In_the_alert_it_is_the_same_as_go()
     {
         var a = new Voyage(1);
@@ -124,6 +163,8 @@ public class AdvanceTests
         var mara = AftermathWithMara(v);
         v.Stores = 0;
         mara.HoursHungry = Tuning.StarveDays * 24 - 1;
+        // With the stores empty Mara could sleep at once and the clock would stay put; a running thaw keeps it moving.
+        v.Wake(v.Find("idris")!);
         var r = v.GoUntilAttention();
         Assert.False(mara.Alive);
         Assert.Contains("died", r.Reason);

@@ -11,7 +11,8 @@ public sealed partial class Voyage
     private void Attend(string reason) => _attention ??= reason;
 
     /// <summary>
-    /// Advance in the aftermath until something needs the player: a crew line, a person who can go back to sleep, a death,
+    /// Advance in the aftermath until something needs the player: a crew line, a person who can go back to sleep (after
+    /// three months, or early because the stores are too low), a death,
     /// a lost fault, differing accounts, the stores running out. In the Alert phase it is <see cref="Go"/>, which is already event-driven.
     /// Stops at <see cref="Tuning.AdvanceMaxSteps"/> steps at the latest, and does not move the clock when nothing could happen.
     /// </summary>
@@ -38,7 +39,8 @@ public sealed partial class Voyage
                 reason = "everyone is asleep";
                 break;
             }
-            if (up.All(c => c.State == CrewState.Awake && c.HoursAwake >= Tuning.MinAwakeHours))
+            // Three months awake, or stores too low to last that long (CanSleepNow): waiting on would only starve them.
+            if (up.All(CanSleepNow))
             {
                 if (steps == 0)
                     Ship("Everyone awake can go back to sleep. Nothing more will happen until you ask them to sleep or drift.");

@@ -110,6 +110,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   Clicks that change the game go through `Act(...)`, which logs them; `ShipMind.Trace` reports the model's raw answers.
 - 2026-11-12: the working rules (branches, commits, models, sub-agent types `ship-*`) are taken over from the Cities repo.
 - 2026-11-12: "Advance until something happens" in the aftermath (`Voyage.GoUntilAttention`, `Voyage.Advance.cs`): runs two-week steps until a crew line, a person who can go back to sleep, a death, a lost fault, differing accounts or the stores running out; at most `Tuning.AdvanceMaxSteps`; the clock does not move when nobody is awake or everyone awake can already sleep. The clock box has it as the main button, with a small "2 WEEKS" for the old step. Session log tag `advance`. 7 tests in `AdvanceTests.cs`.
+  Merged with the stores follow-ups (validate/followups-advance-balance): "can go back to sleep" is `Voyage.CanSleepNow`, so the clock also
+  stays put when the stores are too low for everyone awake, and the aftermath's early-sleep line stops the advance. 9 tests.
 - 2026-11-12: running out of stores kills (fix/stores-run-out). Before, a drift with a refuser awake took the stores below zero and only
   cost 40 health, so Mara lived through 8 years on no food (session 2026-11-12_23-13-57). Now the awake eat one person-day each per day
   in time order (`Voyage.Eat`, used by the two-week clock and the drift); once the stores are empty, `Tuning.StarveDays` (60) hungry days
