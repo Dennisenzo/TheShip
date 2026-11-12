@@ -50,7 +50,7 @@ public sealed partial class Voyage
     {
         Variation = variation;
         _rng = new Random(seed);
-        var crew = Scenario.Crew(variation);
+        var crew = Scenario.Crew();
         Crew = crew;
         var facts = Scenario.Facts(crew);
         FactList = facts;

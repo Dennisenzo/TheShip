@@ -34,6 +34,8 @@ public sealed class CrewMember
     public required Trait[] Traits { get; init; }
     public required Want Want { get; init; }
     public string? PartnerId { get; init; }
+    /// <summary>"he" or "she": who a crew line's pronoun can mean (<see cref="RuleReader.PersonClaims"/>). Null matches either.</summary>
+    public string? Pronoun { get; init; }
     /// <summary>How this person talks and who they are; null for a crew member made without one (tests).</summary>
     public CrewSheet? Sheet { get; init; }
 

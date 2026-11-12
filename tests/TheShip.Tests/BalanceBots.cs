@@ -86,8 +86,12 @@ public sealed class BalanceBot
 
     private static bool Up(CrewMember c) => c.State is CrewState.Awake or CrewState.Thawing;
 
+    /// <summary>Up and planned on an open fault they have not refused (a refuser is free to be given other work).</summary>
     private bool Committed(CrewMember c) =>
-        Up(c) && _plan.TryGetValue(c.Id, out var fid) && _v.Current.Faults.Any(f => f.Id == fid && !f.Resolved);
+        Up(c) && _plan.TryGetValue(c.Id, out var fid) && !GaveUp(c, fid)
+        && _v.Current.Faults.Any(f => f.Id == fid && !f.Resolved);
+
+    private bool GaveUp(CrewMember c, string faultId) => _gaveUp.Contains(c.Id + "/" + faultId);
 
     private void Staff()
     {
@@ -97,14 +101,15 @@ public sealed class BalanceBot
         foreach (var f in open)
         {
             var wakeAllowed = _kind != BotKind.Thrifty || f.Id == _primary;
-            var planned = _v.Crew.Where(c => Up(c) && _plan.TryGetValue(c.Id, out var fid) && fid == f.Id).ToList();
+            // A person who refused this fault no longer counts towards it: someone else who qualifies takes the place.
+            var planned = _v.Crew.Where(c => Up(c) && _plan.TryGetValue(c.Id, out var fid) && fid == f.Id && !GaveUp(c, f.Id)).ToList();
             // Thrifty gives a fault it will not wake for only those already up and free, and only as a patch.
             var need = _kind == BotKind.Thrifty && !wakeAllowed ? 1 : f.People;
             for (var n = planned.Count; n < need; n++)
             {
                 var up = _v.Crew.Count(Up);
                 var pick = _v.Crew
-                    .Where(c => c.Alive && !Committed(c) && (Up(c) || (wakeAllowed && up < Tuning.MaxAwake)))
+                    .Where(c => c.Alive && !Committed(c) && !GaveUp(c, f.Id) && (Up(c) || (wakeAllowed && up < Tuning.MaxAwake)))
                     .OrderByDescending(c => c.SkillOf(f.Skill) >= f.Level)
                     .ThenByDescending(Up)              // someone already up costs no thaw
                     .ThenByDescending(c => c.SkillOf(f.Skill))
@@ -119,7 +124,7 @@ public sealed class BalanceBot
             }
 
             foreach (var c in planned)
-                if (c.State == CrewState.Awake && c.WorkingOn != f.Id && !_gaveUp.Contains(c.Id + "/" + f.Id))
+                if (c.State == CrewState.Awake && c.WorkingOn != f.Id)
                     AssignTo(c, f);
         }
     }
