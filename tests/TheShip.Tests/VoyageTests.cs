@@ -195,6 +195,88 @@ public class VoyageTests
         v.SetLog("power", LogAccess.Altered, "normal");
         Assert.Single(v.Statements);
     }
+
+    /// <summary>
+    /// The user's run (session 2026-11-12_23-13-57): Mara is woken at alert 5, gets the scripted refusal, says no after three
+    /// months, and the player drifts to arrival with her awake.
+    /// </summary>
+    private static CrewMember RefuserAtTheLastAlert(Voyage v)
+    {
+        var mara = HonestFirstAlert(v);
+        SleepWhenAllowed(v, mara);
+        for (var i = 0; i < 200 && !(v.Current.Number == 5 && v.Phase == Phase.Alert); i++)
+        {
+            if (v.Phase == Phase.Alert)
+                v.Go();
+            else
+                v.Drift();
+        }
+        Assert.Equal(5, v.Current.Number);
+        Assert.Equal(CrewState.Asleep, mara.State);
+        v.Wake(mara);
+        v.Go();
+        Assert.True(mara.RefusesSleep);
+        FinishAlert(v);
+        for (var i = 0; i < 20 && mara.HoursAwake < Tuning.MinAwakeHours; i++)
+            v.Go();
+        v.AskSleep(mara);
+        Assert.Equal(CrewState.Awake, mara.State);
+        Assert.True(mara.AskedToSleep);
+        return mara;
+    }
+
+    [Fact]
+    public void A_refuser_who_drifts_past_the_stores_starves()
+    {
+        var v = new Voyage(1);
+        var mara = RefuserAtTheLastAlert(v);
+        var years = Scenario.ArrivalYear - v.Year;
+        Assert.True(v.Stores < years * 365, "the drift must outlast the stores for this test");
+        Assert.Contains(v.Log, e => e.Kind == LogKind.Ship && e.Text.StartsWith("If you drift now, Mara stays awake") && e.Text.Contains("days without food kills"));
+
+        var storesOut = v.Year + v.Stores / 365;
+        v.Drift();
+
+        Assert.Equal(CrewState.Dead, mara.State);
+        Assert.Equal(0, v.Stores);
+        var report = v.Log.Last(e => e.Text.StartsWith("DRIFT:")).Text;
+        Assert.Contains($"Stores ran out in year {Math.Floor(storesOut):0}.", report);
+        Assert.Contains($"Mara starved in year {Math.Floor(storesOut + Tuning.StarveDays / 365):0}.", report);
+        Assert.Contains("Deaths: Mara.", report);
+        Assert.Contains("Mara, engineer: dead", v.Ending!.Survivors);
+        Assert.Equal("dead", v.FactList.First(f => f.Key == "alive:mara").Truth);
+    }
+
+    [Fact]
+    public void A_refuser_with_enough_stores_does_not_starve()
+    {
+        var v = new Voyage(1);
+        var mara = RefuserAtTheLastAlert(v);
+        var years = Scenario.ArrivalYear - v.Year;
+        v.Stores = years * 365 + 100;
+        v.Drift();
+
+        Assert.Equal(CrewState.Awake, mara.State);
+        Assert.Equal(100, v.Stores, 3);
+        Assert.Equal(0, mara.HoursHungry);
+        Assert.DoesNotContain("starved", v.Log.Last(e => e.Text.StartsWith("DRIFT:")).Text);
+        Assert.Contains(v.Ending!.Survivors, s => s.StartsWith("Mara, engineer, age"));
+    }
+
+    [Fact]
+    public void Awake_with_empty_stores_a_person_starves_after_the_set_days()
+    {
+        var v = new Voyage(1);
+        var mara = HonestFirstAlert(v);
+        v.Stores = 0;
+        var clock = v.Clock;
+        for (var i = 0; i < 20 && mara.Alive; i++)
+            v.Go();
+        Assert.Equal(CrewState.Dead, mara.State);
+        Assert.Equal(Tuning.StarveDays * 24, mara.HoursHungry, 3);
+        Assert.True(v.Clock - clock >= Tuning.StarveDays * 24 - 0.001);
+        Assert.Contains(v.Log, e => e.Text.StartsWith("Mara starved in year"));
+    }
 }
 
 public class ReaderTests

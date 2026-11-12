@@ -38,6 +38,8 @@ public sealed class CrewMember
     /// <summary>Ship clock (hours) at which the thaw finishes.</summary>
     public double ThawDoneAt { get; set; }
     public double HoursAwake { get; set; }
+    /// <summary>Hours spent awake with the stores empty; <see cref="Tuning.StarveDays"/> of them kill.</summary>
+    public double HoursHungry { get; set; }
     public int Thaws { get; set; }
     public int CaughtLies { get; set; }
     /// <summary>Trust earned by a hard truth; it arrives at the next drift ("raises trust later").</summary>

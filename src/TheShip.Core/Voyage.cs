@@ -29,7 +29,7 @@ public sealed partial class Voyage
     /// <summary>Ship clock in hours since departure.</summary>
     public double Clock { get; private set; }
     public double Year => Clock / Tuning.HoursPerYear;
-    public double Stores { get; private set; } = Tuning.StartStores;
+    public double Stores { get; internal set; } = Tuning.StartStores;
     public int Parts { get; private set; } = Tuning.StartParts;
     public int PodWear { get; private set; }
     public bool PowerLow { get; private set; }
@@ -160,14 +160,15 @@ public sealed partial class Voyage
         _facts["stores"].Truth = Stores < Tuning.StoresShortAt ? "short" : "enough";
     }
 
-    private void Kill(CrewMember c, string how)
+    private void Kill(CrewMember c, string how, bool quiet = false)
     {
         if (!c.Alive)
             return;
         c.State = CrewState.Dead;
         c.WorkingOn = null;
         _facts["alive:" + c.Id].Truth = "dead";
-        Ship(c.Name + " " + how + ".");
+        if (!quiet)
+            Ship(c.Name + " " + how + ".");
     }
 
     private void StartAlert()
