@@ -127,7 +127,7 @@ public sealed class ShipMind : IDisposable
             return;
         var c = _voyage.Crew.First(x => x.Id == entry.CrewId);
         var system = Prompts.CrewSystem(c, _voyage);
-        var user = Prompts.CrewUser(entry.Intent);
+        var user = Prompts.CrewUser(entry.Intent, c, _voyage, entry);
         var beliefs = new Dictionary<string, Belief>(c.Beliefs);
         entry.Pending = true;
         _ = VoiceAsync(entry, system, user, beliefs, entry.Intent.Decision);
@@ -172,7 +172,7 @@ public sealed class ShipMind : IDisposable
     /// </summary>
     internal bool Acceptable(string text, IReadOnlyDictionary<string, Belief> beliefs, string decision)
     {
-        if (string.IsNullOrWhiteSpace(text) || text == "..." || text.Length > 320)
+        if (string.IsNullOrWhiteSpace(text) || text == "..." || text.Length > Prompts.CrewLineMaxChars)
             return false;
         var stated = string.Join(" ", SentenceEnd.Split(text).Where(s => !s.TrimEnd().EndsWith('?')));
         foreach (var (fact, value) in RuleReader.Claims(stated, _voyage.FactList))

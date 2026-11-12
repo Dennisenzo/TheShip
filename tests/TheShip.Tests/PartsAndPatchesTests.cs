@@ -236,6 +236,25 @@ public class PartsAndPatchesTests
     }
 
     [Fact]
+    public void A_failed_repair_after_another_took_the_last_part_does_not_claim_to_have_used_it()
+    {
+        for (var seed = 1; seed <= 1000; seed++)
+        {
+            var (v, _, fault) = RepairUnderWay(seed);
+            SetParts(v, 0);
+            for (var i = 0; i < 50 && fault.State == FaultState.InRepair; i++)
+                v.Go();
+            var stop = v.Log.Last(e => e.Intent?.Kind == "work_no_parts");
+            if (!stop.Intent!.Decision.Contains("failed"))
+                continue;
+            Assert.DoesNotContain("used up", stop.Intent.Decision);
+            Assert.Contains("no spare parts are left", stop.Intent.Decision);
+            return;
+        }
+        Assert.Fail("no seed in 1..1000 had a failed repair");
+    }
+
+    [Fact]
     public void A_repair_whose_part_was_used_elsewhere_does_not_finish()
     {
         var (v, mara, fault) = RepairUnderWay(1);
