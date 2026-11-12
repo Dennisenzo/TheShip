@@ -34,7 +34,7 @@ The player acts in steps 2 to 7. Steps 1 and 8 belong to the game.
 4. **Brief.** They come round and ask questions before they work. You answer, dodge or lie in your own words.
 5. **Work.** The game resolves the repair in stages. Between stages you can talk, open doors and release information. Complications arrive here.
 6. **Aftermath.** With the fault fixed, the awake crew eat, talk, walk the ship and read what they can reach. They make requests. This lasts until each person has been awake three months, the minimum before a pod can take them again.
-7. **Sleep.** Once a person has been awake three months, you ask them to go back under. They may refuse, bargain or leave a note first.
+7. **Sleep.** Once a person has been awake three months, you ask them to go back under. They may refuse, bargain or leave a note first. When the stores can't feed everyone awake through a person's three months, the minimum is waived and the pod takes them back early (a shorter waking); waking someone onto stores that low is warned about at the wake.
 8. **Drift.** The clock jumps 5 to 40 years. Stores, wear, ages and deaths update. You get a short report of what your working sensors recorded; sections you have lost show as silence.
 
 ### Three time scales

@@ -170,12 +170,19 @@ public sealed partial class Voyage
             return;
 
         var caught = false;
-        foreach (var s in Statements.Where(s => s.Kind == StatementKind.False && s.FactKey == key && s.Value != null
-                                                && s.Hearers.Contains(c.Id) && !s.FoundOutBy.ContainsKey(c.Id)
-                                                && !f.Same(s.Value, value)).ToList())
+        var heard = Statements.Where(s => s.Kind == StatementKind.False && s.FactKey == key && s.Value != null
+                                          && s.Hearers.Contains(c.Id) && !f.Same(s.Value, value)).ToList();
+        foreach (var s in heard.Where(s => !s.FoundOutBy.ContainsKey(c.Id)).ToList())
         {
-            DiscoverLie(s, c);
             caught = true;
+            // A log rewrite put back after someone found it out is a new statement, but to a reader who read the same
+            // false text before it is the same lie: they are caught once per text.
+            if (s.InLog && heard.Any(o => o != s && o.InLog && o.FoundOutBy.ContainsKey(c.Id) && f.Same(o.Value!, s.Value!)))
+            {
+                s.FoundOutBy[c.Id] = Year;
+                continue;
+            }
+            DiscoverLie(s, c);
         }
         if (!caught && doubted && old is { Source: "ship" } && !news)
         {
