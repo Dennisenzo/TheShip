@@ -25,6 +25,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     private readonly List<string> _history = new();
     /// <summary>What a click asked for; run at the start of the next update, never in the middle of a draw.</summary>
     private readonly List<Action> _actions = new();
+    private readonly Sounds _sounds = new();
     private int _historyAt;
     private int _scroll;
     private KeyboardState _prevKeys;
@@ -97,6 +98,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     protected override void LoadContent()
     {
         _batch = new SpriteBatch(GraphicsDevice);
+        _sounds.Load();
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
         _fonts = new FontSystem();
@@ -170,7 +172,11 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     private void Note(string text) => _voyage?.Log.Add(new LogEntry(LogKind.Help, "", text));
 
     /// <summary>Queue what a click asked for.</summary>
-    private void Do(Action action) => _actions.Add(action);
+    private void Do(Action action)
+    {
+        _sounds.Click(); // every button, card, door and tab queues its click here
+        _actions.Add(action);
+    }
 
     /// <summary>Queue a click that changes the game, and record it in the session log (with the state after a clock move).</summary>
     private void Act(string what, Action action, bool snapshot = false) => Do(() =>

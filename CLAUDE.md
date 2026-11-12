@@ -140,6 +140,7 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
     the reading picker, the crew cards (Wake, Sleep, File; click a card to speak to one person) and "Waiting on you".
   - `ShipGame.Screens.cs`: the crew dossier (sheet, what they know, what you told them) and the record with the ship log entries (Open, Restrict, Alter).
   - The model loads in the background; without one the window says what is missing.
+  - `Sounds.cs`: a short click made in code (35 ms sine tick, `ClickVolume` there), played from `Do(...)` so every button, card, door and tab has it; silent without an audio device.
 - **Tests** (`tests/TheShip.Tests`): the loop, the lie lookup, the reader, the grammar, `ShipMind`'s parsing and the warm-up. All pass (2026-11-12).
 
 ### Differences from DESIGN.md to settle
