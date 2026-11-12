@@ -223,7 +223,7 @@ public sealed class Fault
     public required double ClockHours { get; init; }
     public required string IfIgnored { get; init; }
     /// <summary>The fact the people fixing it learn while they work.</summary>
-    public string? ExposureFact { get; init; }
+    public string? ExposureFact { get; set; }
     /// <summary>The fact about the harm the repair does to whoever does it.</summary>
     public string? DangerFact { get; init; }
 

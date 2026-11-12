@@ -98,6 +98,9 @@ public static class Scenario
                 4, EvidenceKind.Logs),
         };
 
+        // The coolant bay is hot from the start: the repair always gives a dose.
+        facts.First(f => f.Key == "dose").Truth = "dosed";
+
         foreach (var c in crew)
         {
             facts.Add(new Fact

@@ -42,7 +42,7 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 
 ### Status
 
-- 2026-11-12: repository scaffolded (solution, projects, font, design copy). Written in a cloud session with no .NET SDK:
+- 2026-11-12: repository scaffolded and the prototype written (Core, AI, Game, tests) in a cloud session with no .NET SDK:
   **nothing has been compiled or run yet.** The first job in a session that has `dotnet` is `dotnet build TheShip.slnx`,
   then `dotnet test`, and fixing whatever they report.
 - 2026-11-12: DESIGN.md gained a "Run variation" section under "Gameplay variations" (what the seed varies per run).
@@ -51,8 +51,40 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 
 ### Built
 
-(nothing yet)
+All of it written on 2026-11-12 and **not yet compiled or run** (see Status). Expect compile errors on the first build.
+
+- **Core** (`src/TheShip.Core`): `Voyage` and its partial files hold the whole loop.
+  - `Scenario.cs`: the Short haul content. 6 crew, 20 facts, 5 scripted alerts (coolant leak, death in sleep, navigation drift,
+    signal from Earth, pod controller fault with a refusal to sleep), arrival in year 60.
+  - `Voyage.Commands.cs`: wake (6 h thaw, 3 to 5 years of ageing, pod wear), `/go` clock, repair and patch with compliance by trust band,
+    fault clocks and consequences, the three-month minimum waking, sleep and refusal, log open/restrict/alter, drift (1 year of ageing per 10 asleep).
+  - `Voyage.Talk.cs`: the statement record; a lie caught at once, later by evidence, or doubted (doubt score); hard truths (morale now, trust at the next drift);
+    promises; dodges; correcting a wrong reading (`Reread`); the logs lockout after an engineer spots a rewritten entry.
+  - `Voyage.Aftermath.cs`: two-week beats (noticing, checking doubts, reading logs, requests, crew telling each other), arrival and the ending record.
+  - `RuleReader.cs`: the keyword reader used with no model. `Lines.cs`: the templated crew lines. `Tuning.cs`: every number.
+- **AI** (`src/TheShip.AI`), ported from Cities: `ILlmProvider`, `LocalLlm` (LLamaSharp 0.30.0, Vulkan or CPU, Gemma 4 / Qwen3 chat handling, reply cleanup),
+  `LlmWorker` + `MainThreadQueue`, `Gbnf`/`Grammars`, `LlmJson`, `ScriptedLlm`.
+  `ShipMind` does the model's jobs: words each crew line from the game's decision (rejects a line that states what the speaker doesn't know, once, then keeps the template),
+  reads a player line with a grammar into the six kinds (falls back to `RuleReader`), and judges free-text statements yes/no against evidence.
+- **Game** (`src/TheShip.Game`): MonoGame DesktopGL window, FontStashSharp text. Status column (numbers shown), transcript, input line.
+  Controls are typed: `/help` lists them. The model loads in the background; without one the game runs on templates.
+- **Tests** (`tests/TheShip.Tests`): the loop, the lie lookup, the reader, the grammar and `ShipMind`'s parsing. Never run.
+
+### Differences from DESIGN.md to settle
+
+- Up to three people awake; alert 4 (the signal) has no fault and can be drifted past with nobody woken.
+- Losing the navigation fault ends the run as "Adrift" (no arrival slip of years).
+- "Landfall without you" can't happen: the logs are the only lockout.
+- Terminal notes and paper notes are not in. The drift report is complete because no sensors are lost yet.
+- Not ported from Cities' LLM stack: the separate model host process, CUDA backend, reply prefix cache, VRAM budget, session log.
 
 ### Not built yet
 
-Everything the design lists outside the prototype scope.
+Everything the design lists outside the prototype scope: the ship schematic, doors, lights, power routing, cameras and microphones,
+factions, children, the other events and faults, the other lockouts and endings, modes, mission types, modifiers, run variation, voice input.
+
+### Next steps
+
+1. `dotnet build TheShip.slnx` and fix what it reports; then `dotnet test`.
+2. Play a `--no-llm` run end to end, then one with a model; tune `Tuning.cs` towards "one honest run in two reaches Landfall".
+3. Run the three playthroughs of the prototype's pass test (DESIGN.md, "Prototype scope").

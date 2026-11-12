@@ -179,6 +179,9 @@ public sealed partial class Voyage
             {
                 Kill(victim, "died in sleep when the pod failed");
                 report = "A pod has failed. " + victim.Name + " is dead. The pod has to be cleared and the bank resealed.";
+                // Whoever clears the pod sees who was in it.
+                foreach (var f in alert.Faults.Where(f => f.Kind == "pod"))
+                    f.ExposureFact = "alive:" + victim.Id;
             }
         }
         if (alert.Number == 4)

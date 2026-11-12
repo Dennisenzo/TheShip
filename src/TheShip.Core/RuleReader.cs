@@ -44,7 +44,11 @@ public static class RuleReader
         {
             var fact = voyage.GetFact(asked!);
             var value = ValueIn(line, fact);
-            if (value != null)
+            if (value is null)
+                continue;
+            // Unless the line is plainly about something else ("Asha is dead" when they asked about Idris).
+            var elsewhere = voyage.FactList.Any(o => o != fact && o.Cues.Any(line.Contains) && ValueIn(line, o) != null);
+            if (fact.Cues.Any(line.Contains) || !elsewhere)
                 return new Reading(LineKind.Statement, fact.Key, value);
         }
         foreach (var fact in voyage.FactList)
