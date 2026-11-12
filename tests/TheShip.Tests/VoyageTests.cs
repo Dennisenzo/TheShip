@@ -6,21 +6,21 @@ namespace TheShip.Tests;
 
 public class VoyageTests
 {
-    private static void Say(Voyage v, CrewMember to, string text)
+    internal static void Say(Voyage v, CrewMember to, string text)
     {
         var hearers = new List<CrewMember> { to };
         v.Say(text, RuleReader.Read(text, v, hearers), hearers);
     }
 
     /// <summary>Runs the clock until the alert is over (a failed repair is simply done again).</summary>
-    private static void FinishAlert(Voyage v)
+    internal static void FinishAlert(Voyage v)
     {
         for (var i = 0; i < 50 && v.Phase == Phase.Alert; i++)
             v.Go();
         Assert.Equal(Phase.Aftermath, v.Phase);
     }
 
-    private static void SleepWhenAllowed(Voyage v, CrewMember c)
+    internal static void SleepWhenAllowed(Voyage v, CrewMember c)
     {
         for (var i = 0; i < 20 && c.HoursAwake < Tuning.MinAwakeHours; i++)
             v.Go();
@@ -29,7 +29,7 @@ public class VoyageTests
     }
 
     /// <summary>Alert 1 played honestly with Mara: she is told Idris is alive and that the repair gives a dose.</summary>
-    private static CrewMember HonestFirstAlert(Voyage v)
+    internal static CrewMember HonestFirstAlert(Voyage v)
     {
         var mara = v.Find("mara")!;
         v.Wake(mara);
@@ -135,7 +135,8 @@ public class VoyageTests
         Assert.Empty(lie.FoundOutBy);
         var trust = mara.Trust;
 
-        v.Assign(mara, v.FindFault("")!, patch: false);
+        // Patched, so the work finishes whatever the parts: a failed repair on the last part now stops it.
+        v.Assign(mara, v.FindFault("")!, patch: true);
         FinishAlert(v);
         Assert.True(lie.FoundOutBy.ContainsKey("mara"));
         Assert.True(mara.Trust <= trust - Tuning.LieTrust);
@@ -200,7 +201,7 @@ public class VoyageTests
     /// The user's run (session 2026-11-12_23-13-57): Mara is woken at alert 5, gets the scripted refusal, says no after three
     /// months, and the player drifts to arrival with her awake.
     /// </summary>
-    private static CrewMember RefuserAtTheLastAlert(Voyage v)
+    internal static CrewMember RefuserAtTheLastAlert(Voyage v)
     {
         var mara = HonestFirstAlert(v);
         SleepWhenAllowed(v, mara);
