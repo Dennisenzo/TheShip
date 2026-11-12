@@ -15,7 +15,6 @@ public sealed class ShipMind : IDisposable
     private readonly LlmWorker _worker;
     private readonly MainThreadQueue _main;
     private readonly HashSet<string> _judged = new();
-    private Task _sayChain = Task.CompletedTask;
 
     public ShipMind(Voyage voyage, ILlmProvider llm, MainThreadQueue main)
     {
@@ -36,68 +35,158 @@ public sealed class ShipMind : IDisposable
 
     /// <summary>
     /// Raised on the game thread when a said line has been read and applied: the text, the reading that was applied
-    /// (plain talk when the model's answer could not be used), and whether it could not be used.
+    /// (plain talk when the model's answer could not be used or did not come in time), and whether it could not be used.
     /// </summary>
     public event Action<string, Reading, bool>? LineRead;
+
+    /// <summary>Raised on the game thread, before <see cref="LineRead"/>, when <see cref="Voyage.Say"/> dropped a line: nobody who heard it is awake, or the voyage had ended.</summary>
+    public event Action<string>? LineDropped;
+
+    /// <summary>The default for <see cref="ReadTimeout"/>.</summary>
+    public static readonly TimeSpan DefaultReadTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// How long a said line waits for its reading before it is applied as plain talk, so a hanging model never holds
+    /// the player's clicks for long. Taken when the line is typed.
+    /// </summary>
+    public TimeSpan ReadTimeout { get; set; } = DefaultReadTimeout;
+
+    /// <summary>
+    /// One thing waiting its turn on the game thread: a said line until its reading is applied, or a click that changes
+    /// the game, held until every line typed before it has been applied.
+    /// </summary>
+    private sealed class Step
+    {
+        public Action? Action;
+        public LogEntry? Entry;
+        public string Text = "";
+        public List<CrewMember> Hearers = new();
+        public bool Ready;
+        public Reading? Reading;
+    }
+
+    /// <summary>Lines and held clicks in the order they came; touched on the game thread only.</summary>
+    private readonly Queue<Step> _steps = new();
+
+    /// <summary>Whether a said line is still being read (game thread): clicks that change the game wait for it.</summary>
+    public bool Holding => _steps.Count > 0;
+
+    /// <summary>The prompt of one reading, built on the game thread from the state when the line was typed.</summary>
+    private sealed record ReadPrompt(string Text, string System, string User, LlmOptions Options);
 
     /// <summary>
     /// The player pressed Enter (game thread). The line is in the log at once and cannot be taken back; the model
     /// reads it right after and the reading is applied with <see cref="Voyage.Say"/> as soon as it arrives. Lines are
-    /// read and applied one after the other, in the order they were typed. An unusable reading is applied as plain talk.
+    /// applied one after the other, in the order they were typed. An unusable reading, or one that takes longer than
+    /// <see cref="ReadTimeout"/>, is applied as plain talk. The read prompt is built here, from the state at Enter
+    /// (who hears it, the question they asked), and nothing changes that state before the line is applied: clicks that
+    /// change the game go through <see cref="AfterReading"/>.
     /// </summary>
     public void SayAtOnce(string text, IReadOnlyList<CrewMember> hearers)
     {
-        var entry = _voyage.BeginSay(text, hearers);
-        var previous = _sayChain;
-        _sayChain = ReadAndSay(previous, entry, text, hearers);
+        var heard = hearers.ToList();
+        var entry = _voyage.BeginSay(text, heard);
+        var prompt = BuildReadPrompt(text, heard);
+        var step = new Step { Entry = entry, Text = text, Hearers = heard };
+        _steps.Enqueue(step);
+        _ = ReadStep(step, prompt);
+        _ = ExpireStep(step, ReadTimeout);
     }
 
-    private async Task ReadAndSay(Task previous, LogEntry entry, string text, IReadOnlyList<CrewMember> hearers)
+    /// <summary>
+    /// A click that changes the game (game thread): it runs now when no said line is waiting for its reading, otherwise
+    /// right after the lines typed before it have been applied, in click order. A line counts at the moment it was said.
+    /// </summary>
+    public void AfterReading(Action action)
     {
-        try { await previous; } catch (Exception) { /* an earlier line failed; this one still goes */ }
-        Reading? reading = null;
-        try
+        if (_steps.Count == 0)
+            action();
+        else
+            _steps.Enqueue(new Step { Action = action });
+    }
+
+    private async Task ReadStep(Step step, ReadPrompt prompt)
+    {
+        var raw = await Ask(prompt);
+        _main.Post(() =>
         {
-            reading = await Read(text, hearers);
-        }
-        catch (Exception e)
-        {
-            Trace?.Invoke("read failed: " + e.GetType().Name + ": " + e.Message);
-        }
-        await _main.Run(() =>
-        {
-            var applied = reading ?? Reading.Plain;
-            _voyage.Say(text, applied, hearers, entry);
-            LineRead?.Invoke(text, applied, reading is null);
+            if (step.Ready)
+                return; // timed out: already applied as plain talk
+            step.Reading = ParseCounted(raw);
+            step.Ready = true;
+            Pump();
         });
+    }
+
+    private async Task ExpireStep(Step step, TimeSpan timeout)
+    {
+        await Task.Delay(timeout);
+        _main.Post(() =>
+        {
+            if (step.Ready)
+                return;
+            Trace?.Invoke("read \"" + step.Text + "\" timed out after " + timeout.TotalSeconds.ToString("0.#") + " s; applied as plain talk");
+            step.Ready = true;
+            Pump();
+        });
+    }
+
+    /// <summary>Applies the lines whose reading is in and runs the clicks held behind them, in order, up to the first line still being read.</summary>
+    private void Pump()
+    {
+        while (_steps.TryPeek(out var step) && (step.Action is not null || step.Ready))
+        {
+            _steps.Dequeue();
+            if (step.Action is not null)
+            {
+                step.Action();
+                continue;
+            }
+            var applied = step.Reading ?? Reading.Plain;
+            if (!_voyage.Say(step.Text, applied, step.Hearers, step.Entry))
+                LineDropped?.Invoke(step.Text);
+            LineRead?.Invoke(step.Text, applied, step.Reading is null);
+        }
     }
 
     /// <summary>The model's reading of one line; nothing reaches the voyage here. Null when the model's answer could not be used.</summary>
     internal async Task<Reading?> Read(string text, IReadOnlyList<CrewMember> hearers)
     {
-        var system = Prompts.ReadSystem(_voyage);
-        var user = Prompts.ReadUser(text, hearers, _voyage);
-        var options = new LlmOptions("read", MaxTokens: 80, Temperature: 0f,
-            Grammar: Grammars.ReadingFor(_voyage.FactList.Select(f => f.Key)), Dialogue: false);
+        var raw = await Ask(BuildReadPrompt(text, hearers));
+        return await _main.Run(() => ParseCounted(raw));
+    }
+
+    /// <summary>Game thread: the read prompt from the voyage as it is now.</summary>
+    private ReadPrompt BuildReadPrompt(string text, IReadOnlyList<CrewMember> hearers) => new(text,
+        Prompts.ReadSystem(_voyage), Prompts.ReadUser(text, hearers, _voyage),
+        new LlmOptions("read", MaxTokens: 80, Temperature: 0f,
+            Grammar: Grammars.ReadingFor(_voyage.FactList.Select(f => f.Key)), Dialogue: false));
+
+    /// <summary>Asks the model for a reading; touches no voyage state. Empty when the call failed.</summary>
+    private async Task<string> Ask(ReadPrompt prompt)
+    {
         var raw = "";
         try
         {
             raw = await _worker.Enqueue(LlmPriority.Reading,
-                (llm, ct) => llm.ChatAsync(system, new[] { new ChatTurn("user", user) }, options, null, ct));
+                (llm, ct) => llm.ChatAsync(prompt.System, new[] { new ChatTurn("user", prompt.User) }, prompt.Options, null, ct));
         }
         catch (Exception e)
         {
-            // Counted below as an unusable reading.
+            // Counted as an unusable reading when parsed.
             Trace?.Invoke("read failed: " + e.GetType().Name + ": " + e.Message);
         }
-        Trace?.Invoke("read \"" + text + "\" -> " + raw);
-        return await _main.Run(() =>
-        {
-            var reading = Parse(raw);
-            if (reading is null)
-                ReadFailures++;
-            return reading;
-        });
+        Trace?.Invoke("read \"" + prompt.Text + "\" -> " + raw);
+        return raw;
+    }
+
+    /// <summary>Game thread: the reading of a raw answer, counting an unusable one.</summary>
+    private Reading? ParseCounted(string raw)
+    {
+        var reading = Parse(raw);
+        if (reading is null)
+            ReadFailures++;
+        return reading;
     }
 
     /// <summary>

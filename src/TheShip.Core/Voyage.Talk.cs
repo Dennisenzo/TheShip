@@ -6,25 +6,27 @@ public sealed partial class Voyage
     /// <summary>
     /// Step 4 and after: one line from the player, already sorted by the reading pass. The effects are the game's:
     /// the statement record, beliefs, trust and morale. There is no taking it back: the reading is settled before
-    /// this is called (DESIGN.md, "Reading").
+    /// this is called (DESIGN.md, "Reading"). False when the line was dropped: the voyage had ended or nobody who
+    /// heard it is awake.
     /// </summary>
-    public void Say(string text, Reading reading, IReadOnlyList<CrewMember> hearers, LogEntry? entry = null)
+    public bool Say(string text, Reading reading, IReadOnlyList<CrewMember> hearers, LogEntry? entry = null)
     {
         if (entry is not null)
             entry.Unread = false;
         if (Phase == Phase.Ended)
-            return;
+            return false;
         var listeners = hearers.Where(h => h.State == CrewState.Awake).ToList();
         if (listeners.Count == 0)
         {
             Ship("Nobody is awake to hear you.");
-            return;
+            return false;
         }
         if (entry is null)
             Log.Add(new LogEntry(LogKind.You, "YOU", text) { Hearers = listeners.Select(l => l.Id).ToList() });
         Apply(text, reading, listeners);
         foreach (var l in listeners)
             Clamp(l);
+        return true;
     }
 
     /// <summary>
