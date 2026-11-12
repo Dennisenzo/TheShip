@@ -276,6 +276,8 @@ public sealed class LogEntry
     public string Text { get; set; }
     public string? CrewId { get; init; }
     public CrewIntent? Intent { get; init; }
+    /// <summary>For a line the player said: the ids of the crew who heard it (awake when it was said). Null for other lines.</summary>
+    public IReadOnlyList<string>? Hearers { get; init; }
     /// <summary>The model is still wording this line; show a placeholder until it is done.</summary>
     public bool Pending { get; set; }
 }

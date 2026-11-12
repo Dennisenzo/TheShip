@@ -40,17 +40,26 @@ public class CrewVoiceProbe
             ("tomas", "work_done", "You finished the repair of the navigation."),
             ("lin", "caught", "You have found out that the ship lied to you. It said: \"Nobody has been hurt.\" The truth: Idris is dead."),
         };
-        v.Log.Add(new LogEntry(LogKind.You, "YOU", "I need you to take the coolant leak, it will not wait."));
-        var report = new List<string>();
-        foreach (var (id, kind, decision) in cases)
+        // Mara's tone by trust band (Follows, WantsReasons, Refuses): the same decisions at 75, 45 and 20.
+        foreach (var trust in new[] { 75, 45, 20 })
         {
+            cases = cases.Append(("mara@" + trust, "work_failed", "The repair of the coolant leak failed and you have to redo half of it."))
+                .Append(("mara@" + trust, "dodge", "You asked the ship whether Idris is all right and it did not answer."))
+                .Append(("mara@" + trust, "comply", "You agree to take on the coolant leak.")).ToArray();
+        }
+        v.Log.Add(new LogEntry(LogKind.You, "YOU", "I need you to take the coolant leak, it will not wait.") { Hearers = v.Crew.Select(c => c.Id).ToList() });
+        var report = new List<string>();
+        foreach (var (key, kind, decision) in cases)
+        {
+            var id = key.Split('@')[0];
             var c = v.Find(id)!;
+            c.Trust = key.Contains('@') ? double.Parse(key.Split('@')[1]) : Scenario.Crew().First(p => p.Id == id).Trust;
             var intent = new CrewIntent(kind, decision);
             var oldUser = "What happens now: " + decision + "\nSay it in your own words.";
             var o = await llm.ChatAsync(Old(c, v), new[] { new ChatTurn("user", oldUser) }, new LlmOptions("reply"));
             var oldTokens = stats[^1].PromptTokens;
             var n = await llm.ChatAsync(Prompts.CrewSystem(c, v), new[] { new ChatTurn("user", Prompts.CrewUser(intent, c, v)) }, new LlmOptions("reply"));
-            report.Add($"{id}/{kind} [{oldTokens} -> {stats[^1].PromptTokens} tokens, {stats[^1].Total.TotalSeconds:0.00}s]\n  OLD: {o}\n  NEW: {n}");
+            report.Add($"{key}/{kind} [{oldTokens} -> {stats[^1].PromptTokens} tokens, {stats[^1].Total.TotalSeconds:0.00}s]\n  OLD: {o}\n  NEW: {n}");
         }
         File.WriteAllText(Environment.GetEnvironmentVariable("SHIP_PROBE_OUT")!, string.Join("\n", report));
     }

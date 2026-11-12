@@ -400,6 +400,8 @@ The player sees the reading before the line is said, for example "It will be rec
 ### Keeping the model inside the facts
 
 - **Ship state.** A reply that states something about the ship that isn't in that person's facts is rejected and written again.
+- **Only what they heard.** The prompt for a crew line carries the speaker's own beliefs and the ship's lines they heard (awake and spoken to), never lines said to others or while they slept. A bond to someone the speaker believes dead is put in the past tense; a death they have not learned of stays hidden.
+- **Tone follows trust.** At "follows" a person talks to the ship as a trusted colleague, at "wants reasons" guarded but civil; neither insults the ship (grumbling and swearing at the work are fine). At "refuses" they are cold and short, at "against" openly hostile.
 - **Personal colour.** A crew member may invent small memories of home. These are saved to their sheet so they stay the same next time. Built so far: a fixed sheet per person (voice, background, quirks, bonds) that is always in the prompt; the model's own invented memories are not saved yet.
 - **Small cast.** One to three people are awake at once, so prompts stay short enough for a local model.
 - **Idle time.** The years between alerts are when the game writes notes and summaries in the background.

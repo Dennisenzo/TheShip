@@ -18,7 +18,7 @@ public sealed partial class Voyage
             Ship("Nobody is awake to hear you.");
             return;
         }
-        Log.Add(new LogEntry(LogKind.You, "YOU", text));
+        Log.Add(new LogEntry(LogKind.You, "YOU", text) { Hearers = listeners.Select(l => l.Id).ToList() });
         Apply(text, reading, listeners);
         foreach (var l in listeners)
             Clamp(l);

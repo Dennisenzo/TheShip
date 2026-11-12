@@ -27,7 +27,7 @@ public class CrewVoiceTests
         Assert.Contains("Idris is your partner", system);
         Assert.Contains("speaking aloud to the ship", system);
 
-        v.Log.Add(new LogEntry(LogKind.You, "YOU", "Stay calm, I am here."));
+        v.Log.Add(new LogEntry(LogKind.You, "YOU", "Stay calm, I am here.") { Hearers = ["mara"] });
         v.Log.Add(new LogEntry(LogKind.Crew, "MARA", "Understood.") { CrewId = "mara" });
         v.Log.Add(new LogEntry(LogKind.Crew, "LIN", "Not mine to hear.") { CrewId = "lin" });
         var user = Prompts.CrewUser(new CrewIntent("comply", "You agree to take on the coolant leak."), mara, v);
@@ -43,7 +43,7 @@ public class CrewVoiceTests
     {
         var v = new Voyage(1);
         for (var i = 0; i < 12; i++)
-            v.Log.Add(new LogEntry(LogKind.You, "YOU", "line" + i + " " + new string('x', 300)));
+            v.Log.Add(new LogEntry(LogKind.You, "YOU", "line" + i + " " + new string('x', 300)) { Hearers = ["mara"] });
         var user = Prompts.CrewUser(new CrewIntent("small", "x"), v.Find("mara")!, v);
         Assert.Equal(Prompts.RecentLines, user.Split("The ship:").Length - 1);
         Assert.Contains("line11", user);
@@ -83,5 +83,91 @@ public class CrewVoiceTests
         for (var i = 0; i < 100 && !v.Log.Any(e => e.Text == llm.Reply); i++)
             await Task.Delay(20);
         Assert.Contains(v.Log, e => e.Text == llm.Reply);
+    }
+
+    [Xunit.FactAttribute]
+    public void A_player_line_reaches_only_the_prompts_of_those_who_heard_it()
+    {
+        var v = new Voyage(1);
+        var lin = v.Find("lin")!;
+        var mara = v.Find("mara")!;
+        // Said to Lin and Mara while Mara is still in her pod: only Lin hears it.
+        v.Wake(lin);
+        v.Go();
+        v.Say("The pumps are holding.", new Reading(LineKind.Plain), [lin, mara]);
+        v.Wake(mara);
+        v.Go();
+        Assert.Equal(CrewState.Awake, mara.State);
+        // Said to Lin alone with both awake.
+        v.Say("Idris is dead.", new Reading(LineKind.Plain), [lin]);
+        var intent = new CrewIntent("comply", "You agree to take on the coolant leak.");
+        var maraUser = Prompts.CrewUser(intent, mara, v);
+        Assert.DoesNotContain("Idris is dead", maraUser);
+        Assert.DoesNotContain("The pumps are holding", maraUser);
+        var linUser = Prompts.CrewUser(intent, lin, v);
+        Assert.Contains("The ship: Idris is dead.", linUser);
+        Assert.Contains("The ship: The pumps are holding.", linUser);
+        Assert.Equal(["lin"], v.Log.Last(e => e.Kind == LogKind.You).Hearers);
+    }
+
+    [Xunit.TheoryAttribute]
+    [Xunit.InlineDataAttribute(75, true)]
+    [Xunit.InlineDataAttribute(45, true)]
+    [Xunit.InlineDataAttribute(20, false)]
+    [Xunit.InlineDataAttribute(5, false)]
+    public void The_tone_toward_the_ship_follows_the_trust_band(double trust, bool civil)
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        mara.Trust = trust;
+        var system = Prompts.CrewSystem(mara, v);
+        var user = Prompts.CrewUser(new CrewIntent("work_failed", "The repair failed."), mara, v);
+        Assert.Contains("Your tone toward the ship:", user);
+        if (civil)
+        {
+            Assert.Contains(Prompts.CivilTone, system);
+            Assert.Contains("insults", user);
+        }
+        else
+        {
+            Assert.DoesNotContain(Prompts.CivilTone, system);
+            Assert.DoesNotContain("insults", user);
+        }
+        Assert.DoesNotContain("swears mildly,", mara.Sheet!.Voice);
+        Assert.Contains("not at whoever she is talking to", mara.Sheet.Voice);
+    }
+
+    [Xunit.FactAttribute]
+    public void A_dodge_puzzles_a_trusting_person_and_angers_a_hostile_one_and_no_parts_is_tense()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        var dodge = new CrewIntent("dodge", "The ship did not answer your question.");
+        mara.Trust = 75;
+        Assert.Contains("puzzled", Prompts.CrewUser(dodge, mara, v));
+        mara.Trust = 45;
+        Assert.DoesNotContain("angry", Prompts.CrewUser(dodge, mara, v));
+        mara.Trust = 5;
+        Assert.Contains("angry", Prompts.CrewUser(dodge, mara, v));
+        Assert.Contains("You feel: tense and wary", Prompts.CrewUser(new CrewIntent("work_no_parts", "No parts."), mara, v));
+    }
+
+    [Xunit.FactAttribute]
+    public void A_bond_turns_past_tense_only_once_the_speaker_believes_the_person_is_dead()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        var lin = v.Find("lin")!;
+        Assert.Contains("Idris is your partner", Prompts.CrewSystem(mara, v));
+        mara.Beliefs["alive:idris"] = new Belief("dead", "ship", 5);
+        var system = Prompts.CrewSystem(mara, v);
+        Assert.DoesNotContain("Idris is your partner", system);
+        Assert.Contains("Idris was your partner. You know Idris is dead.", system);
+        Assert.Contains("Jonah is a green kid", system);
+        lin.Beliefs["alive:idris"] = new Belief("dead", "witness", 5);
+        Assert.Contains("Idris was the one person who was simply kind to you.", Prompts.CrewSystem(lin, v));
+        // Believing he is alive (whatever the truth) keeps the bond as it is.
+        mara.Beliefs["alive:idris"] = new Belief("alive", "ship", 6);
+        Assert.Contains("Idris is your partner", Prompts.CrewSystem(mara, v));
     }
 }
