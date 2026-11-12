@@ -72,7 +72,7 @@ The player controls information and access, and never controls a person or an ob
 | Logs | Show, restrict or alter any ship record | Restricting is visible as a gap; altering counts as a lie and can be detected by an engineer |
 | Cameras and microphones | Watch and listen to any section you still have | Crew can cover or cut them |
 | Terminal notes | Read, hold back or delete notes crew leave on ship terminals | Paper notes exist too: you can see one being written, never read it |
-| Clock | Advance to the next alert once everyone is asleep or settled | You can't choose what the next alert is |
+| Clock | During an alert, advance to the next event; in the aftermath, advance until something needs you (a crew line, someone who can sleep, a death) or by two weeks; drift to the next alert once everyone is asleep or settled | You can't choose what the next alert is |
 
 ### No control
 
@@ -292,7 +292,7 @@ Arrival is graded on four things: who is alive and how old they are, what they b
 
 | Ending | Condition |
 | --- | --- |
-| Landfall | At least 12 alive, enough of working age, and you still have a voice |
+| Landfall | At least 12 alive, enough of working age, and you still have a voice (Short haul with 6 crew: at least 4 alive and 3 under age 50) |
 | Landfall without you | They arrive after muting you or taking the bay |
 | The quiet ship | The ship arrives with nobody able to land it |
 | Turned back | The Return faction took the helm |
@@ -407,16 +407,17 @@ The player sees the reading before the line is said, for example "It will be rec
 
 ## Prototype and open questions
 
-The first build is the Short haul mode in text only: 6 crew, 60 years, 5 scripted alerts, one sitting.
+The first build is the Short haul mode in text only, smaller than the mode table's 8 crew: 6 crew, 60 years, 5 scripted alerts, one sitting.
 
 ### Prototype scope
 
-- **Alerts, in order:** coolant leak, death in sleep, navigation drift, signal from Earth, refusal to sleep.
+- **Alerts, in order:** coolant leak, death in sleep, navigation drift, signal from Earth, pod controller fault (the person woken for it refuses to go back to sleep).
 - **Facts:** about 20, with knowers and the statement record.
 - **Numbers on screen:** trust and morale are shown, so the rules can be judged.
 - **One lockout:** the logs.
 - **One ending screen:** survivors and the full record of what you said.
-- **Left out:** the ship schematic, cameras, factions, children, signals from ahead, all modes and modifiers, run variation.
+- **Ship plan:** a wireframe schematic with sections, doors (only locking has an effect), coolant and power lines, pods and fault markers.
+- **Left out:** cameras, factions, children, signals from ahead, all modes and modifiers, run variation.
 
 The prototype passes if, across three playthroughs, the player lies at least once without being prompted and calls a discovered lie fair.
 
@@ -428,9 +429,13 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 | How often should an honest run reach Landfall? | One run in two |
 | How much of the years between alerts does the player see? | A short report, limited to working sensors |
 | Should altering a log be allowed? | Yes; it counts as a lie and an engineer can detect it |
+| When does Short haul reach Landfall? | At least 4 of 6 alive and 3 under age 50 (2026-11-12) |
+| How many spare parts does Short haul start with? | 2; a failed repair spends a part too (2026-11-12) |
+| What does a navigation fault still patched at arrival cost? | Arrival slips by years; Adrift only when navigation was never repaired or patched (2026-11-13) |
 
 ### Questions for playtest
 
 - [ ] How often does a small model misread a lie as plain talk? Count the readings the player corrects in each prototype playthrough; a first target is under one in ten.
 - [ ] Are paper notes fun, or only frustrating? The prototype has no notes, so this waits for the first build that has them.
-- [ ] Do 8 to 10 alerts fill 60 to 90 minutes?
+- [ ] Do 8 to 10 alerts fill 60 to 90 minutes? The first prototype run (5 alerts, one fault each) took 8 minutes against Short haul's 30.
+- [ ] What should low trust do before the ending (recruiting, the logs, an ending gate, a voice lockout)? Decided once the balance harness has measured the other balance changes.
