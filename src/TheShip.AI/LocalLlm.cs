@@ -24,7 +24,6 @@ public sealed class LocalLlm : ILlmProvider
     private readonly int _contextSize;
 
     public string Name { get; }
-    public bool IsReal => true;
     public string Backend { get; }
 
     public event Action<LlmCallStats>? CallCompleted;

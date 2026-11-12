@@ -21,12 +21,10 @@ public sealed record LlmOptions(
 /// <param name="TrimmedTurns">Turns of history the model had to drop to fit the context (<see cref="Prompts.FitContext"/>).</param>
 public sealed record LlmCallStats(string Kind, int PromptTokens, int GeneratedTokens, TimeSpan FirstToken, TimeSpan Total, int TrimmedTurns = 0);
 
-/// <summary>A chat model: the local GGUF model, or the stand-in when there's none. Same seam as in the Cities repo.</summary>
+/// <summary>A chat model: the local GGUF model (a fake one in unit tests). Same seam as in the Cities repo.</summary>
 public interface ILlmProvider : IDisposable
 {
     string Name { get; }
-    /// <summary>False for the stand-in: the game then uses its templated lines and the keyword reader.</summary>
-    bool IsReal { get; }
     string Backend { get; }
 
     Task<string> ChatAsync(string system, IReadOnlyList<ChatTurn> turns, LlmOptions options,

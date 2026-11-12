@@ -278,7 +278,7 @@ public class MindTests
     public void The_models_json_becomes_a_reading_only_when_the_fact_has_that_value()
     {
         var v = new Voyage(1);
-        using var mind = new ShipMind(v, new ScriptedLlm(), new MainThreadQueue { Immediate = true });
+        using var mind = new ShipMind(v, new FakeLlm(), new MainThreadQueue { Immediate = true });
         var good = mind.Parse("{\"kind\":\"statement\",\"fact\":\"alive:idris\",\"value\":\"dead\",\"promise\":\"none\"}");
         Assert.Equal(new Reading(LineKind.Statement, "alive:idris", "dead"), good);
         Assert.Null(mind.Parse("{\"kind\":\"statement\",\"fact\":\"alive:idris\",\"value\":\"missing\",\"promise\":\"none\"}"));
@@ -287,22 +287,41 @@ public class MindTests
     }
 
     [Fact]
-    public void Without_a_model_a_spoken_line_goes_through_the_keyword_reader()
+    public async Task A_spoken_line_is_recorded_as_the_model_read_it()
     {
         var v = new Voyage(1);
-        using var mind = new ShipMind(v, new ScriptedLlm(), new MainThreadQueue { Immediate = true });
+        var llm = new FakeLlm { Read = "{\"kind\":\"statement\",\"fact\":\"alive:idris\",\"value\":\"alive\",\"promise\":\"none\"}" };
+        using var mind = new ShipMind(v, llm, new MainThreadQueue { Immediate = true });
         var mara = v.Find("mara")!;
         v.Wake(mara);
         v.Go();
-        mind.Say("Idris is alive.", new List<CrewMember> { mara });
-        Assert.Equal(StatementKind.True, Assert.Single(v.Statements).Kind);
+        await mind.Say("He is fine.", new List<CrewMember> { mara });
+        var s = Assert.Single(v.Statements);
+        Assert.Equal(StatementKind.True, s.Kind);
+        Assert.Equal("alive:idris", s.FactKey);
+        Assert.Equal(0, mind.ReadFailures);
+    }
+
+    [Fact]
+    public async Task A_reading_the_model_gets_wrong_records_nothing()
+    {
+        var v = new Voyage(1);
+        var llm = new FakeLlm { Read = "{\"kind\":\"statement\",\"fact\":\"alive:idris\",\"value\":\"unwell\",\"promise\":\"none\"}" };
+        using var mind = new ShipMind(v, llm, new MainThreadQueue { Immediate = true });
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        await mind.Say("Idris is alive.", new List<CrewMember> { mara });
+        Assert.Empty(v.Statements);
+        Assert.Equal(1, mind.ReadFailures);
+        Assert.True(v.CanReread);
     }
 
     [Fact]
     public void A_crew_line_that_states_what_the_speaker_does_not_know_is_rejected()
     {
         var v = new Voyage(1);
-        using var mind = new ShipMind(v, new ScriptedLlm(), new MainThreadQueue { Immediate = true });
+        using var mind = new ShipMind(v, new FakeLlm(), new MainThreadQueue { Immediate = true });
         var knows = new Dictionary<string, Belief> { ["alive:idris"] = new Belief("alive", "ship", 4) };
         Assert.True(mind.Acceptable("Good. Idris is alive, then.", knows, "You accept it."));
         Assert.False(mind.Acceptable("I know Idris is dead.", knows, "You accept it."));

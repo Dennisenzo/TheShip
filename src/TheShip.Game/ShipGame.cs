@@ -49,6 +49,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     private ShipMind? _mind;
     private CrewMember? _target;
     private bool _endingShown;
+    /// <summary>No model could be loaded: the window only shows why.</summary>
+    private bool _fatal;
 
     public ShipGame(Options options)
     {
@@ -95,12 +97,16 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _charWidth = Math.Max(1, _font.MeasureString("M").X);
         _smallCharWidth = Math.Max(1, _small.MeasureString("M").X);
 
-        var path = _options.NoLlm ? null : ResolveModel(_options.Llm);
+        var path = ResolveModel(_options.Llm);
         if (path is null)
         {
-            Start(new ScriptedLlm(), _options.NoLlm
-                ? "Running without a model (--no-llm): templated crew lines and the keyword reader."
-                : "No GGUF model found in " + ModelDirectory + ": templated crew lines and the keyword reader. See the README there.");
+            // The crew's words and the reading of yours come from the model: without one there is no game.
+            _loadingText = (_options.Llm is null
+                               ? "No GGUF model found in " + ModelDirectory + "."
+                               : "The model '" + _options.Llm + "' was not found (looked for the path and in " + ModelDirectory + ").")
+                           + "\nThe Ship needs a language model to run. The README.txt in that folder lists the models and where to get them."
+                           + "\nPut a .gguf file there, or start with --llm <file.gguf>, and run the game again. Esc closes.";
+            _fatal = true;
             return;
         }
         _loadingText = "Loading " + Path.GetFileName(path) + " ...";
@@ -140,10 +146,15 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             _loading = null;
             if (done.IsCompletedSuccessfully)
+            {
                 Start(done.Result, "Model: " + done.Result.Name + " on " + done.Result.Backend + ".");
+            }
             else
-                Start(new ScriptedLlm(), "The model failed to load (" + (done.Exception?.GetBaseException().Message ?? "unknown error")
-                                         + "): templated crew lines and the keyword reader.");
+            {
+                _loadingText = "The model failed to load: " + (done.Exception?.GetBaseException().Message ?? "unknown error")
+                               + "\nThe Ship needs a language model to run. Try another file with --llm <file.gguf>, or --gpu-layers 0 for CPU only. Esc closes.";
+                _fatal = true;
+            }
         }
         _main.Drain();
 
@@ -170,7 +181,11 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
                 _input.Append(_history[_historyAt]);
         }
         if (Pressed(Keys.Escape))
+        {
+            if (_fatal)
+                Exit();
             _input.Clear();
+        }
         _prevKeys = keys;
 
         while (_typed.Count > 0)
@@ -217,7 +232,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             return;
         }
         var hearers = _target is { State: CrewState.Awake } one ? new List<CrewMember> { one } : _voyage.Awake.ToList();
-        _mind.Say(text, hearers);
+        _ = _mind.Say(text, hearers);
     }
 
     private void ShowEnding(Ending ending)
@@ -260,7 +275,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _batch.Begin();
         if (_voyage is null)
         {
-            Text(_font, _loadingText, 40, 40, Amber);
+            var row = 0;
+            foreach (var line in Wrap(_loadingText, (int)((width - 80) / _charWidth)))
+                Text(_font, line, 40, 40 + 26 * row++, _fatal ? Red : Amber);
         }
         else
         {

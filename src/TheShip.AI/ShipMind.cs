@@ -7,7 +7,7 @@ namespace TheShip.AI;
 /// Ties the model to a voyage. It does the model's two jobs and its one judgement (DESIGN.md, "The language model's job"):
 /// writing what the crew say, reading what the player said, and judging a free-text statement against evidence.
 /// Everything it learns goes back to the voyage on the game thread; it never changes state itself.
-/// Without a real model it passes the player's line through the keyword reader and leaves the templated crew lines alone.
+/// The game needs a model: there is no keyword-reader path here any more (the reader survives in Core for unit tests).
 /// </summary>
 public sealed class ShipMind : IDisposable
 {
@@ -30,23 +30,21 @@ public sealed class ShipMind : IDisposable
     /// <summary>A line the player typed is still being read.</summary>
     public bool IsReading => _reading > 0;
     public bool Busy => _worker.Busy || _worker.Pending > 0;
-    /// <summary>Readings the model got wrong enough that the keyword reader was used instead (a playtest number).</summary>
-    public int ReadFallbacks { get; private set; }
+    /// <summary>Readings the model returned that could not be used (a playtest number).</summary>
+    public int ReadFailures { get; private set; }
 
-    /// <summary>The player says a line to the awake crew. Call on the game thread; the voyage hears it once it has been read.</summary>
-    public void Say(string text, IReadOnlyList<CrewMember> hearers)
+    /// <summary>
+    /// The player says a line to the awake crew. Call on the game thread; the voyage hears it once the model has read it.
+    /// The task completes when the voyage has heard the line.
+    /// </summary>
+    public Task Say(string text, IReadOnlyList<CrewMember> hearers)
     {
-        if (!Llm.IsReal)
-        {
-            _voyage.Say(text, RuleReader.Read(text, _voyage, hearers), hearers);
-            return;
-        }
         var system = Prompts.ReadSystem(_voyage);
         var user = Prompts.ReadUser(text, hearers, _voyage);
         var options = new LlmOptions("read", MaxTokens: 80, Temperature: 0f,
             Grammar: Grammars.ReadingFor(_voyage.FactList.Select(f => f.Key)), Dialogue: false);
         _reading++;
-        _ = ReadAsync(text, hearers, system, user, options);
+        return ReadAsync(text, hearers, system, user, options);
     }
 
     private async Task ReadAsync(string text, IReadOnlyList<CrewMember> hearers, string system, string user, LlmOptions options)
@@ -59,16 +57,19 @@ public sealed class ShipMind : IDisposable
         }
         catch (Exception)
         {
-            // The keyword reader takes over below.
+            // Handled below as an unusable reading.
         }
-        _main.Post(() =>
+        await _main.Run(() =>
         {
             _reading--;
             var reading = Parse(raw);
             if (reading is null)
             {
-                ReadFallbacks++;
-                reading = RuleReader.Read(text, _voyage, hearers);
+                // Nothing is guessed: the line is heard as plain talk and the player is told to set the reading.
+                ReadFailures++;
+                _voyage.Say(text, Reading.Plain, hearers);
+                _voyage.Log.Add(new LogEntry(LogKind.Help, "", "The model could not read that line, so nothing was recorded. Correct it with /fix."));
+                return;
             }
             _voyage.Say(text, reading, hearers);
         });
@@ -106,7 +107,7 @@ public sealed class ShipMind : IDisposable
     /// <summary>A crew line was added with its templated text: ask the model to word it, and keep the template if it can't.</summary>
     private void OnCrewSpoke(LogEntry entry)
     {
-        if (!Llm.IsReal || entry.Intent is null || entry.CrewId is null)
+        if (entry.Intent is null || entry.CrewId is null)
             return;
         var c = _voyage.Crew.First(x => x.Id == entry.CrewId);
         var system = Prompts.CrewSystem(c, _voyage);
@@ -170,8 +171,6 @@ public sealed class ShipMind : IDisposable
     /// <summary>A person met evidence: any free-text statement they heard is judged against it, once per statement and evidence.</summary>
     private void OnEvidence(CrewMember c, Fact f, string value)
     {
-        if (!Llm.IsReal)
-            return;
         var evidence = f.Say(value);
         foreach (var s in _voyage.Statements.Where(s => s.Kind == StatementKind.Unkeyed && s.Hearers.Contains(c.Id) && !s.FoundOutBy.ContainsKey(c.Id)).ToList())
         {

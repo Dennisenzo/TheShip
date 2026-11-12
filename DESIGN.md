@@ -390,7 +390,7 @@ The player sees what was recorded, for example "Recorded: you told Mara that Idr
 - **Personal colour.** A crew member may invent small memories of home. These are saved to their sheet so they stay the same next time.
 - **Small cast.** One to three people are awake at once, so prompts stay short enough for a local model.
 - **Idle time.** The years between alerts are when the game writes notes and summaries in the background.
-- **No model.** Templated lines keep the game playable without one.
+- **A model is required.** The game does not run without one. A templated line is shown only when the model's line was rejected twice.
 
 ## Prototype and open questions
 

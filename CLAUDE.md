@@ -11,10 +11,10 @@ add a line for every non-trivial change, and move items between "Built" and "Not
 ```sh
 dotnet build TheShip.slnx
 dotnet test
-dotnet run --project src/TheShip.Game -- [--seed <n>] [--llm <file.gguf>] [--gpu-layers <n>] [--no-llm]
+dotnet run --project src/TheShip.Game -- [--seed <n>] [--llm <file.gguf>] [--gpu-layers <n>]
 ```
 
-- `--no-llm`, or no GGUF in `src/TheShip.Game/Content/Models/llm/`: templated crew lines and the keyword reader.
+- The game needs a GGUF model in `src/TheShip.Game/Content/Models/llm/` (or `--llm`). Without one it shows what is missing and starts no voyage.
 - Models: see the README.txt in that folder.
 
 ## Layout
@@ -30,7 +30,9 @@ dotnet run --project src/TheShip.Game -- [--seed <n>] [--llm <file.gguf>] [--gpu
 
 - The game owns the truth. The model writes crew lines and reads player lines; it never changes state.
   The one exception is the yes/no judgement of a free-text statement against evidence (DESIGN.md, "Reading").
-- `TheShip.Core` must stay playable with no model: every crew line has a templated text, and `RuleReader` sorts player lines by keywords.
+- The game does not run without a model (decided 2026-11-12). What is left of the model-less path is for unit tests and safety nets only:
+  `RuleReader.Read` drives the voyage in Core tests, `RuleReader.Claims` checks a model-written crew line against what the speaker knows,
+  `Lines.cs` is shown when the model's line was rejected twice, and `tests/TheShip.Tests/FakeLlm.cs` stands in for the model in `ShipMind` tests.
 - Model calls go through `LlmWorker` (one at a time, most urgent first); results reach the simulation through `MainThreadQueue`.
 - Structured model output is forced with a GBNF grammar, and every string in a grammar is bounded.
 - Numbers that tune the game live in `Tuning.cs`.
@@ -48,10 +50,14 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-12: DESIGN.md gained a "Run variation" section under "Gameplay variations" (what the seed varies per run).
   Design only; outside the prototype scope.
 - 2026-11-12: DESIGN.md is now the leading design document. The earlier claude.ai document is no longer the source.
+- 2026-11-12: the first version builds and runs on the user's machine (their report).
+- 2026-11-12: the no-model mode is removed (`--no-llm`, `ScriptedLlm`, the `IsReal` switch). Written without a compiler again: build and run the tests.
+- 2026-11-12: an interface design exists as a claude.ai Design canvas (https://claude.ai/artifact/4MRSyehpU9o9mcJ6G9QZND): a wireframe ship plan with doors,
+  lines, faults and crew; crew dossiers; the record and ship logs. Not implemented in the game yet.
 
 ### Built
 
-All of it written on 2026-11-12 and **not yet compiled or run** (see Status). Expect compile errors on the first build.
+Written on 2026-11-12 in sessions without a compiler. The first version builds and runs; changes after it are marked in Status.
 
 - **Core** (`src/TheShip.Core`): `Voyage` and its partial files hold the whole loop.
   - `Scenario.cs`: the Short haul content. 6 crew, 20 facts, 5 scripted alerts (coolant leak, death in sleep, navigation drift,
@@ -61,13 +67,13 @@ All of it written on 2026-11-12 and **not yet compiled or run** (see Status). Ex
   - `Voyage.Talk.cs`: the statement record; a lie caught at once, later by evidence, or doubted (doubt score); hard truths (morale now, trust at the next drift);
     promises; dodges; correcting a wrong reading (`Reread`); the logs lockout after an engineer spots a rewritten entry.
   - `Voyage.Aftermath.cs`: two-week beats (noticing, checking doubts, reading logs, requests, crew telling each other), arrival and the ending record.
-  - `RuleReader.cs`: the keyword reader used with no model. `Lines.cs`: the templated crew lines. `Tuning.cs`: every number.
+  - `RuleReader.cs`: the keyword reader (tests, and the claims check on crew lines). `Lines.cs`: the templated crew lines (fallback). `Tuning.cs`: every number.
 - **AI** (`src/TheShip.AI`), ported from Cities: `ILlmProvider`, `LocalLlm` (LLamaSharp 0.30.0, Vulkan or CPU, Gemma 4 / Qwen3 chat handling, reply cleanup),
-  `LlmWorker` + `MainThreadQueue`, `Gbnf`/`Grammars`, `LlmJson`, `ScriptedLlm`.
+  `LlmWorker` + `MainThreadQueue`, `Gbnf`/`Grammars`, `LlmJson`.
   `ShipMind` does the model's jobs: words each crew line from the game's decision (rejects a line that states what the speaker doesn't know, once, then keeps the template),
-  reads a player line with a grammar into the six kinds (falls back to `RuleReader`), and judges free-text statements yes/no against evidence.
+  reads a player line with a grammar into the six kinds (an unusable reading records nothing and asks for `/fix`), and judges free-text statements yes/no against evidence.
 - **Game** (`src/TheShip.Game`): MonoGame DesktopGL window, FontStashSharp text. Status column (numbers shown), transcript, input line.
-  Controls are typed: `/help` lists them. The model loads in the background; without one the game runs on templates.
+  Controls are typed: `/help` lists them. The model loads in the background; without one the window says what is missing.
 - **Tests** (`tests/TheShip.Tests`): the loop, the lie lookup, the reader, the grammar and `ShipMind`'s parsing. Never run.
 
 ### Differences from DESIGN.md to settle
@@ -86,5 +92,5 @@ factions, children, the other events and faults, the other lockouts and endings,
 ### Next steps
 
 1. `dotnet build TheShip.slnx` and fix what it reports; then `dotnet test`.
-2. Play a `--no-llm` run end to end, then one with a model; tune `Tuning.cs` towards "one honest run in two reaches Landfall".
+2. Play a run end to end; tune `Tuning.cs` towards "one honest run in two reaches Landfall".
 3. Run the three playthroughs of the prototype's pass test (DESIGN.md, "Prototype scope").
