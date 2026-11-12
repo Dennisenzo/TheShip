@@ -397,8 +397,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         Note("=== " + ending.Title.ToUpperInvariant() + " ===");
         Note(ending.Summary);
         Note("");
-        Note("Who is left:");
-        foreach (var line in ending.Survivors)
+        Note("The crew:");
+        foreach (var line in ending.Crew)
             Note("  " + line);
         Note("");
         Note("What they believe about you:");

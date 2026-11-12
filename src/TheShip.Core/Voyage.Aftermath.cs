@@ -37,7 +37,7 @@ public sealed partial class Voyage
             }
             else if (_rng.NextDouble() < (c.Has(Trait.Sceptical) ? 0.5 : 0.25))
             {
-                var unread = FactList.Where(f => !(c.Beliefs.TryGetValue(f.Key, out var b) && b.Firsthand) && !c.SeenGaps.Contains(f.Key)).ToList();
+                var unread = FactList.Where(f => Unread(c, f)).ToList();
                 if (unread.Count > 0)
                     ReadLog(c, unread[_rng.Next(unread.Count)]);
             }
@@ -123,7 +123,7 @@ public sealed partial class Voyage
         Learn(b, key, belief.Value, "crew");
     }
 
-    /// <summary>Arrival: the sleepers are woken, the survivors counted, and the record read out.</summary>
+    /// <summary>Arrival: the sleepers are woken, the living counted, and the record read out.</summary>
     private void Arrive()
     {
         Phase = Phase.Ended;
@@ -158,7 +158,7 @@ public sealed partial class Voyage
 
         var ending = new Ending { Title = title, Summary = summary };
         foreach (var c in Crew)
-            ending.Survivors.Add(c.Alive
+            ending.Crew.Add(c.Alive
                 ? $"{c.Name}, {c.Role}, age {c.Age:0}, thawed {c.Thaws} times"
                 : $"{c.Name}, {c.Role}: dead");
 
@@ -174,7 +174,7 @@ public sealed partial class Voyage
                     break;
                 case StatementKind.False:
                     line += "A lie. " + (s.FoundOutBy.Count == 0
-                        ? "Never found out."
+                        ? s.InLog && s.Hearers.Count == 0 ? "Nobody read it." : "Never found out."
                         : "Found out by " + string.Join(", ", s.FoundOutBy.Select(kv => Names(new[] { kv.Key }) + " in year " + Math.Floor(kv.Value).ToString("0"))) + ".");
                     break;
                 case StatementKind.Promise:
@@ -210,7 +210,8 @@ public sealed class Ending
 {
     public required string Title { get; init; }
     public required string Summary { get; init; }
-    public List<string> Survivors { get; } = new();
+    /// <summary>Everyone aboard: the living with their age and thaws, the dead marked as dead.</summary>
+    public List<string> Crew { get; } = new();
     public List<string> Record { get; } = new();
     public List<string> Beliefs { get; } = new();
 }

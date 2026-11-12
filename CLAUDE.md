@@ -41,7 +41,7 @@ real-time stamp and a tag per line. The game's opening note gives the file's pat
 | `typed`, `reading`, `said`, `dropped` | a line typed (with its hearers), how it was read or re-read by the player, and whether it was said or dropped |
 | `model` | the model's raw reading, rejected crew lines, yes/no judgements, failures |
 | `llm` | each model call: kind, prompt and generated tokens, first-token and total seconds |
-| `ending` | the ending, survivors, beliefs and the record |
+| `ending` | the ending, the crew (living and dead), beliefs and the record |
 
 ## Working with Claude (rules taken from the Cities repo, 2026-11-12)
 
@@ -107,6 +107,10 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-12: every run writes a session log (`SessionLog.cs`, Sessions/ next to the exe; see "Analysing the user's play sessions").
   Clicks that change the game go through `Act(...)`, which logs them; `ShipMind.Trace` reports the model's raw answers.
 - 2026-11-12: the working rules (branches, commits, models, sub-agent types `ship-*`) are taken over from the Cities repo.
+- 2026-11-12: log and record fixes from a play session: altering a log entry back to the same false value is one lie, not one
+  per click (a reader is caught once); nobody reads log entries about alerts that haven't happened or about their own life;
+  a log entry that changed since someone read it is unread again; "the spare parts are gone" at 0 parts; the ending lists
+  the whole crew ("crew:" in the session log), with an unread log rewrite marked "Nobody read it.".
 
 ### Built
 
