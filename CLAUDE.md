@@ -41,7 +41,7 @@ real-time stamp and a tag per line. The game's opening note gives the file's pat
 | `typed`, `reading`, `said`, `dropped` | a line typed (with its hearers), how it was read or re-read by the player, and whether it was said or dropped |
 | `model` | the model's raw reading, rejected crew lines, yes/no judgements, failures |
 | `llm` | each model call: kind, prompt and generated tokens, first-token and total seconds |
-| `ending` | the ending, survivors, beliefs and the record |
+| `ending` | the ending, the crew (living and dead), beliefs and the record |
 
 ## Working with Claude (rules taken from the Cities repo, 2026-11-12)
 
@@ -107,6 +107,15 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-12: every run writes a session log (`SessionLog.cs`, Sessions/ next to the exe; see "Analysing the user's play sessions").
   Clicks that change the game go through `Act(...)`, which logs them; `ShipMind.Trace` reports the model's raw answers.
 - 2026-11-12: the working rules (branches, commits, models, sub-agent types `ship-*`) are taken over from the Cities repo.
+- 2026-11-12: running out of stores kills (fix/stores-run-out). Before, a drift with a refuser awake took the stores below zero and only
+  cost 40 health, so Mara lived through 8 years on no food (session 2026-11-12_23-13-57). Now the awake eat one person-day each per day
+  in time order (`Voyage.Eat`, used by the two-week clock and the drift); once the stores are empty, `Tuning.StarveDays` (60) hungry days
+  kill, through the usual death path. The drift report says "Stores ran out in year X. Mara starved in year Y."; a refusal to sleep
+  is followed by a SHIP line saying the refuser stays awake through the drift and how long the stores last. 3 regression tests.
+- 2026-11-12: log and record fixes from a play session: altering a log entry back to the same false value is one lie, not one
+  per click (a reader is caught once); nobody reads log entries about alerts that haven't happened or about their own life;
+  a log entry that changed since someone read it is unread again; "the spare parts are gone" at 0 parts; the ending lists
+  the whole crew ("crew:" in the session log), with an unread log rewrite marked "Nobody read it.".
 
 ### Built
 
@@ -137,6 +146,7 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
 
 - Up to three people awake; alert 4 (the signal) has no fault and can be drifted past with nobody woken.
 - Losing the navigation fault ends the run as "Adrift" (no arrival slip of years).
+- Stores run out as hunger only, no shorter wakings: once they are empty, whoever is awake dies after `Tuning.StarveDays` (60 days).
 - "Landfall without you" can't happen: the logs are the only lockout.
 - Terminal notes and paper notes are not in. The drift report is complete because no sensors are lost yet.
 - Doors: only locking has an effect. Open and closed look different and behave the same. Nobody reacts to being locked in.

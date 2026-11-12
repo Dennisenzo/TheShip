@@ -224,9 +224,36 @@ public sealed partial class Voyage
             Speak(c, "caught", "You have found out that the ship lied to you. It said: \"" + s.Text + "\" But " + evidence + ".", evidence);
     }
 
-    /// <summary>A person reads one log entry: the truth, a gap, or a rewrite that an engineer may spot.</summary>
-    private void ReadLog(CrewMember c, Fact f, bool quiet = false)
+    /// <summary>
+    /// Whether the log has an entry on this fact a person could learn from: nothing is logged about an alert that hasn't
+    /// happened yet, and nobody reads that they themselves are alive.
+    /// </summary>
+    internal bool InLogFor(CrewMember c, Fact f)
     {
+        if (f.SubjectId == c.Id)
+            return false;
+        if (f.Key.StartsWith("alert:", StringComparison.Ordinal)
+            && int.TryParse(f.Key["alert:".Length..], out var n) && n > Current.Number)
+            return false;
+        return true;
+    }
+
+    /// <summary>What the log shows on a fact now: the truth, or the rewrite (a restricted entry shows a gap).</summary>
+    private string Shown(Fact f) => !LogsLocked && f.Access == LogAccess.Altered && f.AlteredValue is { } fake ? fake : f.Truth;
+
+    /// <summary>
+    /// Whether a person has something left to read in this entry: they never saw it for themselves, or the entry has
+    /// changed since they did (an earlier reading goes stale when the ship's state moves on).
+    /// </summary>
+    internal bool Unread(CrewMember c, Fact f) =>
+        InLogFor(c, f) && !c.SeenGaps.Contains(f.Key)
+        && !(c.Beliefs.TryGetValue(f.Key, out var b) && b.Firsthand && f.Same(b.Value, Shown(f)));
+
+    /// <summary>A person reads one log entry: the truth, a gap, or a rewrite that an engineer may spot.</summary>
+    internal void ReadLog(CrewMember c, Fact f, bool quiet = false)
+    {
+        if (!InLogFor(c, f))
+            return;
         if (!LogsLocked && f.Access == LogAccess.Restricted)
         {
             if (c.SeenGaps.Add(f.Key))

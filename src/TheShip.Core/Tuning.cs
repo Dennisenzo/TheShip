@@ -23,6 +23,8 @@ public static class Tuning
     public const double PowerLowDeathChance = 0.10;
     public const int PodsWornAt = 8;
     public const double StoresShortAt = 300;
+    /// <summary>Days a person awake lives once the stores are empty (DESIGN.md, "What every decision spends": hunger).</summary>
+    public const double StarveDays = 60;
     public const int PartsShortAt = 1;
 
     /// <summary>A number counts as true within this distance (the date, in years).</summary>

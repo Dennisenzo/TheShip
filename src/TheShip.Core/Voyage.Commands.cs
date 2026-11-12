@@ -1,3 +1,4 @@
+
 namespace TheShip.Core;
 
 /// <summary>The player's direct controls and the clock (DESIGN.md, "Direct control" and "The eight steps").</summary>
@@ -107,15 +108,54 @@ public sealed partial class Voyage
     {
         foreach (var f in Current.Faults.Where(f => f.State == FaultState.InRepair && Staffed(f)))
             f.Progress += hours * Rate(f);
-        Clock += hours;
-        foreach (var c in Awake)
+        var start = Clock;
+        var awake = Awake.ToList();
+        var (storesOut, starved) = Eat(awake, hours);
+        foreach (var c in awake)
         {
-            c.HoursAwake += hours;
-            c.Age += hours / Tuning.HoursPerYear;
-            Stores -= hours / 24;
+            var lived = starved.TryGetValue(c, out var at) ? at : hours;
+            c.HoursAwake += lived;
+            c.Age += lived / Tuning.HoursPerYear;
         }
-        if (Stores < 0)
-            Stores = 0;
+        Clock += hours;
+        if (storesOut is { } outAt)
+            Ship($"The stores ran out in year {Math.Floor((start + outAt) / Tuning.HoursPerYear):0}. Whoever is awake now goes hungry: "
+                 + $"{Tuning.StarveDays:0} days without food kills.");
+        foreach (var (c, at) in starved.OrderBy(kv => kv.Value))
+            Kill(c, $"starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}");
+    }
+
+    /// <summary>
+    /// The awake eat for <paramref name="hours"/>: one person-day of stores each per day. Once the stores are empty they go
+    /// hungry, and <see cref="Tuning.StarveDays"/> hungry days kill. Returns when (hours from now) the stores ran out, if they did
+    /// in this span, and who starved and when. Does not kill anyone: the caller does, in time order.
+    /// </summary>
+    private (double? StoresOut, Dictionary<CrewMember, double> Starved) Eat(IReadOnlyList<CrewMember> awake, double hours)
+    {
+        var starved = new Dictionary<CrewMember, double>();
+        if (awake.Count == 0 || hours <= 0)
+            return (null, starved);
+        var fedHours = Stores * 24 / awake.Count;
+        if (fedHours >= hours)
+        {
+            Stores -= hours / 24 * awake.Count;
+            return (null, starved);
+        }
+        double? storesOut = Stores > 0 ? fedHours : null;
+        var hungryFrom = fedHours;
+        Stores = 0;
+        foreach (var c in awake)
+        {
+            var left = Math.Max(0, Tuning.StarveDays * 24 - c.HoursHungry);
+            if (hungryFrom + left <= hours)
+            {
+                c.HoursHungry += left;
+                starved[c] = hungryFrom + left;
+            }
+            else
+                c.HoursHungry += hours - hungryFrom;
+        }
+        return (storesOut, starved);
     }
 
     private void FinishThaws()
@@ -369,6 +409,7 @@ public sealed partial class Voyage
             if (!c.Beliefs.TryGetValue("pods", out var told) || told.Source != "ship")
                 c.PendingQuestion = "pods";
             Speak(c, "sleep_no_pod", "You refuse to go back into the pod until the ship answers: " + podQuestion, podQuestion);
+            WarnStaysAwake();
             return;
         }
         var refuses = c.Band == TrustBand.Against
@@ -378,10 +419,33 @@ public sealed partial class Voyage
         {
             c.AskedToSleep = true;
             Speak(c, "sleep_no", "You refuse to go back to sleep.");
+            WarnStaysAwake();
             return;
         }
         Speak(c, "sleep_yes", "You agree to go back to sleep.");
         Sleep(c);
+    }
+
+    /// <summary>
+    /// Said when someone refuses to sleep: whoever refuses stays awake through the next drift and eats the stores. The player
+    /// hears how far the stores go before choosing to drift.
+    /// </summary>
+    private void WarnStaysAwake()
+    {
+        var up = Awake.Where(c => c.AskedToSleep).ToList();
+        if (up.Count == 0)
+            return;
+        var last = AlertIndex >= Alerts.Count - 1;
+        var target = last ? Scenario.ArrivalYear : Alerts[AlertIndex + 1].Year;
+        var years = Math.Max(0, target - Year);
+        var names = up.Count == 1 ? up[0].Name : string.Join(", ", up.Take(up.Count - 1).Select(c => c.Name)) + " and " + up[^1].Name;
+        var lasts = Stores / up.Count / 365;
+        var one = up.Count == 1;
+        var outlook = lasts >= years
+            ? "last that long."
+            : FormattableString.Invariant($"last about {lasts:0.#} years, then {Tuning.StarveDays:0} days without food kills.");
+        Ship(FormattableString.Invariant($"If you drift now, {names} {(one ? "stays" : "stay")} awake through it and {(one ? "eats" : "eat")} the stores. ")
+             + FormattableString.Invariant($"The drift to year {target} is {years:0.#} years; the stores ({Stores:0} person-days) ") + outlook);
     }
 
     private void Sleep(CrewMember c)
@@ -464,16 +528,34 @@ public sealed partial class Voyage
                 Ship("Alter it to read what? " + (f.Numeric ? "Give a number." : "One of: " + string.Join(", ", f.Values) + "."));
                 return;
             }
+            if (f.Access == LogAccess.Altered && f.AlteredValue is { } now && f.Same(now, v))
+            {
+                Ship("The log already reads that " + f.Say(v) + ".");
+                return;
+            }
             f.Access = LogAccess.Altered;
             f.AlteredValue = v;
             var truth = f.IsTrue(v);
-            if (!truth)
-                Statements.Add(new Statement
-                {
-                    Id = _nextStatement++, Year = Year, Text = "Log altered to read: " + f.Say(v), Kind = StatementKind.False,
-                    FactKey = f.Key, Value = v, TruthThen = f.Truth, InLog = true,
-                });
-            Recorded("Recorded: the log now reads that " + f.Say(v) + ". (" + (truth ? "true" : "false; an engineer can spot the rewrite") + ")");
+            if (truth)
+            {
+                Recorded("Recorded: the log now reads that " + f.Say(v) + ". (true)");
+                return;
+            }
+            // Putting the same false entry back is the same lie, not a new one: one record, one set of readers, one
+            // finding-out. A rewrite that someone has already found out is a new lie.
+            var again = Statements.LastOrDefault(s => s.InLog && s.Kind == StatementKind.False && s.FactKey == f.Key
+                                                      && s.Value != null && f.Same(s.Value, v) && s.FoundOutBy.Count == 0);
+            if (again != null)
+            {
+                Recorded("Recorded: the log reads again that " + f.Say(v) + ". (the same lie as in year " + Math.Floor(again.Year).ToString("0") + "; an engineer can spot the rewrite)");
+                return;
+            }
+            Statements.Add(new Statement
+            {
+                Id = _nextStatement++, Year = Year, Text = "Log altered to read: " + f.Say(v), Kind = StatementKind.False,
+                FactKey = f.Key, Value = v, TruthThen = f.Truth, InLog = true,
+            });
+            Recorded("Recorded: the log now reads that " + f.Say(v) + ". (false; an engineer can spot the rewrite)");
             return;
         }
         f.Access = access;
@@ -507,23 +589,34 @@ public sealed partial class Voyage
         var target = last ? Scenario.ArrivalYear : Alerts[AlertIndex + 1].Year;
         var years = Math.Max(0, target - Year);
         var deaths = new List<string>();
+        var events = new List<string>();
+        var hours = years * Tuning.HoursPerYear;
+        var start = Clock;
+        // Whoever would not sleep stays up through the drift and eats the stores, in time order (DESIGN.md, "What every decision spends").
+        var awake = Awake.ToList();
+        var (storesOut, starved) = Eat(awake, hours);
+        if (storesOut is { } outAt)
+            events.Add($"Stores ran out in year {Math.Floor((start + outAt) / Tuning.HoursPerYear):0}.");
+        foreach (var (c, at) in starved.OrderBy(kv => kv.Value))
+            events.Add($"{c.Name} starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}.");
         foreach (var c in Crew.Where(c => c.Alive).ToList())
         {
             c.Trust += c.PendingTrust;
             c.PendingTrust = 0;
             if (c.State == CrewState.Awake)
             {
-                // Someone who would not sleep ages, eats and reads everything.
-                c.Age += years;
-                c.HoursAwake += years * Tuning.HoursPerYear;
-                Stores -= years * 365;
+                // Someone who would not sleep ages, eats and reads everything, for as long as they live.
+                var lived = starved.TryGetValue(c, out var at) ? at : hours;
+                c.Age += lived / Tuning.HoursPerYear;
+                c.HoursAwake += lived;
+                if (starved.ContainsKey(c))
+                {
+                    deaths.Add(c.Name);
+                    Kill(c, "starved during the drift", quiet: true);
+                    continue;
+                }
                 foreach (var f in FactList)
                     ReadLog(c, f, quiet: true);
-                if (Stores < 0)
-                {
-                    Stores = 0;
-                    c.Health -= 40;
-                }
             }
             else
             {
@@ -542,7 +635,9 @@ public sealed partial class Voyage
         Clock = target * Tuning.HoursPerYear;
         SyncFacts();
         // Limited to working sensors; the prototype loses none, so the report is complete (DESIGN.md, "Drift").
-        Ship($"DRIFT: {years:0} years pass. Year {Math.Floor(Year):0}. Stores {Stores:0} person-days, spare parts {Parts}, pod wear {PodWear}. "
+        Ship($"DRIFT: {years:0} years pass. Year {Math.Floor(Year):0}. "
+             + string.Concat(events.Select(e => e + " "))
+             + $"Stores {Stores:0} person-days, spare parts {Parts}, pod wear {PodWear}. "
              + (deaths.Count == 0 ? "No deaths." : "Deaths: " + string.Join(", ", deaths) + "."));
 
         if (last)
