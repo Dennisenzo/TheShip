@@ -11,6 +11,7 @@ add a line for every non-trivial change, and move items between "Built" and "Not
 ```sh
 dotnet build TheShip.slnx
 dotnet test
+dotnet test --filter Category=Balance   # balance harness: bots play 200 seeds, prints a table, writes balance-report.txt
 dotnet run --project src/TheShip.Game -- [--seed <n>] [--llm <file.gguf>] [--gpu-layers <n>]
 ```
 
@@ -116,6 +117,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   per click (a reader is caught once); nobody reads log entries about alerts that haven't happened or about their own life;
   a log entry that changed since someone read it is unread again; "the spare parts are gone" at 0 parts; the ending lists
   the whole crew ("crew:" in the session log), with an unread log rewrite marked "Nobody read it.".
+
+- 2026-11-12: balance harness (`tests/TheShip.Tests/BalanceBots.cs`, `BalanceTests.cs`, `[Trait("Category","Balance")]`): honest, careless and liar bots play whole voyages over seeds 1..200 through the public `Voyage` API and print a table (Landfall rate, endings, deaths, causes, ages, trust, lies) to the test output and `balance-report.txt`. Run: `dotnet test --filter Category=Balance` (about 5 s). Measures only; the 25-75% honest Landfall target test is skipped until tuning. Builds; passes.
 
 ### Built
 
