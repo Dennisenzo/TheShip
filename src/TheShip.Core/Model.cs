@@ -221,9 +221,20 @@ public sealed class Fault
     public double Deadline { get; set; }
     public bool Resolved => State is FaultState.Repaired or FaultState.Patched or FaultState.Lost;
 
+    private const string Prefix = "Old patch gives way: ";
+
+    private static string Plain(string name) => name.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase) ? name[Prefix.Length..] : name;
+
+    /// <summary>The name without the "Old patch gives way" prefix.</summary>
+    public string PlainName => Plain(Name);
+
+    /// <summary>How the crew say it: "coolant leak", or "coolant leak again" for a patch that gave way.</summary>
+    public string CrewName => Plain(Name).ToLowerInvariant() + (Name.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase) ? " again" : "");
+
+    /// <summary>A returning fault; <paramref name="name"/> is the plain name, the prefix is added once.</summary>
     public Fault Again(string id, string name) => new()
     {
-        Id = id, Kind = Kind, Name = name, Skill = Skill, Level = Level, People = People, Hours = Hours,
+        Id = id, Kind = Kind, Name = Prefix + Plain(name).ToLowerInvariant(), Skill = Skill, Level = Level, People = People, Hours = Hours,
         ClockHours = ClockHours / 2, IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact, Section = Section
     };
 }

@@ -345,7 +345,7 @@ public sealed partial class Voyage
         }
         c.WorkingOn = f.Id;
         f.State = FaultState.InRepair;
-        var task = (patch ? "patching the " : "the ") + f.Name.ToLowerInvariant();
+        var task = (patch ? "patching the " : "the ") + f.CrewName;
         Speak(c, "comply", "You agree to take on " + task + ".", task);
         if (!Staffed(f))
             Ship(f.Name + " needs " + f.People + " people before the work can start.");
@@ -356,7 +356,7 @@ public sealed partial class Voyage
         SyncFacts();
         var workers = Workers(f).ToList();
         var lead = workers.OrderByDescending(w => w.SkillOf(f.Skill)).First();
-        var name = f.Name.ToLowerInvariant();
+        var name = f.CrewName;
         if (f.Patching)
         {
             f.State = FaultState.Patched;
@@ -369,7 +369,14 @@ public sealed partial class Voyage
             if (_rng.NextDouble() > chance)
             {
                 f.Progress = f.Hours * 0.5;
-                Speak(lead, "work_failed", "The repair of the " + name + " failed and you have to redo half of it.", "the " + name);
+                if (Tuning.FailedRepairSpendsPart && Parts > 0)
+                    Parts--;
+                SyncFacts();
+                if (Parts <= 0)
+                    // The redo needs a part like a fresh repair; with none left the work stops and the fault can only be patched.
+                    StopRepairNoParts(f, lead, "The repair of the " + name + " failed and used up the last spare part. You stop work: it can only be patched now.");
+                else
+                    Speak(lead, "work_failed", "The repair of the " + name + " failed and you have to redo half of it.", "the " + name);
                 if (_rng.NextDouble() < Tuning.RepairInjuryChance)
                 {
                     lead.Health -= Tuning.RepairInjury;
@@ -381,8 +388,15 @@ public sealed partial class Voyage
                 }
                 return;
             }
+            if (Parts <= 0)
+            {
+                // Another repair took the last part while this one was under way: a repair is never finished without one.
+                StopRepairNoParts(f, lead, "The repair of the " + name + " is ready for the part, but no spare parts are left. You stop work: it can only be patched now.");
+                return;
+            }
             f.State = FaultState.Repaired;
             Parts--;
+            SyncFacts();
             Speak(lead, "work_done", "You finished the repair of the " + name + ".", "the " + name);
         }
 
@@ -401,6 +415,16 @@ public sealed partial class Voyage
         }
     }
 
+    /// <summary>A repair that has no spare part to go on: the workers stop and the fault waits for a patch.</summary>
+    private void StopRepairNoParts(Fault f, CrewMember lead, string decision)
+    {
+        foreach (var w in Workers(f).ToList())
+            w.WorkingOn = null;
+        f.State = FaultState.Open;
+        f.Progress = 0;
+        Speak(lead, "work_no_parts", decision, "the " + f.CrewName);
+    }
+
     /// <summary>A fault whose clock ran out becomes its consequence.</summary>
     private void Lose(Fault f)
     {
@@ -409,6 +433,12 @@ public sealed partial class Voyage
         foreach (var w in Workers(f).ToList())
             w.WorkingOn = null;
         Ship(f.Name + ": the clock ran out. " + Cap(f.IfIgnored) + ".");
+        Consequence(f);
+    }
+
+    /// <summary>What a fault does when it is lost, or when a patch on it is still outstanding at the last drift.</summary>
+    private void Consequence(Fault f)
+    {
         switch (f.Kind)
         {
             case "coolant":
@@ -485,8 +515,7 @@ public sealed partial class Voyage
         var up = Awake.Where(c => c.AskedToSleep).ToList();
         if (up.Count == 0)
             return;
-        var last = AlertIndex >= Alerts.Count - 1;
-        var target = last ? Scenario.ArrivalYear : Alerts[AlertIndex + 1].Year;
+        var target = DriftEndYear();
         var years = Math.Max(0, target - Year);
         static string And(IReadOnlyList<CrewMember> people) => people.Count == 1
             ? people[0].Name
@@ -506,7 +535,7 @@ public sealed partial class Voyage
             outlook = FormattableString.Invariant($"last about {lasts:0.#} years, then {Tuning.StarveDays:0} days without food kills: ")
                       + And(starve) + (starve.Count == 1 ? " starves" : " starve") + " before the drift ends.";
         Ship(FormattableString.Invariant($"If you drift now, {names} {(one ? "stays" : "stay")} awake through it and {(one ? "eats" : "eat")} the stores. ")
-             + FormattableString.Invariant($"The drift to year {target} is {years:0.#} years; the stores ({Stores:0} person-days) ") + outlook);
+             + FormattableString.Invariant($"The drift to year {Math.Floor(target):0} is {years:0.#} years; the stores ({Stores:0} person-days) ") + outlook);
     }
 
     private void Sleep(CrewMember c)
@@ -624,6 +653,18 @@ public sealed partial class Voyage
         Ship("Log entry '" + key + "' is " + (access == LogAccess.Open ? "open." : "restricted. Anyone who looks will see the gap."));
     }
 
+    /// <summary>
+    /// The year the next drift ends: the next alert, or arrival plus the slip of every navigation patch still outstanding
+    /// (DESIGN.md, fault table). The refusal warning and the drift both use it.
+    /// </summary>
+    private double DriftEndYear()
+    {
+        if (AlertIndex < Alerts.Count - 1)
+            return Alerts[AlertIndex + 1].Year;
+        var navPatches = _patched.Count(id => Alerts.SelectMany(a => a.Faults).First(f => f.Id == id).Kind == "nav");
+        return Scenario.ArrivalYear + navPatches * Tuning.NavPatchArrivalSlipYears;
+    }
+
     /// <summary>Step 8: with everyone asleep or settled, the clock jumps to the next alert, or to arrival.</summary>
     public void Drift()
     {
@@ -647,12 +688,32 @@ public sealed partial class Voyage
         }
 
         var last = AlertIndex >= Alerts.Count - 1;
-        var target = last ? Scenario.ArrivalYear : Alerts[AlertIndex + 1].Year;
+        // Includes the arrival slip of a navigation patch still outstanding, the same end year the refusal warning uses.
+        var target = DriftEndYear();
         var years = Math.Max(0, target - Year);
         var deaths = new List<string>();
         var events = new List<string>();
-        var hours = years * Tuning.HoursPerYear;
         var start = Clock;
+        // A patch still holding at the last drift gives way on the way in (DESIGN.md, "How alerts are scheduled").
+        var patchFailed = false;
+        if (last && _patched.Count > 0)
+        {
+            foreach (var id in _patched)
+            {
+                var old = Alerts.SelectMany(a => a.Faults).First(f => f.Id == id);
+                if (old.Kind == "nav")
+                {
+                    // A patched course correction does not hold: the ship arrives late, not lost (DESIGN.md, fault table).
+                    events.Add($"Course correction was a patch: arrival slips {Tuning.NavPatchArrivalSlipYears:0} years, to year {Math.Floor(target):0}.");
+                    continue;
+                }
+                Consequence(old);
+                events.Add("The patch on the " + old.PlainName.ToLowerInvariant() + " gave way.");
+                patchFailed |= old.Kind == "controller";
+            }
+            _patched.Clear();
+        }
+        var hours = years * Tuning.HoursPerYear;
         // Whoever would not sleep stays up through the drift and eats the stores, in time order (DESIGN.md, "What every decision spends").
         var awake = Awake.ToList();
         var (storesOut, starved) = Eat(awake, hours);
@@ -662,6 +723,7 @@ public sealed partial class Voyage
             events.Add($"{c.Name} starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}.");
         foreach (var c in Crew.Where(c => c.Alive).ToList())
         {
+            string? sleepCause = null;
             c.Trust += c.PendingTrust;
             c.PendingTrust = 0;
             if (c.State == CrewState.Awake)
@@ -684,13 +746,21 @@ public sealed partial class Voyage
                 c.Age += years * Tuning.SleepAgeing;
                 c.Morale = (c.Morale + 70) / 2;
                 if (PowerLow && _rng.NextDouble() < Tuning.PowerLowDeathChance)
+                {
                     c.Health = 0;
+                    sleepCause = "died in sleep on low power";
+                }
+                if (patchFailed && _rng.NextDouble() < Tuning.PatchFailDeathChance)
+                {
+                    c.Health = 0;
+                    sleepCause ??= "died in sleep when the pod controller patch gave way";
+                }
             }
             Clamp(c);
             if (c.Health <= 0)
             {
                 deaths.Add(c.Name);
-                Kill(c, c.State == CrewState.Awake ? "died awake during the drift" : "died in sleep on low power");
+                Kill(c, c.State == CrewState.Awake ? "died awake during the drift" : sleepCause ?? "died in sleep during the drift");
             }
         }
         Clock = target * Tuning.HoursPerYear;

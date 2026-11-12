@@ -140,6 +140,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   the ship plan in scope, the clock's advance buttons, and the user's balance decisions as settled questions (Short haul Landfall:
   4 of 6 alive and 3 under 50; 2 starting parts, a failed repair spends one; a nav fault patched at arrival slips arrival).
   The 8-minute first run and the open low-trust question are playtest questions. Design text only.
+- 2026-11-13: balance step B3 (parts and patches that bite): `StartParts` 2, a failed repair spends a part too, patches return from alert 2 on, the doubled "Old patch gives way" prefix is fixed, and a patch still outstanding at the last drift takes its consequence (controller: +4 wear and `PatchFailDeathChance` per sleeper; nav: arrival slips `NavPatchArrivalSlipYears`, 9). Balance harness (200 seeds, after the validator fixes below): Landfall honest 96.5%, careless 85.5%, liar 61.5% (30.5% Adrift); tuning continues in later steps.
+- 2026-11-13: B3 validator fixes: the refusal warning and the drift share one end year (`DriftEndYear`, arrival slip included), so the warning no longer says the stores last when the slipped drift starves the refuser; sleepers killed by the controller patch die of it, not "on low power" (the harness's cause table splits them); a repair under way needs a part to finish or redo, and stops with none left (`work_no_parts`); crew say "the coolant leak again" for a returned fault (`Fault.CrewName`); Adrift wording covers a returned nav patch; `Tuning.cs` doc comments untangled.
 
 ### Built
 
@@ -170,7 +172,7 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
 ### Differences from DESIGN.md to settle
 
 - Up to three people awake; alert 4 (the signal) has no fault and can be drifted past with nobody woken.
-- Losing the navigation fault ends the run as "Adrift" (no arrival slip of years).
+- Adrift when a navigation fault's clock runs out unrepaired (including a returned patch); a patch still outstanding at the last drift slips the arrival by 9 years instead. A slip by decades for other cases is not built.
 - Shorter wakings are all or nothing: the three-month minimum is waived as soon as the stores can't feed everyone up through a
   person's remaining three months (`Voyage.CanSleepNow`); there is no rationing. Once the stores are empty, whoever stays awake dies
   after `Tuning.StarveDays` (60 days).
