@@ -355,14 +355,14 @@ public sealed partial class ShipGame
 
             var bx = x + width - buttons;
             if (_p.Button(new Rectangle(bx, y, 84, 32), "OPEN", live, selected: access == LogAccess.Open))
-                Do(() => v.SetLog(f.Key, LogAccess.Open));
+                Act("log " + f.Key + " open", () => v.SetLog(f.Key, LogAccess.Open));
             if (_p.Button(new Rectangle(bx + 88, y, 84, 32), "RESTRICT", live, selected: access == LogAccess.Restricted))
-                Do(() => v.SetLog(f.Key, LogAccess.Restricted));
+                Act("log " + f.Key + " restricted", () => v.SetLog(f.Key, LogAccess.Restricted));
             if (_p.Button(new Rectangle(bx + 176, y, 84, 32), "ALTER", live, selected: access == LogAccess.Altered))
             {
                 var next = NextAltered(f);
                 if (next != null)
-                    Do(() => v.SetLog(f.Key, LogAccess.Altered, next));
+                    Act("log " + f.Key + " altered to " + next, () => v.SetLog(f.Key, LogAccess.Altered, next));
             }
             y += 37;
         }

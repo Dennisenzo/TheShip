@@ -270,6 +270,17 @@ public class MindTests
     }
 
     [Fact]
+    public async Task The_warm_up_makes_one_call_of_each_shape_the_game_uses()
+    {
+        var calls = new List<LlmCallStats>();
+        var llm = new FakeLlm();
+        llm.CallCompleted += calls.Add;
+        await ShipMind.WarmUpAsync(llm);
+        Assert.Equal(3, calls.Count);
+        Assert.All(calls, c => Assert.Equal("warmup", c.Kind));
+    }
+
+    [Fact]
     public async Task A_line_is_read_before_it_is_said_and_nothing_is_recorded_by_reading()
     {
         var v = new Voyage(1);

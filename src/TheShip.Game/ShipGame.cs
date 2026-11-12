@@ -38,9 +38,12 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     private Painter _p = null!;
 
     private Task<ILlmProvider>? _loading;
-    private string _loadingText = "";
+    /// <summary>Written by the loading task as well as the game thread.</summary>
+    private volatile string _loadingText = "";
     private Voyage? _voyage;
     private ShipMind? _mind;
+    /// <summary>The record of this run in Sessions/ (see <see cref="SessionLog"/>).</summary>
+    private SessionLog? _session;
     /// <summary>The person selected on the bridge: who you speak to alone, and who repair requests go to.</summary>
     private CrewMember? _target;
     private CrewMember? _dossier;
@@ -114,7 +117,22 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         }
         _loadingText = "Loading " + Path.GetFileName(path) + " ...";
         var layers = _options.GpuLayers;
-        _loading = Task.Run<ILlmProvider>(() => new LocalLlm(path, gpuLayerCount: layers));
+        _loading = Task.Run<ILlmProvider>(async () =>
+        {
+            var llm = new LocalLlm(path, gpuLayerCount: layers);
+            // The first calls carry one-time costs (GPU shader compilation can take a minute): pay them here, not on the player's first line.
+            _loadingText = "Warming up " + Path.GetFileName(path) + " on " + llm.Backend + " ..."
+                           + "\nThe first run after installing the game or a graphics driver can take a minute. Later runs are quick.";
+            try
+            {
+                await ShipMind.WarmUpAsync(llm);
+            }
+            catch (Exception)
+            {
+                // A model that can't answer the warm-up shows it on the first real call; the load itself worked.
+            }
+            return llm;
+        });
     }
 
     /// <summary>Bundled font, falling back to a system font if Content/Fonts is missing.</summary>
@@ -136,8 +154,16 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     private void Start(ILlmProvider llm, string note)
     {
         _voyage = new Voyage(_options.Seed);
+        _session = new SessionLog("seed " + _options.Seed + ", model " + llm.Name + " on " + llm.Backend);
+        llm.CallCompleted += s => _session.Line("llm", s.Kind + ": " + s.PromptTokens + " prompt tokens, " + s.GeneratedTokens
+                                                       + " generated, first token " + s.FirstToken.TotalSeconds.ToString("0.00") + " s, total "
+                                                       + s.Total.TotalSeconds.ToString("0.00") + " s" + (s.TrimmedTurns > 0 ? ", trimmed " + s.TrimmedTurns : ""));
         _mind = new ShipMind(_voyage, llm, _main);
+        _mind.Trace += text => _session.Line("model", text);
         Note(note);
+        if (_session.FilePath is { } file)
+            Note("This run is recorded in " + file + ".");
+        _session.Snapshot(_voyage);
         Note("Wake someone from the crew list, then advance the clock. Type to speak to whoever is awake; select a person to speak to them alone.");
     }
 
@@ -145,6 +171,18 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
 
     /// <summary>Queue what a click asked for.</summary>
     private void Do(Action action) => _actions.Add(action);
+
+    /// <summary>Queue a click that changes the game, and record it in the session log (with the state after a clock move).</summary>
+    private void Act(string what, Action action, bool snapshot = false) => Do(() =>
+    {
+        _session?.Line("click", what);
+        action();
+        if (snapshot && _voyage is not null)
+        {
+            _session?.Follow(_voyage);
+            _session?.Snapshot(_voyage);
+        }
+    });
 
     /// <summary>How the 1600 x 900 layout sits in the window: its scale and its top-left corner.</summary>
     private (float Scale, float X, float Y) View()
@@ -181,6 +219,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
                 action();
             _scroll = 0;
         }
+        if (_voyage is not null)
+            _session?.Follow(_voyage);
 
         var mouse = Mouse.GetState();
         var view = View();
@@ -220,7 +260,10 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             else if (_picker)
                 _picker = false;
             else if (_pendingText != null)
+            {
+                _session?.Line("dropped", _pendingText);
                 CancelPending();
+            }
             else
                 _input.Clear();
         }
@@ -248,6 +291,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             _screen = Screen.Bridge;
             CancelPending();
             ShowEnding(ending);
+            _session?.Follow(_voyage);
+            _session?.Ending(ending);
+            _session?.Snapshot(_voyage);
         }
         base.Update(gameTime);
     }
@@ -280,6 +326,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             Note("Nobody is awake to hear you.");
             return;
         }
+        _session?.Line("typed", "to " + string.Join(", ", hearers.Select(h => h.Name)) + ": " + text);
         _pendingText = text;
         _pendingHearers = hearers;
         _pendingReading = null;
@@ -304,6 +351,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
                 return;
             _pendingFailed = reading is null;
             _pendingReading = reading ?? Reading.Plain;
+            if (_voyage is not null)
+                _session?.Line("reading", (reading is null ? "the model could not read it; " : "") + "shown as " + Describe(_voyage, _pendingReading));
         });
     }
 
@@ -316,6 +365,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         var reading = _pendingReading;
         var hearers = _pendingHearers;
         CancelPending();
+        _session?.Line("said", Describe(_voyage, reading) + ": " + text);
         _voyage.Say(text, reading, hearers);
         _scroll = 0;
     }
@@ -367,6 +417,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     protected override void UnloadContent()
     {
         _mind?.Dispose();
+        _session?.Line("quit", _voyage?.Phase == Phase.Ended ? "after the ending" : "before the end of the voyage");
+        _session?.Dispose();
         _fonts?.Dispose();
         base.UnloadContent();
     }

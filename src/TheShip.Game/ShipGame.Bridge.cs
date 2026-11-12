@@ -53,6 +53,7 @@ public sealed partial class ShipGame
 
         void Pick(Reading reading) => Do(() =>
         {
+            _session?.Line("reading", "changed by you to " + Describe(v, reading));
             _pendingReading = reading;
             _pendingFailed = false;
             _picker = false;
@@ -186,9 +187,9 @@ public sealed partial class ShipGame
                 var half = (inner - 8) / 2;
                 var fault = f;
                 if (_p.Button(new Rectangle(ix, y, half, 40), who is null ? "SELECT SOMEONE" : "REPAIR: " + who.Name.ToUpperInvariant(), who != null) && who != null)
-                    Do(() => v.Assign(who, fault, patch: false));
+                    Act("repair " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: false));
                 if (_p.Button(new Rectangle(ix + half + 8, y, half, 40), "PATCH", who != null) && who != null)
-                    Do(() => v.Assign(who, fault, patch: true));
+                    Act("patch " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: true));
                 y += 40;
             }
             y += 12;
@@ -204,9 +205,9 @@ public sealed partial class ShipGame
         _p.TextRight(_p.Small, "year " + N(Math.Floor(v.Year)) + ", day " + day, x + width - 14, clock.Y + 12, Painter.Dim);
         var label = v.Phase == Phase.Aftermath ? "ADVANCE TWO WEEKS" : "ADVANCE TO NEXT EVENT";
         if (_p.Button(new Rectangle(ix, clock.Y + 44, inner, 40), label, v.Phase != Phase.Ended, primary: true))
-            Do(() => v.Go());
+            Act(label.ToLowerInvariant(), v.Go, snapshot: true);
         if (_p.Button(new Rectangle(ix, clock.Y + 94, inner, 40), "DRIFT TO THE NEXT ALERT", v.Phase == Phase.Aftermath))
-            Do(() => v.Drift());
+            Act("drift to the next alert", v.Drift, snapshot: true);
     }
 
     // ---- The ship plan ----
@@ -283,7 +284,7 @@ public sealed partial class ShipGame
                     DoorState.Closed => DoorState.Locked,
                     _ => DoorState.Open,
                 };
-                Do(() => v.SetDoor(id, next));
+                Act("door " + id + " to " + next, () => v.SetDoor(id, next));
             }
         }
 
@@ -481,14 +482,14 @@ public sealed partial class ShipGame
             if (c.State == CrewState.Asleep)
             {
                 if (_p.Button(act, "WAKE", !ended))
-                    Do(() => v.Wake(person));
+                    Act("wake " + person.Name, () => v.Wake(person));
             }
             else if (c.State == CrewState.Awake)
             {
                 var can = c.HoursAwake >= Tuning.MinAwakeHours;
                 var days = N(Math.Ceiling((Tuning.MinAwakeHours - c.HoursAwake) / 24));
                 if (_p.Button(act, can ? "SLEEP" : "in " + days + " d", can && !ended))
-                    Do(() => v.AskSleep(person));
+                    Act("ask " + person.Name + " to sleep", () => v.AskSleep(person));
             }
             if (c.Alive && _p.Hit(card) && !_p.Over(file) && !_p.Over(act))
                 Do(() => _target = _target == person ? null : person);

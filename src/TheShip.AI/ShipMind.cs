@@ -30,6 +30,9 @@ public sealed class ShipMind : IDisposable
     /// <summary>A line the player typed is still being read.</summary>
     public bool IsReading => _reading > 0;
     public bool Busy => _worker.Busy || _worker.Pending > 0;
+    /// <summary>What the model answered, for the session log: raw readings, rejected crew lines, judgements. Raised on worker threads.</summary>
+    public event Action<string>? Trace;
+
     /// <summary>Readings the model returned that could not be used (a playtest number).</summary>
     public int ReadFailures { get; private set; }
 
@@ -51,10 +54,12 @@ public sealed class ShipMind : IDisposable
             raw = await _worker.Enqueue(LlmPriority.Reading,
                 (llm, ct) => llm.ChatAsync(system, new[] { new ChatTurn("user", user) }, options, null, ct));
         }
-        catch (Exception)
+        catch (Exception e)
         {
             // Counted below as an unusable reading.
+            Trace?.Invoke("read failed: " + e.GetType().Name + ": " + e.Message);
         }
+        Trace?.Invoke("read \"" + text + "\" -> " + raw);
         return await _main.Run(() =>
         {
             _reading--;
@@ -63,6 +68,27 @@ public sealed class ShipMind : IDisposable
                 ReadFailures++;
             return reading;
         });
+    }
+
+    /// <summary>
+    /// Runs one call of each shape the game makes (a reading with its grammar, a crew line, a yes/no judgement) on a
+    /// throwaway voyage, so the one-time costs land on the loading screen instead of the player's first line: the GPU
+    /// backend compiles its shaders on the first call (about 45 seconds with Vulkan when the driver has no cache yet).
+    /// </summary>
+    public static async Task WarmUpAsync(ILlmProvider llm, CancellationToken ct = default)
+    {
+        var voyage = new Voyage(0);
+        var hearers = voyage.Crew.Take(1).ToList();
+        var read = new LlmOptions("warmup", MaxTokens: 80, Temperature: 0f,
+            Grammar: Grammars.ReadingFor(voyage.FactList.Select(f => f.Key)), Dialogue: false);
+        await llm.ChatAsync(Prompts.ReadSystem(voyage),
+            new[] { new ChatTurn("user", Prompts.ReadUser("We are twelve years out.", hearers, voyage)) }, read, null, ct);
+        await llm.ChatAsync(Prompts.CrewSystem(hearers[0], voyage),
+            new[] { new ChatTurn("user", "What happens now: you wake up in your pod.\nSay it in your own words.") },
+            new LlmOptions("warmup", MaxTokens: 8), null, ct);
+        await llm.ChatAsync(Prompts.LieJudgeSystem,
+            YesNo.Turns(Prompts.LieJudgeQuestion("Nobody has been hurt.", "Idris is dead"), Prompts.LieJudgeExamples),
+            YesNo.Options with { Kind = "warmup" }, null, ct);
     }
 
     /// <summary>The model's JSON as a reading; null when it isn't usable (unknown kind, a value the fact doesn't have).</summary>
@@ -120,13 +146,15 @@ public sealed class ShipMind : IDisposable
                     var text = await llm.ChatAsync(system, new[] { new ChatTurn("user", user) }, new LlmOptions("reply"), null, ct);
                     if (Acceptable(text, beliefs, decision))
                         return text;
+                    Trace?.Invoke("crew line rejected (attempt " + (attempt + 1) + ", " + entry.Speaker + "): " + text);
                 }
                 return null;
             });
         }
-        catch (Exception)
+        catch (Exception e)
         {
             // The templated line stays.
+            Trace?.Invoke("crew line failed: " + e.GetType().Name + ": " + e.Message);
         }
         _main.Post(() =>
         {
@@ -178,6 +206,7 @@ public sealed class ShipMind : IDisposable
             var answer = await _worker.Enqueue(LlmPriority.Background,
                 (llm, ct) => llm.ChatAsync(Prompts.LieJudgeSystem, turns, YesNo.Options, null, ct));
             // Leaning towards missing a lie over a false accusation: anything but a clear yes changes nothing.
+            Trace?.Invoke("judge \"" + statement + "\" against \"" + evidence + "\" for " + crewId + ": " + answer);
             if (YesNo.IsYes(answer))
                 _main.Post(() => _voyage.DiscoverUnkeyed(statementId, crewId, evidence));
         }

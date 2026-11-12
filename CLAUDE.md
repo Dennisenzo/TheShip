@@ -26,6 +26,41 @@ dotnet run --project src/TheShip.Game -- [--seed <n>] [--llm <file.gguf>] [--gpu
 | `src/TheShip.Game` | MonoGame window: the bridge (ship plan, issues, crew, log), crew dossiers, the record and ship logs. `Painter.cs` is the drawing kit. |
 | `tests/TheShip.Tests` | xunit tests of the simulation and the reader. |
 
+## Analysing the user's play sessions
+
+Every run writes `src/TheShip.Game/bin/Debug/net10.0/win-x64/Sessions/<date>_<time>.log` (`SessionLog.cs`): a plain-text record with a
+real-time stamp and a tag per line. The game's opening note gives the file's path.
+
+| Tag | What it records |
+| --- | --- |
+| `start`, `quit` | seed, model and backend; whether the voyage had ended |
+| `state` | after each clock move: year, phase, stores, parts, pod wear, the alert's faults, every person's state, age, trust, morale, days awake, thaws, beliefs, caught lies, doubts |
+| `Y<year> ship/crew/you/recorded/help` | every ship log line; a crew line shows its template and the game's decision |
+| `voiced` | the model's wording of that crew line, or that it was rejected and the template stayed |
+| `click` | every click that changes the game: wake, sleep, repair, patch, advance, drift, doors, logs |
+| `typed`, `reading`, `said`, `dropped` | a line typed (with its hearers), how it was read or re-read by the player, and whether it was said or dropped |
+| `model` | the model's raw reading, rejected crew lines, yes/no judgements, failures |
+| `llm` | each model call: kind, prompt and generated tokens, first-token and total seconds |
+| `ending` | the ending, survivors, beliefs and the record |
+
+## Working with Claude (rules taken from the Cities repo, 2026-11-12)
+
+- **Branches.** Work happens on branches (`feature/<topic>`, `fix/<topic>`) in git worktrees; `main` only receives merges. The main
+  session merges, builds and runs the tests on `main` after each merge. Push only when the user asks.
+- **Commits.** Commit after every change that builds and passes its tests, one commit per change, descriptive message. Update this file's
+  Progress section, DESIGN.md (design changes) and README.md in the same commit. Stage files by name.
+- **Models.** The main session runs on Opus. Sub-agents run on Sonnet unless their type says otherwise: `ship-bugfix` is Opus,
+  `ship-validator` is Fable.
+- **Sub-agents.** Use the agent types in `~/.claude/agents/`: `ship-planner` (read-only plan), `ship-dev` (feature, own worktree and branch),
+  `ship-bugfix` (reproduce, root cause, regression test), `ship-validator` (checks a finished branch, runs the full suite, fixes warnings).
+  Name each agent after the thing it works on (the Agent call's description) and report by that name. A multi-step plan is done one
+  sub-agent per step, in order; tasks that touch mostly different files may run in parallel worktrees. Sub-agents may start their own
+  sub-agents if they stay on the same branch.
+- **Tests.** Dev and bugfix agents run targeted tests (`dotnet test --filter`); the validator runs the full suite.
+- **Validation.** Dev/bugfix branch, then `ship-validator`, then the merge. With several tasks running, validate once all are done; fix what
+  it finds with `ship-bugfix` agents without asking, then validate again.
+- **The real model.** Before loading it (probes, runs), check no `TheShip.Game` process is running: the user may be playing.
+
 ## Rules for the code
 
 - The game owns the truth. The model writes crew lines and reads player lines; it never changes state.
@@ -41,7 +76,8 @@ dotnet run --project src/TheShip.Game -- [--seed <n>] [--llm <file.gguf>] [--gpu
 - A line is read before it is said and can't be changed afterwards (`ShipMind.Read`, then `Voyage.Say`). The reading shown to the
   player never says whether a statement is true. Don't add an undo for spoken lines: it lets a failed lie be taken back.
 - The interface is laid out in a 1600 x 900 space and scaled to the window (`ShipGame.View`). Colours come from `Painter`. Clicks are
-  queued with `Do(...)` and run at the start of the next update, never inside a draw.
+  queued with `Do(...)` (or `Act(...)` for a click that changes the game, so the session log records it) and run at the start of the
+  next update, never inside a draw.
 
 ## Progress
 
@@ -65,6 +101,12 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   doors that lock (a locked door stops a repair and blocks a crew member checking evidence behind it, at a trust cost), and the three screens.
   All typed controls are removed. A line is now read before it is said, with a picker for the reading; the take-back (`Voyage.Reread`) is gone.
   Written without a compiler: build, run the tests, and look at every screen.
+- 2026-11-12: "stuck on the model is reading it" was the first model call paying a one-time Vulkan shader compile (about 45 s with no
+  driver cache; 0.4 s per reading afterwards, measured with Gemma 4 E4B). The loading screen now runs `ShipMind.WarmUpAsync`
+  (one reading, one crew line, one yes/no) after the model loads, so that cost is paid before the voyage starts. Builds; 27 tests pass.
+- 2026-11-12: every run writes a session log (`SessionLog.cs`, Sessions/ next to the exe; see "Analysing the user's play sessions").
+  Clicks that change the game go through `Act(...)`, which logs them; `ShipMind.Trace` reports the model's raw answers.
+- 2026-11-12: the working rules (branches, commits, models, sub-agent types `ship-*`) are taken over from the Cities repo.
 
 ### Built
 
@@ -89,7 +131,7 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
     the reading picker, the crew cards (Wake, Sleep, File; click a card to speak to one person) and "Waiting on you".
   - `ShipGame.Screens.cs`: the crew dossier (sheet, what they know, what you told them) and the record with the ship log entries (Open, Restrict, Alter).
   - The model loads in the background; without one the window says what is missing.
-- **Tests** (`tests/TheShip.Tests`): the loop, the lie lookup, the reader, the grammar and `ShipMind`'s parsing. Never run.
+- **Tests** (`tests/TheShip.Tests`): the loop, the lie lookup, the reader, the grammar, `ShipMind`'s parsing and the warm-up. All pass (2026-11-12).
 
 ### Differences from DESIGN.md to settle
 
@@ -99,7 +141,7 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
 - Terminal notes and paper notes are not in. The drift report is complete because no sensors are lost yet.
 - Doors: only locking has an effect. Open and closed look different and behave the same. Nobody reacts to being locked in.
 - The design canvas shows things the game does not simulate: a section without sensors, a "next event" line on the clock, crew notes in the drift report.
-- Not ported from Cities' LLM stack: the separate model host process, CUDA backend, reply prefix cache, VRAM budget, session log.
+- Not ported from Cities' LLM stack: the separate model host process, CUDA backend, reply prefix cache, VRAM budget (the session log is now in, as plain text).
 
 ### Not built yet
 
