@@ -702,14 +702,19 @@ public class MindTests
     {
         var v = new Voyage(1);
         var llm = new FakeLlm { Read = "not json at all" };
-        using var mind = new ShipMind(v, llm, new MainThreadQueue { Immediate = true });
+        var main = new MainThreadQueue();
+        using var mind = new ShipMind(v, llm, main);
         var mara = v.Find("mara")!;
         v.Wake(mara);
         v.Go();
         var seen = new List<(Reading Reading, bool Failed)>();
         mind.LineRead += (_, r, failed) => seen.Add((r, failed));
         mind.SayAtOnce("Idris is alive.", new List<CrewMember> { mara });
-        await Task.Delay(50);
+        for (var i = 0; i < 300 && seen.Count == 0; i++)
+        {
+            main.Drain();
+            await Task.Delay(10);
+        }
         Assert.Empty(v.Statements);
         Assert.Equal((Reading.Plain, true), Assert.Single(seen));
         Assert.False(v.Log.Last(e => e.Kind == LogKind.You).Unread);

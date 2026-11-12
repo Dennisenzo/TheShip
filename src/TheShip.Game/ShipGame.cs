@@ -157,7 +157,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         llm.CallCompleted += s => _session.Line("llm", s.Kind + ": " + s.PromptTokens + " prompt tokens, " + s.GeneratedTokens
                                                        + " generated, first token " + s.FirstToken.TotalSeconds.ToString("0.00") + " s, total "
                                                        + s.Total.TotalSeconds.ToString("0.00") + " s" + (s.TrimmedTurns > 0 ? ", trimmed " + s.TrimmedTurns : ""));
-        _mind = new ShipMind(_voyage, llm, _main);
+        _mind = new ShipMind(_voyage, llm, _main) { ReadTimeout = TimeSpan.FromSeconds(ReadHoldSeconds) };
+        _mind.LineDropped += text => _session.Line("read", "dropped by the game (nobody who heard it is awake, or the voyage had ended): " + text);
         _mind.Trace += text => _session.Line("model", text);
         _mind.LineRead += (text, reading, failed) => _session.Line("read",
             (failed ? "the model's reading was unusable, recorded as plain talk; " : "") + Describe(_voyage!, reading) + ": " + text);
@@ -177,16 +178,33 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _actions.Add(action);
     }
 
-    /// <summary>Queue a click that changes the game, and record it in the session log (with the state after a clock move).</summary>
+    /// <summary>
+    /// The longest a click that changes the game waits for the reading of a line said before it (a hanging model);
+    /// after that the line is applied as plain talk. Readings take about 0.4 s.
+    /// </summary>
+    private const double ReadHoldSeconds = 5;
+
+    /// <summary>
+    /// Queue a click that changes the game, and record it in the session log (with the state after a clock move).
+    /// While a said line is still being read the click waits for it (<see cref="ShipMind.AfterReading"/>), so the line
+    /// counts at the moment it was said: before a Sleep, an Advance or a Repair clicked right after it.
+    /// </summary>
     private void Act(string what, Action action, bool snapshot = false) => Do(() =>
     {
-        _session?.Line("click", what);
-        action();
-        if (snapshot && _voyage is not null)
+        void Run()
         {
-            _session?.Follow(_voyage);
-            _session?.Snapshot(_voyage);
+            _session?.Line("click", what);
+            action();
+            if (snapshot && _voyage is not null)
+            {
+                _session?.Follow(_voyage);
+                _session?.Snapshot(_voyage);
+            }
         }
+        if (_mind is not null)
+            _mind.AfterReading(Run);
+        else
+            Run();
     });
 
     /// <summary>How the 1600 x 900 layout sits in the window: its scale and its top-left corner.</summary>
