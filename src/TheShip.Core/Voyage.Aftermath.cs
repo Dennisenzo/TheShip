@@ -74,11 +74,18 @@ public sealed partial class Voyage
                 Attend(c.Name + " can go back to sleep");
                 Ship(c.Name + " has been awake three months. The pod can take them again.");
             }
-            else if (!c.CanSleepAnnounced && CanSleepNow(c))
+            else if (!c.CanSleepAnnounced && !c.EarlySleepAnnounced && CanSleepNow(c))
             {
-                c.CanSleepAnnounced = true;
+                // Its own flag: the offer can lapse (someone else goes to sleep and the stores last again), and the
+                // three-month line must still come.
+                c.EarlySleepAnnounced = true;
                 Attend(c.Name + " can go back to sleep early");
                 Ship("The stores won't last " + c.Name + " three months awake. The pod can take them back early.");
+            }
+            else if (c.EarlySleepAnnounced && !CanSleepNow(c))
+            {
+                // The early offer lapsed; if the stores run short again it is offered again.
+                c.EarlySleepAnnounced = false;
             }
             Clamp(c);
         }

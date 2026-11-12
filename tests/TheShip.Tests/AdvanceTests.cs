@@ -144,6 +144,35 @@ public class AdvanceTests
     }
 
     [Fact]
+    public void A_lapsed_early_sleep_offer_still_lets_the_three_month_line_come()
+    {
+        var v = new Voyage(1);
+        var mara = AftermathWithMara(v);
+        Assert.True(mara.HoursAwake < Tuning.MinAwakeHours);
+        // 120 person-days last Mara alone through her three months, but not Mara and Tomas together.
+        v.Stores = 120;
+        var tomas = v.Find("tomas")!;
+        v.Wake(tomas);
+        v.Go(); // the thaw
+        v.Go(); // a two-week beat: the early offer
+        Assert.Equal(CrewState.Awake, tomas.State);
+        Assert.True(v.CanSleepNow(mara));
+        Assert.Contains(v.Log, e => e.Text.StartsWith("The stores won't last Mara three months awake"));
+
+        // Tomas goes back: the stores last Mara again, so the early offer lapses.
+        v.AskSleep(tomas);
+        Assert.Equal(CrewState.Asleep, tomas.State);
+        Assert.False(v.CanSleepNow(mara));
+
+        var reason = "";
+        for (var i = 0; i < 6 && !reason.Contains("go back to sleep"); i++)
+            reason = v.GoUntilAttention().Reason;
+        Assert.Equal("Mara can go back to sleep", reason);
+        Assert.Contains(v.Log, e => e.Text.StartsWith("Mara has been awake three months"));
+        Assert.True(v.CanSleepNow(mara));
+    }
+
+    [Fact]
     public void In_the_alert_it_is_the_same_as_go()
     {
         var a = new Voyage(1);

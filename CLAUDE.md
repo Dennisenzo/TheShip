@@ -127,6 +127,10 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   onto empty stores was fatal (60 hungry days < 90-day minimum). A reader who read the same false log text twice (a rewrite put back
   after someone else found it out) is caught once, not twice. Repair work is credited to a worker only until they starve. The
   refusal warning says when the hungry days fall short of the 60 that kill, and names who starves. 5 regression tests.
+- 2026-11-12: dedupe and early-sleep fixes (fix/dedupe-and-early-sleep). The once-per-text log catch now only merges identical log
+  statements caught in the same finding-out; a reader who caught a rewrite, believed it again when it was put back and finds out
+  again is caught again (trust, CaughtLies, crew line). The early-sleep offer has its own flag (`EarlySleepAnnounced`), reset when
+  the offer lapses, so the three-month line still comes (and stops the advance) after the stores last again. 2 regression tests.
 
 - 2026-11-12: balance harness (`tests/TheShip.Tests/BalanceBots.cs`, `BalanceTests.cs`, `[Trait("Category","Balance")]`): honest, careless and liar bots play whole voyages over seeds 1..200 through the public `Voyage` API and print a table (Landfall rate, endings, deaths, causes, ages, trust, lies) to the test output and `balance-report.txt`. Run: `dotnet test --filter Category=Balance` (about 5 s). Measures only; the 25-75% honest Landfall target test is skipped until tuning. Builds; passes.
 

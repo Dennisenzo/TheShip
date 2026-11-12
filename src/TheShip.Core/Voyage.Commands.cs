@@ -225,6 +225,7 @@ public sealed partial class Voyage
         c.SawPartner = false;
         c.SmallTalkDone = false;
         c.CanSleepAnnounced = false;
+        c.EarlySleepAnnounced = false;
         c.PendingQuestion = null;
         PodWear++;
         Ship(c.Name + " is awake.");

@@ -71,6 +71,8 @@ public sealed class CrewMember
     public bool SawPartner { get; set; }
     public bool SmallTalkDone { get; set; }
     public bool CanSleepAnnounced { get; set; }
+    /// <summary>The early-sleep offer (stores too low for three months) was made and still holds.</summary>
+    public bool EarlySleepAnnounced { get; set; }
 
     public bool Has(Trait trait) => Traits.Contains(trait);
     public int SkillOf(Skill skill) => Skills.TryGetValue(skill, out var level) ? level : 0;

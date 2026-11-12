@@ -424,6 +424,33 @@ public class VoyageTests
     }
 
     [Fact]
+    public void Fooled_again_by_the_same_log_text_after_catching_it_costs_again()
+    {
+        var v = new Voyage(1);
+        var idris = v.Find("idris")!;
+        var stores = v.GetFact("stores");
+        Assert.Equal(0, idris.SkillOf(Skill.Engineering));
+        v.SetLog("stores", LogAccess.Altered, "short");
+        v.ReadLog(idris, stores);
+        v.SetLog("stores", LogAccess.Open);
+        v.ReadLog(idris, stores);
+        Assert.Equal(1, idris.CaughtLies);
+
+        // Put back after she caught it: a new statement, and she believes it again.
+        v.SetLog("stores", LogAccess.Altered, "short");
+        Assert.Equal(2, v.Statements.Count);
+        v.ReadLog(idris, stores);
+        Assert.Equal("short", idris.Beliefs["stores"].Value);
+        var trust = idris.Trust;
+        v.SetLog("stores", LogAccess.Open);
+        v.ReadLog(idris, stores);
+
+        Assert.Equal(2, idris.CaughtLies);
+        Assert.True(idris.Trust < trust);
+        Assert.All(v.Statements, s => Assert.True(s.FoundOutBy.ContainsKey("idris")));
+    }
+
+    [Fact]
     public void A_rewrite_undone_before_anyone_read_it_stays_one_unread_lie_in_the_ending()
     {
         var v = new Voyage(1);
