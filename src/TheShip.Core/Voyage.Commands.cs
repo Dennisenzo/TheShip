@@ -528,16 +528,34 @@ public sealed partial class Voyage
                 Ship("Alter it to read what? " + (f.Numeric ? "Give a number." : "One of: " + string.Join(", ", f.Values) + "."));
                 return;
             }
+            if (f.Access == LogAccess.Altered && f.AlteredValue is { } now && f.Same(now, v))
+            {
+                Ship("The log already reads that " + f.Say(v) + ".");
+                return;
+            }
             f.Access = LogAccess.Altered;
             f.AlteredValue = v;
             var truth = f.IsTrue(v);
-            if (!truth)
-                Statements.Add(new Statement
-                {
-                    Id = _nextStatement++, Year = Year, Text = "Log altered to read: " + f.Say(v), Kind = StatementKind.False,
-                    FactKey = f.Key, Value = v, TruthThen = f.Truth, InLog = true,
-                });
-            Recorded("Recorded: the log now reads that " + f.Say(v) + ". (" + (truth ? "true" : "false; an engineer can spot the rewrite") + ")");
+            if (truth)
+            {
+                Recorded("Recorded: the log now reads that " + f.Say(v) + ". (true)");
+                return;
+            }
+            // Putting the same false entry back is the same lie, not a new one: one record, one set of readers, one
+            // finding-out. A rewrite that someone has already found out is a new lie.
+            var again = Statements.LastOrDefault(s => s.InLog && s.Kind == StatementKind.False && s.FactKey == f.Key
+                                                      && s.Value != null && f.Same(s.Value, v) && s.FoundOutBy.Count == 0);
+            if (again != null)
+            {
+                Recorded("Recorded: the log reads again that " + f.Say(v) + ". (the same lie as in year " + Math.Floor(again.Year).ToString("0") + "; an engineer can spot the rewrite)");
+                return;
+            }
+            Statements.Add(new Statement
+            {
+                Id = _nextStatement++, Year = Year, Text = "Log altered to read: " + f.Say(v), Kind = StatementKind.False,
+                FactKey = f.Key, Value = v, TruthThen = f.Truth, InLog = true,
+            });
+            Recorded("Recorded: the log now reads that " + f.Say(v) + ". (false; an engineer can spot the rewrite)");
             return;
         }
         f.Access = access;

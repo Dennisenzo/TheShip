@@ -157,6 +157,7 @@ public sealed partial class Voyage
         _facts["date"].Truth = ((int)Math.Floor(Year)).ToString(CultureInfo.InvariantCulture);
         _facts["pods"].Truth = PodWear >= Tuning.PodsWornAt ? "worn" : "sound";
         _facts["parts"].Truth = Parts <= Tuning.PartsShortAt ? "short" : "enough";
+        _facts["parts"].Sentences["short"] = Parts <= 0 ? "the spare parts are gone" : "the spare parts are nearly gone";
         _facts["stores"].Truth = Stores < Tuning.StoresShortAt ? "short" : "enough";
     }
 

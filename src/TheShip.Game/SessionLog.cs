@@ -112,8 +112,8 @@ public sealed class SessionLog : IDisposable
     public void Ending(Ending ending)
     {
         var sb = new StringBuilder(ending.Title + ": " + ending.Summary);
-        foreach (var s in ending.Survivors)
-            sb.Append("\nsurvivor: ").Append(s);
+        foreach (var s in ending.Crew)
+            sb.Append("\ncrew: ").Append(s);
         foreach (var b in ending.Beliefs)
             sb.Append("\nbelief: ").Append(b);
         foreach (var r in ending.Record)

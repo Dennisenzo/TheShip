@@ -41,7 +41,7 @@ real-time stamp and a tag per line. The game's opening note gives the file's pat
 | `typed`, `reading`, `said`, `dropped` | a line typed (with its hearers), how it was read or re-read by the player, and whether it was said or dropped |
 | `model` | the model's raw reading, rejected crew lines, yes/no judgements, failures |
 | `llm` | each model call: kind, prompt and generated tokens, first-token and total seconds |
-| `ending` | the ending, survivors, beliefs and the record |
+| `ending` | the ending, the crew (living and dead), beliefs and the record |
 
 ## Working with Claude (rules taken from the Cities repo, 2026-11-12)
 
@@ -112,6 +112,10 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   in time order (`Voyage.Eat`, used by the two-week clock and the drift); once the stores are empty, `Tuning.StarveDays` (60) hungry days
   kill, through the usual death path. The drift report says "Stores ran out in year X. Mara starved in year Y."; a refusal to sleep
   is followed by a SHIP line saying the refuser stays awake through the drift and how long the stores last. 3 regression tests.
+- 2026-11-12: log and record fixes from a play session: altering a log entry back to the same false value is one lie, not one
+  per click (a reader is caught once); nobody reads log entries about alerts that haven't happened or about their own life;
+  a log entry that changed since someone read it is unread again; "the spare parts are gone" at 0 parts; the ending lists
+  the whole crew ("crew:" in the session log), with an unread log rewrite marked "Nobody read it.".
 
 ### Built
 

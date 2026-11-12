@@ -137,6 +137,16 @@ A crew member tests what you tell them when they hear it, and again whenever the
 
 Statements and evidence are stored against the same fact keys, with dates, so finding a keyed lie is a lookup.
 
+An altered log entry is one lie for as long as it says the same false thing: opening, restricting and altering it back to
+the same value again does not add a second lie to the record (a rewrite that someone has already found out does). A rewrite
+undone before anyone read it stays in the record, marked as read by nobody.
+
+### What the log holds
+
+The log only holds what has happened and the ship's state now: nobody reads about an alert before it comes, and nobody reads
+that they themselves are alive. An entry someone read earlier counts as unread again once it shows something else
+(the stores ran short, a pod failed), so knowledge from the log goes stale and can be refreshed.
+
 ### How knowledge spreads
 
 - **Shared shifts.** People awake in the same section talk every hour. Bonded pairs share almost everything.

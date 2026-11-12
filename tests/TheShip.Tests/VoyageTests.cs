@@ -243,7 +243,7 @@ public class VoyageTests
         Assert.Contains($"Stores ran out in year {Math.Floor(storesOut):0}.", report);
         Assert.Contains($"Mara starved in year {Math.Floor(storesOut + Tuning.StarveDays / 365):0}.", report);
         Assert.Contains("Deaths: Mara.", report);
-        Assert.Contains("Mara, engineer: dead", v.Ending!.Survivors);
+        Assert.Contains("Mara, engineer: dead", v.Ending!.Crew);
         Assert.Equal("dead", v.FactList.First(f => f.Key == "alive:mara").Truth);
     }
 
@@ -260,7 +260,7 @@ public class VoyageTests
         Assert.Equal(100, v.Stores, 3);
         Assert.Equal(0, mara.HoursHungry);
         Assert.DoesNotContain("starved", v.Log.Last(e => e.Text.StartsWith("DRIFT:")).Text);
-        Assert.Contains(v.Ending!.Survivors, s => s.StartsWith("Mara, engineer, age"));
+        Assert.Contains(v.Ending!.Crew, s => s.StartsWith("Mara, engineer, age"));
     }
 
     [Fact]
@@ -276,6 +276,128 @@ public class VoyageTests
         Assert.Equal(Tuning.StarveDays * 24, mara.HoursHungry, 3);
         Assert.True(v.Clock - clock >= Tuning.StarveDays * 24 - 0.001);
         Assert.Contains(v.Log, e => e.Text.StartsWith("Mara starved in year"));
+    }
+
+    [Fact]
+    public void Toggling_a_log_entry_back_to_the_same_rewrite_is_one_lie()
+    {
+        // The session of 2026-11-12 23:13: altered, open, restricted, altered, restricted, altered, open within seconds.
+        var v = new Voyage(1);
+        v.SetLog("stores", LogAccess.Altered, "short");
+        v.SetLog("stores", LogAccess.Open);
+        v.SetLog("stores", LogAccess.Restricted);
+        v.SetLog("stores", LogAccess.Altered, "short");
+        v.SetLog("stores", LogAccess.Altered, "short");
+        v.SetLog("stores", LogAccess.Restricted);
+        v.SetLog("stores", LogAccess.Altered, "short");
+        v.SetLog("stores", LogAccess.Open);
+        var s = Assert.Single(v.Statements);
+        Assert.Equal(StatementKind.False, s.Kind);
+        Assert.Equal("short", s.Value);
+    }
+
+    [Fact]
+    public void A_reader_of_a_rewrite_put_back_twice_finds_out_one_lie()
+    {
+        var v = new Voyage(1);
+        var tomas = v.Find("tomas")!;
+        var stores = v.GetFact("stores");
+        Assert.Equal(0, tomas.SkillOf(Skill.Engineering));
+        v.SetLog("stores", LogAccess.Altered, "short");
+        v.ReadLog(tomas, stores);
+        v.SetLog("stores", LogAccess.Open);
+        v.SetLog("stores", LogAccess.Altered, "short");
+        v.ReadLog(tomas, stores);
+        Assert.Equal("short", tomas.Beliefs["stores"].Value);
+        v.SetLog("stores", LogAccess.Open);
+        v.ReadLog(tomas, stores);
+        var s = Assert.Single(v.Statements);
+        Assert.Equal(new[] { "tomas" }, s.Hearers);
+        Assert.True(s.FoundOutBy.ContainsKey("tomas"));
+        Assert.Equal(1, tomas.CaughtLies);
+        // Once found out, writing it again is a new lie.
+        v.SetLog("stores", LogAccess.Altered, "short");
+        Assert.Equal(2, v.Statements.Count);
+    }
+
+    [Fact]
+    public void A_rewrite_undone_before_anyone_read_it_stays_one_unread_lie_in_the_ending()
+    {
+        var v = new Voyage(1);
+        v.SetLog("stores", LogAccess.Altered, "short");
+        v.SetLog("stores", LogAccess.Open);
+        v.SetLog("stores", LogAccess.Altered, "short");
+        v.SetLog("stores", LogAccess.Open);
+        for (var i = 0; i < 200 && v.Phase != Phase.Ended; i++)
+        {
+            if (v.Phase == Phase.Alert)
+                v.Go();
+            else
+                v.Drift();
+        }
+        var line = Assert.Single(v.Ending!.Record);
+        Assert.EndsWith("A lie. Nobody read it.", line);
+        Assert.Contains("Idris, botanist: dead", v.Ending.Crew);
+    }
+
+    [Fact]
+    public void Nobody_reads_the_log_about_an_alert_that_has_not_happened()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        for (var n = 2; n <= 5; n++)
+        {
+            var f = v.GetFact("alert:" + n);
+            Assert.False(v.InLogFor(mara, f));
+            Assert.False(v.Unread(mara, f));
+            v.ReadLog(mara, f);
+            Assert.False(mara.Beliefs.ContainsKey(f.Key));
+        }
+        Assert.True(v.InLogFor(mara, v.GetFact("alert:1")));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    public void A_long_aftermath_reads_no_future_alert_and_not_ones_own_life(int seed)
+    {
+        // The session of 2026-11-12 23:13: in year 4 Mara read "there was no navigation fault" and later "Mara is alive".
+        var v = new Voyage(seed);
+        var mara = HonestFirstAlert(v);
+        for (var i = 0; i < 60; i++)
+            v.Go();
+        for (var n = 2; n <= 5; n++)
+            Assert.False(mara.Beliefs.ContainsKey("alert:" + n), "Mara learned about alert " + n + " before it happened");
+        Assert.False(mara.Beliefs.ContainsKey("alive:mara"));
+        Assert.DoesNotContain(v.Log, e => e.Text.StartsWith("Mara reads the log: Mara", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Nobody_reads_their_own_life_in_the_log()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        var own = v.GetFact("alive:mara");
+        Assert.False(v.InLogFor(mara, own));
+        v.ReadLog(mara, own);
+        Assert.False(mara.Beliefs.ContainsKey(own.Key));
+        Assert.True(v.InLogFor(mara, v.GetFact("alive:tomas")));
+    }
+
+    [Fact]
+    public void A_log_entry_read_earlier_is_unread_again_once_it_changed()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        var stores = v.GetFact("stores");
+        v.ReadLog(mara, stores);
+        Assert.Equal("enough", mara.Beliefs["stores"].Value);
+        Assert.False(v.Unread(mara, stores));
+        stores.Truth = "short";
+        Assert.True(v.Unread(mara, stores));
     }
 }
 
