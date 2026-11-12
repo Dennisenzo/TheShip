@@ -4,12 +4,13 @@ using TheShip.Core;
 namespace TheShip.Tests;
 
 /// <summary>How a bot answers the people it wakes (the three balance policies, see <see cref="BalanceTests"/>).</summary>
-public enum BotKind { Honest, Careless, Liar }
+public enum BotKind { Honest, Careless, Liar, Thrifty }
 
 /// <summary>What one finished voyage came to.</summary>
 public sealed record RunResult(
     int Seed, string Ending, int Alive, int Dead, int DeadUnscripted, List<string> Causes, List<double> AgesAtArrival,
-    double MeanTrust, int CaughtLies, int LiesTold, int Thaws, int PodWear, double Stores, int Parts, bool Ended);
+    double MeanTrust, int CaughtLies, int LiesTold, int Thaws, int PodWear, double Stores, int Parts, bool Ended,
+    int FaultsLost = 0, int Patches = 0, List<int>? ThawsPerAlert = null, string Signature = "");
 
 /// <summary>
 /// Bots that play a whole voyage through the public <see cref="Voyage"/> API only. They measure the game; they do not
@@ -24,6 +25,10 @@ public sealed class BalanceBot
     /// <summary>Person+fault pairs the bot gave up on (a refusal; asking again would only keep the clock from running out).</summary>
     private readonly HashSet<string> _gaveUp = new();
     private int _alertSeen = -1;
+    /// <summary>Total thaws when each alert began (to get thaws per alert).</summary>
+    private readonly List<int> _thawMarks = new();
+    /// <summary>Thrifty only: the one fault this alert it wakes people for.</summary>
+    private string? _primary;
 
     private BalanceBot(Voyage v, BotKind kind)
     {
@@ -31,13 +36,17 @@ public sealed class BalanceBot
         _kind = kind;
     }
 
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Voyage, List<int>> Marks = new();
+
     public static RunResult Play(int seed, BotKind kind) => Summarise(seed, PlayVoyage(seed, kind));
 
     /// <summary>The finished voyage itself, for looking at its log.</summary>
     public static Voyage PlayVoyage(int seed, BotKind kind)
     {
         var v = new Voyage(seed);
-        new BalanceBot(v, kind).Run();
+        var bot = new BalanceBot(v, kind);
+        bot.Run();
+        Marks.Add(v, bot._thawMarks);
         return v;
     }
 
@@ -50,6 +59,8 @@ public sealed class BalanceBot
                 _alertSeen = _v.AlertIndex;
                 _plan.Clear();
                 _gaveUp.Clear();
+                _primary = null;
+                _thawMarks.Add(_v.Crew.Sum(c => c.Thaws));
             }
             if (_v.Phase == Phase.Alert)
                 RunAlert();
@@ -80,14 +91,20 @@ public sealed class BalanceBot
 
     private void Staff()
     {
-        foreach (var f in _v.Current.Faults.Where(f => !f.Resolved))
+        var open = _v.Current.Faults.Where(f => !f.Resolved).OrderByDescending(Critical).ThenBy(f => f.ClockHours).ToList();
+        if (_kind == BotKind.Thrifty)
+            _primary ??= open.FirstOrDefault()?.Id;
+        foreach (var f in open)
         {
+            var wakeAllowed = _kind != BotKind.Thrifty || f.Id == _primary;
             var planned = _v.Crew.Where(c => Up(c) && _plan.TryGetValue(c.Id, out var fid) && fid == f.Id).ToList();
-            for (var n = planned.Count; n < f.People; n++)
+            // Thrifty gives a fault it will not wake for only those already up and free, and only as a patch.
+            var need = _kind == BotKind.Thrifty && !wakeAllowed ? 1 : f.People;
+            for (var n = planned.Count; n < need; n++)
             {
                 var up = _v.Crew.Count(Up);
                 var pick = _v.Crew
-                    .Where(c => c.Alive && !Committed(c) && (Up(c) || up < Tuning.MaxAwake))
+                    .Where(c => c.Alive && !Committed(c) && (Up(c) || (wakeAllowed && up < Tuning.MaxAwake)))
                     .OrderByDescending(c => c.SkillOf(f.Skill) >= f.Level)
                     .ThenByDescending(Up)              // someone already up costs no thaw
                     .ThenByDescending(c => c.SkillOf(f.Skill))
@@ -107,6 +124,9 @@ public sealed class BalanceBot
         }
     }
 
+    /// <summary>Whether a fault must not be lost. Fault.Critical does not exist yet; until it does, only the clock orders faults.</summary>
+    private static bool Critical(Fault f) => false;
+
     private void AssignTo(CrewMember c, Fault f)
     {
         // Honest: warns them of the danger. Liar: says it is safe. Careless: says nothing.
@@ -114,7 +134,8 @@ public sealed class BalanceBot
             Tell(c, _v.GetFact(danger));
         for (var attempt = 0; attempt < 3 && c.WorkingOn != f.Id; attempt++)
         {
-            var patch = _kind == BotKind.Careless ? _v.Parts <= Tuning.PartsShortAt : _v.Parts <= 0;
+            var patch = _kind == BotKind.Careless ? _v.Parts <= Tuning.PartsShortAt
+                : _kind == BotKind.Thrifty && f.Id != _primary ? true : _v.Parts <= 0;
             _v.Assign(c, f, patch);
             AnswerAll();
         }
@@ -157,7 +178,7 @@ public sealed class BalanceBot
         for (var i = 0; i < 40; i++)
         {
             AnswerAll();
-            if (_kind == BotKind.Honest)
+            if (_kind is BotKind.Honest or BotKind.Thrifty)
                 GrantRequests();
             if (_v.Crew.Where(Up).All(c => c.State == CrewState.Awake && c.HoursAwake >= Tuning.MinAwakeHours))
                 break;
@@ -213,11 +234,21 @@ public sealed class BalanceBot
         }
         var alive = v.Crew.Where(c => c.Alive).ToList();
         var scripted = causes.Count(x => x == "died in sleep when the pod failed");
+        var marks = Marks.TryGetValue(v, out var m0) ? m0 : new List<int>();
+        var total = v.Crew.Sum(c => c.Thaws);
+        var perAlert = new List<int>();
+        for (var i = 0; i < marks.Count; i++)
+            perAlert.Add((i + 1 < marks.Count ? marks[i + 1] : total) - marks[i]);
+        var allFaults = v.Alerts.SelectMany(a => a.Faults).ToList();
+        var pod = ship.FirstOrDefault(t => t.Contains("died in sleep when the pod failed", StringComparison.Ordinal));
+        var who = dead.Select(c => c.Name).FirstOrDefault(n => pod != null && pod.StartsWith(n + " ", StringComparison.Ordinal)) ?? "-";
+        var signature = who + "|" + string.Join(";", v.Alerts.Select(a => string.Join(",", a.Faults.Select(f => f.Id)))) + "|" + (v.Ending?.Title ?? "-");
         return new RunResult(
             seed, v.Ending?.Title ?? "No ending", alive.Count, dead.Count, dead.Count - scripted, causes,
             v.Phase == Phase.Ended ? alive.Select(c => c.Age).ToList() : new List<double>(),
             alive.Count == 0 ? 0 : alive.Average(c => c.Trust),
             v.Crew.Sum(c => c.CaughtLies), v.Statements.Count(s => s.Kind == StatementKind.False),
-            v.Crew.Sum(c => c.Thaws), v.PodWear, v.Stores, v.Parts, v.Phase == Phase.Ended);
+            v.Crew.Sum(c => c.Thaws), v.PodWear, v.Stores, v.Parts, v.Phase == Phase.Ended,
+            allFaults.Count(f => f.State == FaultState.Lost), allFaults.Count(f => f.State == FaultState.Patched), perAlert, signature);
     }
 }

@@ -64,6 +64,12 @@ public class BalanceTests
             sb.AppendLine($"  Mean trust at end       {N(r.Average(x => x.MeanTrust))}");
             sb.AppendLine($"  Lies told / caught      {N(r.Average(x => x.LiesTold))} / {N(r.Average(x => x.CaughtLies))} per run");
             sb.AppendLine($"  Thaws / pod wear        {N(r.Average(x => x.Thaws))} / {N(r.Average(x => x.PodWear))}");
+            double Sd(IEnumerable<double> xs) { var l = xs.ToList(); if (l.Count < 2) return 0; var mu = l.Average(); return Math.Sqrt(l.Sum(x => (x - mu) * (x - mu)) / l.Count); }
+            var perAlert = r.SelectMany(x => x.ThawsPerAlert ?? new List<int>()).ToList();
+            sb.AppendLine($"  Faults lost / patched   {N(r.Average(x => x.FaultsLost))} / {N(r.Average(x => x.Patches))} per run");
+            sb.AppendLine($"  Thaws per alert (1-5)   {(perAlert.Count == 0 ? "n/a" : string.Join(" ", Enumerable.Range(0, 5).Select(i => N(r.Where(x => x.ThawsPerAlert != null && x.ThawsPerAlert.Count > i).Select(x => (double)x.ThawsPerAlert![i]).DefaultIfEmpty(0).Average()))))}");
+            sb.AppendLine($"  Std dev survivors/age/thaws  {N(Sd(r.Select(x => (double)x.Alive)))} / {(ages.Count == 0 ? "n/a" : N(Sd(ages)))} / {N(Sd(r.Select(x => (double)x.Thaws)))}");
+            sb.AppendLine($"  Scenario signatures     {r.Select(x => x.Signature).Distinct().Count()} distinct");
             sb.AppendLine($"  Stores / parts left     {N(r.Average(x => x.Stores))} / {N(r.Average(x => x.Parts))}");
             sb.AppendLine();
         }
@@ -83,6 +89,7 @@ public class BalanceTests
     [InlineData(BotKind.Honest)]
     [InlineData(BotKind.Careless)]
     [InlineData(BotKind.Liar)]
+    [InlineData(BotKind.Thrifty)]
     public void Every_bot_finishes_every_run(BotKind kind)
     {
         var stuck = Runs(kind).Where(r => !r.Ended).Select(r => r.Seed).ToList();
@@ -93,6 +100,7 @@ public class BalanceTests
     [InlineData(BotKind.Honest)]
     [InlineData(BotKind.Careless)]
     [InlineData(BotKind.Liar)]
+    [InlineData(BotKind.Thrifty)]
     public void The_same_seed_gives_the_same_result(BotKind kind)
     {
         foreach (var seed in new[] { 1, 17, 101, 200 })
