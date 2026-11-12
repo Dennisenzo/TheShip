@@ -15,13 +15,11 @@ public sealed partial class Voyage
     private int _nextStatement = 1;
     private bool _idleWarned;
     private bool _refuserPicked;
-    private Undo? _undo;
-
-    private sealed record Undo(List<(CrewMember Crew, CrewMember.Saved State)> Crew, int Statements, int Log, int NextId, string Text);
 
     public IReadOnlyList<CrewMember> Crew { get; }
     public IReadOnlyList<Fact> FactList { get; }
     public IReadOnlyList<Alert> Alerts { get; }
+    public IReadOnlyList<Section> Sections { get; } = ShipPlan.Sections();
     public List<Statement> Statements { get; } = new();
     public List<LogEntry> Log { get; } = new();
 
@@ -64,6 +62,27 @@ public sealed partial class Voyage
 
     public Fact GetFact(string key) => _facts[key];
     public bool HasFact(string key) => _facts.ContainsKey(key);
+    public Section? GetSection(string id) => Sections.FirstOrDefault(s => s.Id == id);
+
+    /// <summary>Where a person is on the plan: their pod bank, the section of the fault they work on, or the corridor.</summary>
+    public string LocationOf(CrewMember c)
+    {
+        if (c.State != CrewState.Awake)
+            return ShipPlan.Pod(c.Id).Bank;
+        var fault = c.WorkingOn is null ? null : Current.Faults.FirstOrDefault(f => f.Id == c.WorkingOn);
+        return fault is { Section.Length: > 0 } ? fault.Section : "corridor";
+    }
+
+    private bool Locked(string sectionId) => GetSection(sectionId) is { DoorState: DoorState.Locked };
+
+    /// <summary>Open, close or lock a door. A locked door stops repairs behind it and is seen by whoever tries it.</summary>
+    public void SetDoor(string sectionId, DoorState state)
+    {
+        if (Phase == Phase.Ended || GetSection(sectionId) is not { Door: not null } section)
+            return;
+        section.DoorState = state;
+        Ship("The door to the " + section.Name.ToLowerInvariant() + " is " + state.ToString().ToLowerInvariant() + ".");
+    }
     public IEnumerable<CrewMember> Awake => Crew.Where(c => c.State == CrewState.Awake);
 
     /// <summary>A crew member by id or the start of their name; null when nobody or more than one fits.</summary>
@@ -181,7 +200,10 @@ public sealed partial class Voyage
                 report = "A pod has failed. " + victim.Name + " is dead. The pod has to be cleared and the bank resealed.";
                 // Whoever clears the pod sees who was in it.
                 foreach (var f in alert.Faults.Where(f => f.Kind == "pod"))
+                {
                     f.ExposureFact = "alive:" + victim.Id;
+                    f.Section = ShipPlan.Pod(victim.Id).Bank;
+                }
             }
         }
         if (alert.Number == 4)
@@ -198,7 +220,7 @@ public sealed partial class Voyage
         if (alert.Faults.Count == 0)
         {
             Phase = Phase.Aftermath;
-            Ship("Nothing to repair. You can wake someone, change the log, or /drift.");
+            Ship("Nothing to repair. You can wake someone, change the log, or drift.");
         }
     }
 

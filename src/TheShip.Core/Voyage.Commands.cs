@@ -18,11 +18,10 @@ public sealed partial class Voyage
             Ship("Three people awake is the most this build allows at once.");
             return;
         }
-        _undo = null;
         _idleWarned = false;
         c.State = CrewState.Thawing;
         c.ThawDoneAt = Clock + Tuning.ThawHours;
-        Ship("Thaw started for " + c.Name + ". Six hours. /go moves the clock.");
+        Ship("Thaw started for " + c.Name + ". Six hours. Advance the clock.");
     }
 
     /// <summary>Move the clock to the next thing that happens.</summary>
@@ -30,7 +29,6 @@ public sealed partial class Voyage
     {
         if (Phase == Phase.Ended)
             return;
-        _undo = null;
         if (Phase == Phase.Alert)
             GoAlert();
         else
@@ -67,7 +65,7 @@ public sealed partial class Voyage
         if (!thawing && !working && !_idleWarned)
         {
             _idleWarned = true;
-            Ship("Nobody is thawing and no repair is staffed. /go again lets the clocks run out.");
+            Ship("Nobody is thawing and no repair is staffed. Advance again to let the clocks run out.");
             return;
         }
         foreach (var f in open)
@@ -92,7 +90,7 @@ public sealed partial class Voyage
         var up = Crew.Where(c => c.State is CrewState.Awake or CrewState.Thawing).ToList();
         if (up.Count == 0)
         {
-            Ship("Everyone is asleep. /drift moves the clock to the next alert.");
+            Ship("Everyone is asleep. Drift moves the clock to the next alert.");
             return;
         }
         var step = Tuning.AftermathStepHours;
@@ -213,10 +211,14 @@ public sealed partial class Voyage
         }
         if (!patch && Parts <= 0)
         {
-            Ship("No spare parts are left. This can only be patched: /patch.");
+            Ship("No spare parts are left. This can only be patched.");
             return;
         }
-        _undo = null;
+        if (Locked(f.Section))
+        {
+            Ship("The door to the " + GetSection(f.Section)!.Name.ToLowerInvariant() + " is locked. Nobody can reach the " + f.Name.ToLowerInvariant() + ".");
+            return;
+        }
         _idleWarned = false;
 
         if (c.Band == TrustBand.Against || (c.Band == TrustBand.Refuses && !c.RequestGranted))
@@ -342,7 +344,7 @@ public sealed partial class Voyage
         if (Phase != Phase.Alert || !Current.Faults.All(f => f.Resolved))
             return;
         Phase = Phase.Aftermath;
-        Ship("The alert is over. Whoever is awake stays up until they have been awake three months. /go moves two weeks at a time.");
+        Ship("The alert is over. Whoever is awake stays up until they have been awake three months. The clock now moves two weeks at a time.");
     }
 
     /// <summary>Step 7: ask a person to go back under. They may refuse.</summary>
@@ -360,7 +362,6 @@ public sealed partial class Voyage
             Ship("The pod can't take " + c.Name + " yet: " + Hours(Tuning.MinAwakeHours - c.HoursAwake) + " to go.");
             return;
         }
-        _undo = null;
         if (c.RefusesSleep)
         {
             c.AskedToSleep = true;
@@ -452,7 +453,7 @@ public sealed partial class Voyage
         }
         if (!_facts.TryGetValue(key, out var f))
         {
-            Ship("No log entry '" + key + "'. /facts lists them.");
+            Ship("No log entry '" + key + "'.");
             return;
         }
         if (access == LogAccess.Altered)
@@ -501,7 +502,6 @@ public sealed partial class Voyage
             Ship("Still awake and not asked to sleep: " + string.Join(", ", unsettled) + ".");
             return;
         }
-        _undo = null;
 
         var last = AlertIndex >= Alerts.Count - 1;
         var target = last ? Scenario.ArrivalYear : Alerts[AlertIndex + 1].Year;

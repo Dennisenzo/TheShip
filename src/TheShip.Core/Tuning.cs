@@ -41,6 +41,7 @@ public static class Tuning
     public const double HurtByOrder = 10;
     public const double Dodge = 3;
     public const double LogGap = 5;
+    public const double LockedDoor = 5;
     public const double ConfirmedTruth = 3;
     public const double DoubtThreshold = 55;
 

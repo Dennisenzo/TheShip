@@ -1,0 +1,251 @@
+using System.Text;
+using FontStashSharp;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+
+namespace TheShip.Game;
+
+/// <summary>
+/// The drawing kit of the interface: lines, outlines, panels, text and buttons on a white pixel, in the wireframe look
+/// of the interface design. Everything is laid out in a 1600 x 900 space that the game scales to the window.
+/// </summary>
+internal sealed class Painter
+{
+    public const int ScreenWidth = 1600;
+    public const int ScreenHeight = 900;
+
+    public static readonly Color Ground = new(11, 17, 20);
+    public static readonly Color Panel = new(15, 24, 28);
+    public static readonly Color Room = new(15, 26, 31);
+    public static readonly Color Edge = new(35, 53, 61);
+    public static readonly Color Track = new(27, 42, 48);
+    public static readonly Color Faint = new(34, 55, 63);
+    public static readonly Color Hull = new(44, 70, 80);
+    public static readonly Color Wire = new(108, 151, 164);
+    public static readonly Color Dim = new(157, 182, 189);
+    public static readonly Color Ink = new(213, 227, 230);
+    public static readonly Color Bright = new(234, 243, 245);
+    public static readonly Color Accent = new(242, 176, 76);
+    public static readonly Color Blue = new(124, 196, 232);
+    public static readonly Color Power = new(140, 122, 78);
+    public static readonly Color Dead = new(74, 95, 103);
+
+    private readonly SpriteBatch _batch;
+    private readonly Texture2D _pixel;
+
+    public SpriteFontBase Small { get; }
+    public SpriteFontBase Body { get; }
+    public SpriteFontBase Head { get; }
+    public SpriteFontBase Big { get; }
+    public float SmallWidth { get; }
+    public float BodyWidth { get; }
+
+    /// <summary>The mouse in the 1600 x 900 space, and whether the left button was released since the last frame drawn.</summary>
+    public Vector2 Mouse { get; set; }
+    public bool Click { get; set; }
+
+    public Painter(SpriteBatch batch, Texture2D pixel, FontSystem fonts)
+    {
+        _batch = batch;
+        _pixel = pixel;
+        Small = fonts.GetFont(15);
+        Body = fonts.GetFont(17);
+        Head = fonts.GetFont(22);
+        Big = fonts.GetFont(32);
+        SmallWidth = Math.Max(1, Small.MeasureString("M").X);
+        BodyWidth = Math.Max(1, Body.MeasureString("M").X);
+    }
+
+    public void Fill(Rectangle r, Color color) => _batch.Draw(_pixel, r, color);
+
+    public void Frame(Rectangle r, Color color, int thickness = 1)
+    {
+        Fill(new Rectangle(r.X, r.Y, r.Width, thickness), color);
+        Fill(new Rectangle(r.X, r.Bottom - thickness, r.Width, thickness), color);
+        Fill(new Rectangle(r.X, r.Y, thickness, r.Height), color);
+        Fill(new Rectangle(r.Right - thickness, r.Y, thickness, r.Height), color);
+    }
+
+    /// <summary>A panel: filled, with a one-pixel edge.</summary>
+    public void Box(Rectangle r, Color edge)
+    {
+        Fill(r, Panel);
+        Frame(r, edge);
+    }
+
+    public void Line(Vector2 a, Vector2 b, Color color, float thickness = 1.5f)
+    {
+        var d = b - a;
+        var length = d.Length();
+        if (length < 0.01f)
+            return;
+        _batch.Draw(_pixel, a, null, color, MathF.Atan2(d.Y, d.X), new Vector2(0f, 0.5f), new Vector2(length, thickness), SpriteEffects.None, 0f);
+    }
+
+    public void Dashed(Vector2 a, Vector2 b, Color color, float dash = 7f, float gap = 5f, float thickness = 1.5f)
+    {
+        var d = b - a;
+        var length = d.Length();
+        if (length < 0.01f)
+            return;
+        var unit = d / length;
+        for (var at = 0f; at < length; at += dash + gap)
+            Line(a + unit * at, a + unit * Math.Min(length, at + dash), color, thickness);
+    }
+
+    public void Poly(IReadOnlyList<Vector2> points, Color color, float thickness = 1.5f, bool closed = true, bool dashed = false)
+    {
+        var count = closed ? points.Count : points.Count - 1;
+        for (var i = 0; i < count; i++)
+        {
+            var a = points[i];
+            var b = points[(i + 1) % points.Count];
+            if (dashed)
+                Dashed(a, b, color, 3f, 4f, thickness);
+            else
+                Line(a, b, color, thickness);
+        }
+    }
+
+    /// <summary>A diamond outline around a point: the fault marker.</summary>
+    public void Diamond(Vector2 centre, float radius, Color color, float thickness = 2f)
+    {
+        Poly(new[]
+        {
+            centre + new Vector2(0, -radius), centre + new Vector2(radius, 0), centre + new Vector2(0, radius), centre + new Vector2(-radius, 0),
+        }, color, thickness);
+    }
+
+    /// <summary>A small solid triangle pointing up: an awake person.</summary>
+    public void Marker(Vector2 centre, Color color)
+    {
+        for (var row = 0; row < 12; row++)
+        {
+            var half = row * 0.6f;
+            Fill(new Rectangle((int)(centre.X - half), (int)(centre.Y - 6 + row), (int)Math.Max(1, half * 2), 1), color);
+        }
+    }
+
+    public void Text(SpriteFontBase font, string text, float x, float y, Color color) =>
+        font.DrawText(_batch, Printable(text), new Vector2(MathF.Round(x), MathF.Round(y)), color);
+
+    public void TextRight(SpriteFontBase font, string text, float right, float y, Color color)
+    {
+        var shown = Printable(text);
+        font.DrawText(_batch, shown, new Vector2(MathF.Round(right - font.MeasureString(shown).X), MathF.Round(y)), color);
+    }
+
+    public void TextCentre(SpriteFontBase font, string text, float centre, float y, Color color)
+    {
+        var shown = Printable(text);
+        font.DrawText(_batch, shown, new Vector2(MathF.Round(centre - font.MeasureString(shown).X / 2), MathF.Round(y)), color);
+    }
+
+    /// <summary>Wrapped text in the small font; returns the y below it.</summary>
+    public int Paragraph(string text, int x, int y, int width, Color color, int lineHeight = 19)
+    {
+        foreach (var line in Wrap(text, (int)(width / SmallWidth)))
+        {
+            Text(Small, line, x, y, color);
+            y += lineHeight;
+        }
+        return y;
+    }
+
+    public int Lines(string text, int width) => Wrap(text, (int)(width / SmallWidth)).Count;
+
+    public bool Over(Rectangle r) => r.Contains((int)Mouse.X, (int)Mouse.Y);
+
+    /// <summary>True when the rectangle was clicked this frame.</summary>
+    public bool Hit(Rectangle r) => Click && Over(r);
+
+    /// <summary>
+    /// A button. Solid when <paramref name="primary"/>, outlined otherwise, greyed when disabled. Returns true when it
+    /// was clicked this frame.
+    /// </summary>
+    public bool Button(Rectangle r, string label, bool enabled = true, bool primary = false, bool selected = false)
+    {
+        var over = enabled && Over(r);
+        Color ink;
+        if (!enabled)
+        {
+            Frame(r, Faint);
+            ink = Dim;
+        }
+        else if (primary || selected)
+        {
+            Fill(r, over ? Bright : primary ? Accent : Ink);
+            ink = Ground;
+        }
+        else
+        {
+            if (over)
+                Fill(r, Track);
+            Frame(r, over ? Bright : Wire);
+            ink = Bright;
+        }
+        TextCentre(Small, label, r.X + r.Width / 2f, r.Y + (r.Height - 16) / 2f, ink);
+        return enabled && Hit(r);
+    }
+
+    /// <summary>A bar from 0 to 1.</summary>
+    public void Meter(Rectangle r, double value, Color color)
+    {
+        Fill(r, Track);
+        Fill(new Rectangle(r.X, r.Y, (int)(r.Width * Math.Clamp(value, 0, 1)), r.Height), color);
+    }
+
+    /// <summary>The model may write characters the bundled font lacks: map the common ones, replace the rest.</summary>
+    public static string Printable(string text)
+    {
+        var sb = new StringBuilder(text.Length);
+        foreach (var ch in text)
+        {
+            sb.Append(ch switch
+            {
+                '‘' or '’' => "'",
+                '“' or '”' => "\"",
+                '–' or '—' => "-",
+                '…' => "...",
+                '\t' => " ",
+                _ => ch is >= ' ' and <= 'ÿ' ? ch.ToString() : "?",
+            });
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Word wrap for the monospaced font: by character count.</summary>
+    public static List<string> Wrap(string text, int columns)
+    {
+        var lines = new List<string>();
+        columns = Math.Max(8, columns);
+        foreach (var paragraph in Printable(text).Split('\n'))
+        {
+            var line = new StringBuilder();
+            foreach (var word in paragraph.Split(' '))
+            {
+                var piece = word;
+                while (piece.Length > columns)
+                {
+                    if (line.Length > 0)
+                    {
+                        lines.Add(line.ToString());
+                        line.Clear();
+                    }
+                    lines.Add(piece[..columns]);
+                    piece = piece[columns..];
+                }
+                if (line.Length > 0 && line.Length + 1 + piece.Length > columns)
+                {
+                    lines.Add(line.ToString());
+                    line.Clear();
+                }
+                if (line.Length > 0)
+                    line.Append(' ');
+                line.Append(piece);
+            }
+            lines.Add(line.ToString());
+        }
+        return lines;
+    }
+}

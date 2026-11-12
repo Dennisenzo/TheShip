@@ -5,7 +5,8 @@ public sealed partial class Voyage
 {
     /// <summary>
     /// Step 4 and after: one line from the player, already sorted by the reading pass. The effects are the game's:
-    /// the statement record, beliefs, trust and morale.
+    /// the statement record, beliefs, trust and morale. There is no taking it back: the reading is settled before
+    /// this is called (DESIGN.md, "Reading").
     /// </summary>
     public void Say(string text, Reading reading, IReadOnlyList<CrewMember> hearers)
     {
@@ -17,31 +18,10 @@ public sealed partial class Voyage
             Ship("Nobody is awake to hear you.");
             return;
         }
-        _undo = new Undo(listeners.Select(l => (l, l.Save())).ToList(), Statements.Count, Log.Count, _nextStatement, text);
         Log.Add(new LogEntry(LogKind.You, "YOU", text));
         Apply(text, reading, listeners);
         foreach (var l in listeners)
             Clamp(l);
-    }
-
-    /// <summary>True while the last spoken line can still be corrected (no time has passed since).</summary>
-    public bool CanReread => _undo != null && Phase != Phase.Ended;
-
-    /// <summary>Correct a wrong reading of the last line: its effects are taken back and applied again with the new reading.</summary>
-    public void Reread(Reading reading)
-    {
-        if (_undo is null || Phase == Phase.Ended)
-        {
-            Ship("Nothing to correct: the clock has moved on since your last line.");
-            return;
-        }
-        var undo = _undo;
-        foreach (var (crew, state) in undo.Crew)
-            crew.Restore(state);
-        Statements.RemoveRange(undo.Statements, Statements.Count - undo.Statements);
-        Log.RemoveRange(undo.Log, Log.Count - undo.Log);
-        _nextStatement = undo.NextId;
-        Say(undo.Text, reading, undo.Crew.Select(c => c.Crew).ToList());
     }
 
     private Statement NewStatement(string text, StatementKind kind, List<string> hearers, string? promiseKey = null) => new()
@@ -114,7 +94,7 @@ public sealed partial class Voyage
                 break;
             case LineKind.Order:
                 Speak(listeners[0], "order", "The ship gave an order in words. You ask which fault it means.");
-                Log.Add(new LogEntry(LogKind.Help, "", "Work is asked for with /repair <name> [fault] or /patch <name> [fault]."));
+                Log.Add(new LogEntry(LogKind.Help, "", "Work is asked for on the issue itself: select someone awake, then Repair or Patch."));
                 break;
             default:
                 foreach (var l in listeners.Where(l => !l.SmallTalkDone))
@@ -299,6 +279,24 @@ public sealed partial class Voyage
         if (f.Evidence == EvidenceKind.Logs)
         {
             ReadLog(c, f);
+            return;
+        }
+        var room = f.Evidence switch
+        {
+            EvidenceKind.Pod => ShipPlan.Pod(f.SubjectId ?? "").Bank,
+            EvidenceKind.Console => "helm",
+            _ => "medical",
+        };
+        if (Locked(room))
+        {
+            // A locked door is visible to whoever tries it; the doubt stays.
+            var name = "the " + GetSection(room)!.Name.ToLowerInvariant();
+            if (c.SeenLocks.Add(room))
+            {
+                c.Trust -= Tuning.LockedDoor;
+                Clamp(c);
+                Speak(c, "locked", "You went to check something for yourself and found the door to " + name + " locked by the ship.", name);
+            }
             return;
         }
         var where = f.Evidence switch

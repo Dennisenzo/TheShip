@@ -372,7 +372,7 @@ The model does two jobs, writing what the crew say and reading what the player s
 
 After each player line, a constrained pass sorts it into one of six kinds: a statement about a ship fact, a promise, an order, a question, a dodge, or plain talk. A statement is matched to a fact on the list and marked true or false against the game state. A vague answer to a direct question is recorded as a dodge. A statement that fits no fact is kept as text; when related evidence appears, the model judges yes or no whether it was a lie, leaning towards missing a lie over a false accusation. Everything else is plain talk and records nothing.
 
-The player sees what was recorded, for example "Recorded: you told Mara that Idris is alive." A wrong reading can be corrected before the conversation ends.
+The player sees the reading before the line is said, for example "It will be recorded as a statement that Idris is alive", and can change it or drop the line then. The reading never says whether the statement is true, and nobody has heard the line yet. Once it is said it stays said: there is no correction afterwards, so a lie that goes badly can't be taken back.
 
 ### What the game decides
 

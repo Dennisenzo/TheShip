@@ -43,15 +43,17 @@ public sealed class CrewMember
     /// <summary>Trust earned by a hard truth; it arrives at the next drift ("raises trust later").</summary>
     public double PendingTrust { get; set; }
 
-    public Dictionary<string, Belief> Beliefs { get; private set; } = new();
+    public Dictionary<string, Belief> Beliefs { get; } = new();
     /// <summary>Fact keys this person doubts and will check when they get the chance.</summary>
-    public HashSet<string> Doubts { get; private set; } = new();
+    public HashSet<string> Doubts { get; } = new();
     /// <summary>Fact keys you dodged when they asked.</summary>
-    public HashSet<string> Dodged { get; private set; } = new();
+    public HashSet<string> Dodged { get; } = new();
+    /// <summary>Locked doors they have already run into.</summary>
+    public HashSet<string> SeenLocks { get; } = new();
     /// <summary>Restricted log entries they have already run into.</summary>
-    public HashSet<string> SeenGaps { get; private set; } = new();
+    public HashSet<string> SeenGaps { get; } = new();
     /// <summary>Fact keys they will notice by themselves at the next aftermath beat (a dosimeter reading, ...).</summary>
-    public List<string> ToNotice { get; private set; } = new();
+    public List<string> ToNotice { get; } = new();
     /// <summary>One line per earlier waking, for the crew-speech prompt.</summary>
     public List<string> Memories { get; } = new();
 
@@ -85,26 +87,6 @@ public sealed class CrewMember
         _ => "against you"
     };
 
-    /// <summary>Everything a spoken line can change, so a wrong reading can be taken back (<see cref="Voyage.Reread"/>).</summary>
-    internal sealed record Saved(double Trust, double Morale, double PendingTrust, int CaughtLies, string? PendingQuestion, bool RefusesSleep,
-        bool SmallTalkDone, Dictionary<string, Belief> Beliefs, HashSet<string> Doubts, HashSet<string> Dodged);
-
-    internal Saved Save() => new(Trust, Morale, PendingTrust, CaughtLies, PendingQuestion, RefusesSleep, SmallTalkDone,
-        new Dictionary<string, Belief>(Beliefs), new HashSet<string>(Doubts), new HashSet<string>(Dodged));
-
-    internal void Restore(Saved s)
-    {
-        Trust = s.Trust;
-        Morale = s.Morale;
-        PendingTrust = s.PendingTrust;
-        CaughtLies = s.CaughtLies;
-        PendingQuestion = s.PendingQuestion;
-        RefusesSleep = s.RefusesSleep;
-        SmallTalkDone = s.SmallTalkDone;
-        Beliefs = new Dictionary<string, Belief>(s.Beliefs);
-        Doubts = new HashSet<string>(s.Doubts);
-        Dodged = new HashSet<string>(s.Dodged);
-    }
 }
 
 public enum LogAccess { Open, Restricted, Altered }
@@ -224,6 +206,8 @@ public sealed class Fault
     public required string IfIgnored { get; init; }
     /// <summary>The fact the people fixing it learn while they work.</summary>
     public string? ExposureFact { get; set; }
+    /// <summary>The section of the ship the fault is in (<see cref="ShipPlan"/>).</summary>
+    public string Section { get; set; } = "";
     /// <summary>The fact about the harm the repair does to whoever does it.</summary>
     public string? DangerFact { get; init; }
 
@@ -236,7 +220,7 @@ public sealed class Fault
     public Fault Again(string id, string name) => new()
     {
         Id = id, Kind = Kind, Name = name, Skill = Skill, Level = Level, People = People, Hours = Hours,
-        ClockHours = ClockHours / 2, IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact
+        ClockHours = ClockHours / 2, IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact, Section = Section
     };
 }
 

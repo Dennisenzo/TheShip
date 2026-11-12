@@ -90,23 +90,6 @@ public class VoyageTests
     }
 
     [Fact]
-    public void A_wrong_reading_can_be_corrected_before_the_clock_moves()
-    {
-        var v = new Voyage(1);
-        var mara = v.Find("mara")!;
-        v.Wake(mara);
-        v.Go();
-        var trust = mara.Trust;
-        Say(v, mara, "Idris is dead.");
-        Assert.Equal(StatementKind.False, Assert.Single(v.Statements).Kind);
-        v.Reread(Reading.Plain);
-        Assert.Empty(v.Statements);
-        Assert.Equal(trust, mara.Trust);
-        Assert.False(mara.Beliefs.ContainsKey("alive:idris"));
-        Assert.Equal("alive:idris", mara.PendingQuestion);
-    }
-
-    [Fact]
     public void Nobody_goes_back_to_sleep_before_three_months()
     {
         var v = new Voyage(1);
@@ -287,7 +270,7 @@ public class MindTests
     }
 
     [Fact]
-    public async Task A_spoken_line_is_recorded_as_the_model_read_it()
+    public async Task A_line_is_read_before_it_is_said_and_nothing_is_recorded_by_reading()
     {
         var v = new Voyage(1);
         var llm = new FakeLlm { Read = "{\"kind\":\"statement\",\"fact\":\"alive:idris\",\"value\":\"alive\",\"promise\":\"none\"}" };
@@ -295,15 +278,18 @@ public class MindTests
         var mara = v.Find("mara")!;
         v.Wake(mara);
         v.Go();
-        await mind.Say("He is fine.", new List<CrewMember> { mara });
-        var s = Assert.Single(v.Statements);
-        Assert.Equal(StatementKind.True, s.Kind);
-        Assert.Equal("alive:idris", s.FactKey);
+        var hearers = new List<CrewMember> { mara };
+        var reading = await mind.Read("He is fine.", hearers);
+        Assert.Equal(new Reading(LineKind.Statement, "alive:idris", "alive"), reading);
+        Assert.Empty(v.Statements);
         Assert.Equal(0, mind.ReadFailures);
+
+        v.Say("He is fine.", reading!, hearers);
+        Assert.Equal(StatementKind.True, Assert.Single(v.Statements).Kind);
     }
 
     [Fact]
-    public async Task A_reading_the_model_gets_wrong_records_nothing()
+    public async Task A_reading_the_model_gets_wrong_comes_back_empty()
     {
         var v = new Voyage(1);
         var llm = new FakeLlm { Read = "{\"kind\":\"statement\",\"fact\":\"alive:idris\",\"value\":\"unwell\",\"promise\":\"none\"}" };
@@ -311,10 +297,9 @@ public class MindTests
         var mara = v.Find("mara")!;
         v.Wake(mara);
         v.Go();
-        await mind.Say("Idris is alive.", new List<CrewMember> { mara });
+        Assert.Null(await mind.Read("Idris is alive.", new List<CrewMember> { mara }));
         Assert.Empty(v.Statements);
         Assert.Equal(1, mind.ReadFailures);
-        Assert.True(v.CanReread);
     }
 
     [Fact]
@@ -326,5 +311,35 @@ public class MindTests
         Assert.True(mind.Acceptable("Good. Idris is alive, then.", knows, "You accept it."));
         Assert.False(mind.Acceptable("I know Idris is dead.", knows, "You accept it."));
         Assert.True(mind.Acceptable("Is Idris dead?", knows, "You ask the ship."));
+    }
+}
+
+public class DoorTests
+{
+    [Fact]
+    public void A_locked_door_stops_the_repair_behind_it()
+    {
+        var v = new Voyage(1);
+        var asha = v.Find("asha")!;
+        v.Wake(asha);
+        v.Go();
+        v.SetDoor("coolant", DoorState.Locked);
+        var fault = v.FindFault("")!;
+        v.Assign(asha, fault, patch: false);
+        Assert.Null(asha.WorkingOn);
+        v.SetDoor("coolant", DoorState.Open);
+        v.Assign(asha, fault, patch: false);
+        Assert.Equal(fault.Id, asha.WorkingOn);
+    }
+
+    [Fact]
+    public void Everyone_is_somewhere_on_the_plan()
+    {
+        var v = new Voyage(1);
+        foreach (var c in v.Crew)
+            Assert.NotNull(v.GetSection(v.LocationOf(c)));
+        foreach (var f in v.Alerts.SelectMany(a => a.Faults))
+            Assert.NotNull(v.GetSection(f.Section));
+        Assert.Equal(DoorState.Open, v.GetSection("podA")!.DoorState);
     }
 }

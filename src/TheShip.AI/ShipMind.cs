@@ -7,7 +7,7 @@ namespace TheShip.AI;
 /// Ties the model to a voyage. It does the model's two jobs and its one judgement (DESIGN.md, "The language model's job"):
 /// writing what the crew say, reading what the player said, and judging a free-text statement against evidence.
 /// Everything it learns goes back to the voyage on the game thread; it never changes state itself.
-/// The game needs a model: there is no keyword-reader path here any more (the reader survives in Core for unit tests).
+/// The game needs a model: there is no keyword-reader path here (the reader survives in Core for unit tests).
 /// </summary>
 public sealed class ShipMind : IDisposable
 {
@@ -34,21 +34,17 @@ public sealed class ShipMind : IDisposable
     public int ReadFailures { get; private set; }
 
     /// <summary>
-    /// The player says a line to the awake crew. Call on the game thread; the voyage hears it once the model has read it.
-    /// The task completes when the voyage has heard the line.
+    /// Reads a line the player wants to say, before it is said: nothing reaches the voyage here. Call on the game
+    /// thread. The result is null when the model's answer could not be used. The player sees the reading (never
+    /// whether it is true), may change it, and only then says the line with <see cref="Voyage.Say"/>.
     /// </summary>
-    public Task Say(string text, IReadOnlyList<CrewMember> hearers)
+    public async Task<Reading?> Read(string text, IReadOnlyList<CrewMember> hearers)
     {
         var system = Prompts.ReadSystem(_voyage);
         var user = Prompts.ReadUser(text, hearers, _voyage);
         var options = new LlmOptions("read", MaxTokens: 80, Temperature: 0f,
             Grammar: Grammars.ReadingFor(_voyage.FactList.Select(f => f.Key)), Dialogue: false);
         _reading++;
-        return ReadAsync(text, hearers, system, user, options);
-    }
-
-    private async Task ReadAsync(string text, IReadOnlyList<CrewMember> hearers, string system, string user, LlmOptions options)
-    {
         var raw = "";
         try
         {
@@ -57,21 +53,15 @@ public sealed class ShipMind : IDisposable
         }
         catch (Exception)
         {
-            // Handled below as an unusable reading.
+            // Counted below as an unusable reading.
         }
-        await _main.Run(() =>
+        return await _main.Run(() =>
         {
             _reading--;
             var reading = Parse(raw);
             if (reading is null)
-            {
-                // Nothing is guessed: the line is heard as plain talk and the player is told to set the reading.
                 ReadFailures++;
-                _voyage.Say(text, Reading.Plain, hearers);
-                _voyage.Log.Add(new LogEntry(LogKind.Help, "", "The model could not read that line, so nothing was recorded. Correct it with /fix."));
-                return;
-            }
-            _voyage.Say(text, reading, hearers);
+            return reading;
         });
     }
 

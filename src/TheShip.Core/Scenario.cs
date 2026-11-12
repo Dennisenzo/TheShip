@@ -158,7 +158,7 @@ public static class Scenario
                 new Fault
                 {
                     Id = "coolant", Kind = "coolant", Name = "Coolant leak", Skill = Skill.Engineering, Level = 2, Hours = 8, ClockHours = 30,
-                    IfIgnored = "power drops and the pods are at risk", DangerFact = "dose",
+                    IfIgnored = "power drops and the pods are at risk", DangerFact = "dose", Section = "coolant",
                 },
             },
         },
@@ -171,7 +171,7 @@ public static class Scenario
                 new Fault
                 {
                     Id = "pod", Kind = "pod", Name = "Failed pod", Skill = Skill.Medicine, Level = 1, Hours = 4, ClockHours = 240,
-                    IfIgnored = "the bank leaks and every pod in it wears faster",
+                    IfIgnored = "the bank leaks and every pod in it wears faster", Section = "podA",
                 },
             },
         },
@@ -184,7 +184,7 @@ public static class Scenario
                 new Fault
                 {
                     Id = "nav", Kind = "nav", Name = "Navigation drift", Skill = Skill.Navigation, Level = 2, People = 2, Hours = 12, ClockHours = 720,
-                    IfIgnored = "the ship never finds its course again", ExposureFact = "date",
+                    IfIgnored = "the ship never finds its course again", ExposureFact = "date", Section = "helm",
                 },
             },
         },
@@ -203,7 +203,7 @@ public static class Scenario
                 new Fault
                 {
                     Id = "controller", Kind = "controller", Name = "Pod controller", Skill = Skill.Engineering, Level = 1, Hours = 4, ClockHours = 72,
-                    IfIgnored = "the pods wear much faster", ExposureFact = "pods",
+                    IfIgnored = "the pods wear much faster", ExposureFact = "pods", Section = "podB",
                 },
             },
         },

@@ -51,6 +51,7 @@ public static class Lines
             "found" => Pick(rng, "I went and looked. " + Cap(detail) + ".", "I checked for myself: " + detail + "."),
             "confirmed" => "I checked what you told me. It was true.",
             "gap" => "There's a gap in the log where " + detail + " should be. You're hiding something.",
+            "locked" => Pick(rng, "The door to " + detail + " is locked. Why is it locked?", "I can't get into " + detail + ". You locked it."),
             "altered" => "This log entry was rewritten. The checksums don't match. I'm taking the logs out of your hands.",
             "small" => Pick(rng, "Mm.", "It's strange, hearing a voice and seeing nobody.", "Thanks. It helps to talk."),
             "answer" => Pick(rng, "You have the sensors. You tell me.", "I know what you've told me, and what I've seen. That's all."),

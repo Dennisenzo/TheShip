@@ -27,9 +27,13 @@ public sealed partial class Voyage
             // What they doubt, they check; otherwise they may read a log entry.
             if (c.Doubts.Count > 0)
             {
-                var doubt = c.Doubts.First();
-                CheckEvidence(c, _facts[doubt]);
-                c.Doubts.Remove(doubt);     // a restricted log entry puts it back; one try per beat
+                // One doubt is settled per beat; one that can't be checked now (a locked door, a restricted entry) stays.
+                foreach (var doubt in c.Doubts.ToList())
+                {
+                    CheckEvidence(c, _facts[doubt]);
+                    if (!c.Doubts.Contains(doubt))
+                        break;
+                }
             }
             else if (_rng.NextDouble() < (c.Has(Trait.Sceptical) ? 0.5 : 0.25))
             {
@@ -67,7 +71,7 @@ public sealed partial class Voyage
             if (!c.CanSleepAnnounced && c.HoursAwake >= Tuning.MinAwakeHours)
             {
                 c.CanSleepAnnounced = true;
-                Ship(c.Name + " has been awake three months. The pod can take them again: /sleep " + c.Name.ToLowerInvariant() + ".");
+                Ship(c.Name + " has been awake three months. The pod can take them again.");
             }
             Clamp(c);
         }
