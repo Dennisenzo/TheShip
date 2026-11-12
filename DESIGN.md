@@ -1,7 +1,8 @@
 # Generation Ship: game design
 
-Copy of the live design document (https://claude.ai/artifact/CU9PmSiGg9WW65Se6y1KAJ) as of 12 November 2026.
-The live document is the source; update this file when it changes. What is built so far is tracked in CLAUDE.md.
+This file is the leading design document: design changes are made here first.
+It began as a copy of an earlier document (https://claude.ai/artifact/CU9PmSiGg9WW65Se6y1KAJ), which still holds the two diagrams and is no longer kept up to date.
+What is built so far is tracked in CLAUDE.md.
 
 ## Premise and pillars
 
@@ -21,7 +22,7 @@ Five rules the design never breaks:
 
 The game is one loop of eight steps, repeated 8 to 10 times, with years passing between repeats.
 
-Diagram in the live document: the eight steps as a cycle, with the briefing marked as the step where a run is won or lost.
+Diagram in the earlier document: the eight steps as a cycle, with the briefing marked as the step where a run is won or lost.
 
 The player acts in steps 2 to 7. Steps 1 and 8 belong to the game.
 
@@ -185,7 +186,7 @@ An event has two to four faults and at most one is critical. It usually has one 
 
 ### Worked example: a strike in year 73
 
-Diagram in the live document. In words: a micrometeoroid strike in section 4 causes three faults.
+Diagram in the earlier document. In words: a micrometeoroid strike in section 4 causes three faults.
 
 | Fault | Clock | If the clock runs out |
 | --- | --- | --- |
@@ -326,8 +327,6 @@ Each is a switch that can be added to any mode.
 - **Spoken.** The player talks by microphone and the crew answer aloud.
 
 ### Run variation
-
-Proposed on 12 November 2026; not yet in the live document.
 
 Modes, missions and modifiers are chosen by the player. The seed varies everything below, so two runs with the same settings still differ. The aim is that no single policy for waking or lying is best in every run.
 

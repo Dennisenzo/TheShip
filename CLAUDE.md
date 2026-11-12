@@ -3,7 +3,7 @@
 The Ship: you are the AI of a sleeper ship and keep the crew alive by choosing who to wake and what to tell them.
 C# / .NET 10, MonoGame DesktopGL, a local LLM through LLamaSharp (same stack and versions as the Cities repo).
 
-**Read DESIGN.md first.** It is a copy of the live design document. Keep this file's Progress section up to date:
+**Read DESIGN.md first.** It is the leading design document: make design changes there. Keep this file's Progress section up to date:
 add a line for every non-trivial change, and move items between "Built" and "Not built yet".
 
 ## Commands
@@ -46,7 +46,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   **nothing has been compiled or run yet.** The first job in a session that has `dotnet` is `dotnet build TheShip.slnx`,
   then `dotnet test`, and fixing whatever they report.
 - 2026-11-12: DESIGN.md gained a "Run variation" section under "Gameplay variations" (what the seed varies per run).
-  It was written here first and is not yet in the live document. Design only; outside the prototype scope.
+  Design only; outside the prototype scope.
+- 2026-11-12: DESIGN.md is now the leading design document. The earlier claude.ai document is no longer the source.
 
 ### Built
 
