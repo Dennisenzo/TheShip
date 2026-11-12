@@ -1,4 +1,9 @@
 <Solution>
+  <Folder Name="/doc/">
+    <File Path="CLAUDE.md" />
+    <File Path="DESIGN.md" />
+    <File Path="README.md" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/TheShip.AI/TheShip.AI.csproj" />
     <Project Path="src/TheShip.Core/TheShip.Core.csproj" />
