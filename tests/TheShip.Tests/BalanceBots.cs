@@ -43,7 +43,7 @@ public sealed class BalanceBot
     /// <summary>The finished voyage itself, for looking at its log.</summary>
     public static Voyage PlayVoyage(int seed, BotKind kind)
     {
-        var v = new Voyage(seed);
+        var v = new Voyage(seed, Variation.Draw(seed));
         var bot = new BalanceBot(v, kind);
         bot.Run();
         Marks.Add(v, bot._thawMarks);
@@ -124,8 +124,8 @@ public sealed class BalanceBot
         }
     }
 
-    /// <summary>Whether a fault must not be lost. Fault.Critical does not exist yet; until it does, only the clock orders faults.</summary>
-    private static bool Critical(Fault f) => false;
+    /// <summary>Whether a fault must not be lost (coolant, navigation): staffed before the others, then by the shortest clock.</summary>
+    private static bool Critical(Fault f) => f.Critical;
 
     private void AssignTo(CrewMember c, Fault f)
     {

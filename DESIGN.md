@@ -354,6 +354,8 @@ Modes, missions and modifiers are chosen by the player. The seed varies everythi
 | Rare events | One or two per run from a large pool: a stowaway, a derelict, a birth, a crew member's discovery | No single run shows everything |
 | Hidden causes | The same fault can come from wear, an old patch or a person | A familiar alert can't be read from its faults alone |
 
+The prototype draws a small part of this (`Variation.cs`, from a random generator of its own so a seed draws the same whatever the player does): who dies in alert 2 (Idris weighted 3, else Tomas, Asha or Jonah, never Mara or Lin), a bank neighbour of the victim as the alert-2 patient, a side fault for alerts 3 and 5 (alert 3: blight or power sag; alert 5: always power sag, also after a sag in alert 3), clock slack per alert (1 to 6 hours, none for alert 1) and a year jitter of up to 2 years per alert (order kept, arrival stays year 60). Filters that depend on who is alive belong to the steps that use the draws. `Variation.Classic` is the fixed scenario of the unit tests. Faults carry `Critical` (ignoring it ends or cripples the voyage: coolant, navigation) and a `SubjectId`.
+
 Notes on the rows:
 
 - **Hidden truth and Sealed orders.** With the Sealed orders modifier the player knows the secret from the start. With a hidden truth the player learns it when the crew could, and has to decide on the spot.
@@ -419,7 +421,7 @@ The first build is the Short haul mode in text only, smaller than the mode table
 - **One lockout:** the logs.
 - **One ending screen:** survivors and the full record of what you said.
 - **Ship plan:** a wireframe schematic with sections, doors (only locking has an effect), coolant and power lines, pods and fault markers.
-- **Left out:** cameras, factions, children, signals from ahead, all modes and modifiers, run variation.
+- **Left out:** cameras, factions, children, signals from ahead, all modes and modifiers, run variation except: the alert-2 victim and patient, side-fault draws, clock slack, year jitter.
 
 The prototype passes if, across three playthroughs, the player lies at least once without being prompted and calls a discovered lie fair.
 

@@ -20,6 +20,10 @@ public static class Tuning
 
     public const double StartStores = 1500;     // person-days
     public const int StartParts = 2;
+    /// <summary>Run variation: extra clock hours per alert, and the most years an alert moves either way.</summary>
+    public const int AlertSlackMin = 1;
+    public const int AlertSlackMax = 6;
+    public const int AlertYearJitter = 2;
     /// <summary>A failed repair burns a spare part too.</summary>
     public const bool FailedRepairSpendsPart = true;
     /// <summary>Years the arrival slips when the navigation fix was only a patch at the last drift.</summary>
