@@ -202,15 +202,21 @@ public static class Prompts
     };
 
     /// <summary>The turn for a crew line: the last few lines of the log (this person's and the ship's) and what the game decided now.</summary>
+    /// <summary>
+    /// The last few lines this person saw, oldest first: their own lines and the ship's lines they heard (awake and spoken to);
+    /// lines said to others or while they slept are not theirs.
+    /// </summary>
+    public static List<LogEntry> Recent(CrewMember speaker, Voyage voyage, LogEntry? current = null) =>
+        voyage.Log.Where(e => e != current && !e.Pending
+                && ((e.Kind == LogKind.Crew && e.CrewId == speaker.Id) || (e.Kind == LogKind.You && e.Hearers?.Contains(speaker.Id) == true)))
+            .TakeLast(RecentLines).ToList();
+
     public static string CrewUser(CrewIntent intent, CrewMember? speaker = null, Voyage? voyage = null, LogEntry? current = null)
     {
         var sb = new StringBuilder();
         if (speaker != null && voyage != null)
         {
-            var recent = voyage.Log.Where(e => e != current && !e.Pending
-                    // A player's line only if this person heard it (awake and spoken to); lines said to others or while they slept are not theirs.
-                    && ((e.Kind == LogKind.Crew && e.CrewId == speaker.Id) || (e.Kind == LogKind.You && e.Hearers?.Contains(speaker.Id) == true)))
-                .TakeLast(RecentLines).ToList();
+            var recent = Recent(speaker, voyage, current);
             if (recent.Count > 0)
             {
                 sb.AppendLine("Recent conversation:");

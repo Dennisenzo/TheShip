@@ -159,11 +159,13 @@ public sealed class ShipMind : IDisposable
         var system = Prompts.CrewSystem(c, _voyage);
         var user = Prompts.CrewUser(entry.Intent, c, _voyage, entry);
         var beliefs = new Dictionary<string, Belief>(c.Beliefs);
+        var context = new LineContext(c.Id, entry.Intent.Decision, c.PendingQuestion,
+            Prompts.Recent(c, _voyage, entry).Select(e => e.Text).ToList());
         entry.Pending = true;
-        _ = VoiceAsync(entry, system, user, beliefs, entry.Intent.Decision);
+        _ = VoiceAsync(entry, system, user, beliefs, context);
     }
 
-    private async Task VoiceAsync(LogEntry entry, string system, string user, Dictionary<string, Belief> beliefs, string decision)
+    private async Task VoiceAsync(LogEntry entry, string system, string user, Dictionary<string, Belief> beliefs, LineContext context)
     {
         string? line = null;
         try
@@ -174,7 +176,7 @@ public sealed class ShipMind : IDisposable
                 for (var attempt = 0; attempt < 2; attempt++)
                 {
                     var text = await llm.ChatAsync(system, new[] { new ChatTurn("user", user) }, new LlmOptions("reply"), null, ct);
-                    if (Acceptable(text, beliefs, decision))
+                    if (Acceptable(text, beliefs, context.Decision, context))
                         return text;
                     Trace?.Invoke("crew line rejected (attempt " + (attempt + 1) + ", " + entry.Speaker + "): " + text);
                 }
@@ -198,14 +200,19 @@ public sealed class ShipMind : IDisposable
 
     /// <summary>
     /// Whether a crew line stays inside what its speaker knows: every fact value it states (questions aside) must be
-    /// one the speaker holds, or one the game's decision for this turn names.
+    /// one the speaker holds, or one the game's decision for this turn names. With a <paramref name="context"/>, what the
+    /// line says about someone's life through "he", "she", "they" or "my partner" is checked too, against the person
+    /// the reference most likely means (<see cref="RuleReader.PersonClaims"/>).
     /// </summary>
-    internal bool Acceptable(string text, IReadOnlyDictionary<string, Belief> beliefs, string decision)
+    internal bool Acceptable(string text, IReadOnlyDictionary<string, Belief> beliefs, string decision, LineContext? context = null)
     {
         if (string.IsNullOrWhiteSpace(text) || text == "..." || text.Length > Prompts.CrewLineMaxChars)
             return false;
         var stated = string.Join(" ", SentenceEnd.Split(text).Where(s => !s.TrimEnd().EndsWith('?')));
-        foreach (var (fact, value) in RuleReader.Claims(stated, _voyage.FactList))
+        var claims = RuleReader.Claims(stated, _voyage.FactList);
+        if (context != null)
+            claims.AddRange(RuleReader.PersonClaims(stated, context, _voyage.Crew, _voyage.FactList));
+        foreach (var (fact, value) in claims)
         {
             if (beliefs.TryGetValue(fact.Key, out var held) && fact.Same(held.Value, value))
                 continue;

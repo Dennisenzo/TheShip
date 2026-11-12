@@ -37,26 +37,26 @@ public static class Scenario
             new Dictionary<string, string> { ["mara"] = "Mara taught you most of what you know and scares you a little.", ["asha"] = "Asha is the boss and you try to impress her." }),
     };
 
-    public static List<CrewMember> Crew(Variation? variation = null) => new()
+    public static List<CrewMember> Crew() => new()
     {
-        Person("mara", "Mara", "engineer", 34, 58, Want.WakePartner, "idris",
+        Person("mara", "she", "Mara", "engineer", 34, 58, Want.WakePartner, "idris",
             new[] { Trait.Steady, Trait.Sceptical }, (Skill.Engineering, 3), (Skill.Navigation, 1)),
-        Person("idris", "Idris", "botanist", 36, 66, Want.KnowTheDate, "mara",
+        Person("idris", "he", "Idris", "botanist", 36, 66, Want.KnowTheDate, "mara",
             new[] { Trait.Steady, Trait.Obedient }, (Skill.Botany, 3), (Skill.Medicine, 1)),
-        Person("tomas", "Tomas", "navigator", 41, 62, Want.HearFromEarth, null,
+        Person("tomas", "he", "Tomas", "navigator", 41, 62, Want.HearFromEarth, null,
             new[] { Trait.Anxious, Trait.Obedient }, (Skill.Navigation, 3), (Skill.Command, 1)),
-        Person("lin", "Lin", "medic", 29, 50, Want.SeeTheLogs, null,
+        Person("lin", "she", "Lin", "medic", 29, 50, Want.SeeTheLogs, null,
             new[] { Trait.Steady, Trait.Sceptical }, (Skill.Medicine, 3), (Skill.Botany, 1)),
-        Person("asha", "Asha", "commander", 44, 70, Want.KnowTheDate, null,
+        Person("asha", "she", "Asha", "commander", 44, 70, Want.KnowTheDate, null,
             new[] { Trait.Steady, Trait.Obedient }, (Skill.Command, 3), (Skill.Navigation, 2), (Skill.Engineering, 1)),
-        Person("jonah", "Jonah", "technician", 26, 45, Want.StayAwake, null,
+        Person("jonah", "he", "Jonah", "technician", 26, 45, Want.StayAwake, null,
             new[] { Trait.Anxious, Trait.Sceptical }, (Skill.Engineering, 2), (Skill.Medicine, 1)),
     };
 
-    private static CrewMember Person(string id, string name, string role, double age, double trust, Want want, string? partner,
+    private static CrewMember Person(string id, string pronoun, string name, string role, double age, double trust, Want want, string? partner,
         Trait[] traits, params (Skill Skill, int Level)[] skills) => new()
     {
-        Id = id, Name = name, Role = role, Age = age, Trust = trust, Want = want, PartnerId = partner, Traits = traits, Sheet = Sheets.GetValueOrDefault(id),
+        Id = id, Pronoun = pronoun, Name = name, Role = role, Age = age, Trust = trust, Want = want, PartnerId = partner, Traits = traits, Sheet = Sheets.GetValueOrDefault(id),
         Skills = skills.ToDictionary(s => s.Skill, s => s.Level)
     };
 
