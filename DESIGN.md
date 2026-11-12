@@ -400,7 +400,7 @@ The player sees the reading before the line is said, for example "It will be rec
 ### Keeping the model inside the facts
 
 - **Ship state.** A reply that states something about the ship that isn't in that person's facts is rejected and written again.
-- **Personal colour.** A crew member may invent small memories of home. These are saved to their sheet so they stay the same next time.
+- **Personal colour.** A crew member may invent small memories of home. These are saved to their sheet so they stay the same next time. Built so far: a fixed sheet per person (voice, background, quirks, bonds) that is always in the prompt; the model's own invented memories are not saved yet.
 - **Small cast.** One to three people are awake at once, so prompts stay short enough for a local model.
 - **Idle time.** The years between alerts are when the game writes notes and summaries in the background.
 - **A model is required.** The game does not run without one. A templated line is shown only when the model's line was rejected twice.

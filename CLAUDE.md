@@ -140,6 +140,7 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   the ship plan in scope, the clock's advance buttons, and the user's balance decisions as settled questions (Short haul Landfall:
   4 of 6 alive and 3 under 50; 2 starting parts, a failed repair spends one; a nav fault patched at arrival slips arrival).
   The 8-minute first run and the open low-trust question are playtest questions. Design text only.
+- 2026-11-13: crew voice (feature/crew-voice). Model-worded crew lines were short and alike. Each of the six has a `CrewSheet` (`Scenario.Sheets`, `CrewMember.Sheet`): how they talk, background, quirks and bonds in words ("Idris is your partner"). `Prompts.CrewSystem` carries the sheet; `Prompts.CrewUser` carries the last 5 log lines (this person's own lines and the ship's, each cut to 130 chars) and the feeling of the decision kind. The rules now ask for 1-3 sentences with feeling, spoken to the ship, no stock filler. `ReplyMaxTokens` 90 -> 140, `Acceptable` limit 320 -> 480 chars (`Prompts.CrewLineMaxChars`). Crew prompt grew from about 200 to about 430 tokens (Gemma 4 E4B), 0.4-0.8 s per line. Invented memories are not saved ("Personal colour" stays open). 5 tests in `CrewVoiceTests.cs`; `CrewVoiceProbe.cs` is a real-model before/after probe that does nothing unless SHIP_PROBE=1.
 
 ### Built
 

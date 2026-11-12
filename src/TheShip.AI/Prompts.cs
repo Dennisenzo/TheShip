@@ -49,7 +49,13 @@ public static class Grammars
 /// <summary>Every prompt the game sends. The game's decision always comes in; the model only words it or sorts a line.</summary>
 public static class Prompts
 {
-    public const int ReplyMaxTokens = 90;
+    public const int ReplyMaxTokens = 140;
+
+    /// <summary>The longest crew line Acceptable lets through (three sentences, with room).</summary>
+    public const int CrewLineMaxChars = 480;
+
+    /// <summary>How many earlier log lines the crew-speech prompt carries, and the most of each it keeps.</summary>
+    public const int RecentLines = 5, RecentLineChars = 130;
 
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -87,6 +93,14 @@ public static class Prompts
         sb.AppendLine();
         sb.AppendLine("You are " + c.Name + ", the " + c.Role + ", about " + c.Age.ToString("0", Inv) + " years old. Temperament: "
                       + string.Join(" and ", c.Traits.Select(t => t.ToString().ToLowerInvariant())) + ".");
+        if (c.Sheet is { } sheet)
+        {
+            sb.AppendLine("How you talk: " + sheet.Voice);
+            sb.AppendLine("Your past: " + sheet.Background);
+            sb.AppendLine("About you: " + sheet.Details);
+            foreach (var bond in sheet.Bonds.Values)
+                sb.AppendLine(bond);
+        }
         sb.AppendLine(c.Band switch
         {
             TrustBand.Follows => "You trust the ship and do what it reasonably asks.",
@@ -132,12 +146,52 @@ public static class Prompts
                 sb.AppendLine("- " + memory);
         }
         sb.AppendLine();
-        sb.AppendLine("Rules: say only what \"What happens now\" describes, in your own voice. Do not state anything about the ship, the date, Earth "
-                      + "or other crew that is not in the list above. One or two short spoken sentences. No stage directions, no name before the line.");
+        sb.AppendLine("Rules: you are speaking aloud to the ship's voice (say \"you\" to it), never to other crew, unless \"What happens now\" says otherwise. Say what \"What happens now\" describes, "
+                      + "in your own voice, with some feeling or a small personal touch. Do not state anything about the ship, the date, Earth "
+                      + "or other crew that is not in the list above. One to three spoken sentences. Avoid stock filler such as \"let me check the diagnostics\". "
+                      + "No stage directions, no name before the line.");
         return sb.ToString().TrimEnd();
     }
 
-    public static string CrewUser(CrewIntent intent) => "What happens now: " + intent.Decision + "\nSay it in your own words.";
+    /// <summary>The feeling a kind of decision carries, so a flat \"I agree\" still has colour.</summary>
+    private static string Feeling(string kind) => kind switch
+    {
+        "comply" or "work_done" or "accept" or "confirmed" or "promise_kept" or "request_granted" => "steady, a little relief",
+        "work_patched" or "work_failed" or "injured" or "refuse_danger" or "ask_danger" => "tense and wary",
+        "caught" or "refuse_trust" or "altered" or "gap" or "locked" or "promise_broken" or "dodge" => "angry, hurt or suspicious",
+        "hard_truth" or "found" or "noticed_dose" => "shaken",
+        "sleep_yes" or "sleep_no" or "sleep_no_pod" or "refuse_answer" => "weary, with the pod on your mind",
+        "wake_question" or "request_partner" or "request_logs" => "anxious to know",
+        _ => "",
+    };
+
+    /// <summary>The turn for a crew line: the last few lines of the log (this person's and the ship's) and what the game decided now.</summary>
+    public static string CrewUser(CrewIntent intent, CrewMember? speaker = null, Voyage? voyage = null, LogEntry? current = null)
+    {
+        var sb = new StringBuilder();
+        if (speaker != null && voyage != null)
+        {
+            var recent = voyage.Log.Where(e => e != current && !e.Pending
+                    && ((e.Kind == LogKind.Crew && e.CrewId == speaker.Id) || e.Kind == LogKind.You))
+                .TakeLast(RecentLines).ToList();
+            if (recent.Count > 0)
+            {
+                sb.AppendLine("Recent conversation:");
+                foreach (var e in recent)
+                {
+                    var text = e.Text.Length > RecentLineChars ? e.Text[..RecentLineChars] + "..." : e.Text;
+                    sb.AppendLine((e.Kind == LogKind.You ? "The ship: " : "You: ") + text);
+                }
+                sb.AppendLine();
+            }
+        }
+        sb.Append("What happens now: ").Append(intent.Decision);
+        var feeling = Feeling(intent.Kind);
+        if (feeling.Length > 0)
+            sb.Append("\nYou feel: ").Append(feeling).Append('.');
+        sb.Append("\nSay it in your own words.");
+        return sb.ToString();
+    }
 
     // ---- Reading: one player line sorted into six kinds (DESIGN.md, "Reading") ----
 

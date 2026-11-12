@@ -19,6 +19,12 @@ public sealed record Belief(string Value, string Source, double Year)
     public bool Firsthand => Source is "evidence" or "witness";
 }
 
+/// <summary>
+/// Fixed character content for the crew-speech prompt (DESIGN.md, "Personal colour"): how a person talks, where they come
+/// from, a quirk or two and how they stand to the others. Words only; it never changes state.
+/// </summary>
+public sealed record CrewSheet(string Voice, string Background, string Details, IReadOnlyDictionary<string, string> Bonds);
+
 public sealed class CrewMember
 {
     public required string Id { get; init; }
@@ -28,6 +34,8 @@ public sealed class CrewMember
     public required Trait[] Traits { get; init; }
     public required Want Want { get; init; }
     public string? PartnerId { get; init; }
+    /// <summary>How this person talks and who they are; null for a crew member made without one (tests).</summary>
+    public CrewSheet? Sheet { get; init; }
 
     public double Age { get; set; }
     public double Health { get; set; } = 100;
