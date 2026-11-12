@@ -40,7 +40,7 @@ real-time stamp and a tag per line. The game's opening note gives the file's pat
 | `voiced` | the model's wording of that crew line, or that it was rejected and the template stayed |
 | `click` | every click that changes the game: wake, sleep, repair, patch, advance, drift, doors, logs |
 | `advance` | the result of "advance until something happens": steps taken and why it stopped |
-| `typed`, `reading`, `said`, `dropped` | a line typed (with its hearers), how it was read or re-read by the player, and whether it was said or dropped |
+| `said`, `read` | a line said when Enter was pressed (with its hearers); the model's reading applied to it a moment later (`unusable ... plain talk` when the answer could not be used). Whether a statement was true appears only in the `recorded` line of the log |
 | `model` | the model's raw reading, rejected crew lines, yes/no judgements, failures |
 | `llm` | each model call: kind, prompt and generated tokens, first-token and total seconds |
 | `ending` | the ending, the crew (living and dead), beliefs and the record |
@@ -75,8 +75,10 @@ real-time stamp and a tag per line. The game's opening note gives the file's pat
 - Numbers that tune the game live in `Tuning.cs`.
 - No typed controls. Every control is a button or a click; the input line is only for speaking. When a control gets a button or
   another UI option, its text command is removed in the same change (the user's standing rule, 2026-11-12). Don't add slash commands.
-- A line is read before it is said and can't be changed afterwards (`ShipMind.Read`, then `Voyage.Say`). The reading shown to the
-  player never says whether a statement is true. Don't add an undo for spoken lines: it lets a failed lie be taken back.
+- A line is said when it is typed (`ShipMind.SayAtOnce`: it is in the log at once, marked unread) and read by the model right after;
+  the reading is applied with `Voyage.Say` when it arrives, in typing order, and an unusable reading is plain talk. There is no
+  confirmation step and no picker (decided 2026-11-13). What the player sees never says whether a statement is true. Don't add an
+  undo for spoken lines: it lets a failed lie be taken back.
 - The interface is laid out in a 1600 x 900 space and scaled to the window (`ShipGame.View`). Colours come from `Painter`. Clicks are
   queued with `Do(...)` (or `Act(...)` for a click that changes the game, so the session log records it) and run at the start of the
   next update, never inside a draw.
@@ -140,6 +142,7 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   the ship plan in scope, the clock's advance buttons, and the user's balance decisions as settled questions (Short haul Landfall:
   4 of 6 alive and 3 under 50; 2 starting parts, a failed repair spends one; a nav fault patched at arrival slips arrival).
   The 8-minute first run and the open low-trust question are playtest questions. Design text only.
+- 2026-11-13: lines are said at once (feature/say-at-once). Enter puts the line in the log as YOU with a "..." marker (`Voyage.BeginSay`), `ShipMind.SayAtOnce` reads it and applies the reading with `Voyage.Say` when it arrives, one line after the other in typing order; an unusable reading is plain talk. The reading picker, the "NOT YET SAID" preview and `IsReading` are removed; session-log tags are now `said` and `read`. The log's "Recorded: ..." line no longer shows "(true)/(false)" to the player (`LogEntry.Secret`, session log only). Builds; 69 tests pass.
 
 ### Built
 
@@ -157,11 +160,11 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
 - **AI** (`src/TheShip.AI`), ported from Cities: `ILlmProvider`, `LocalLlm` (LLamaSharp 0.30.0, Vulkan or CPU, Gemma 4 / Qwen3 chat handling, reply cleanup),
   `LlmWorker` + `MainThreadQueue`, `Gbnf`/`Grammars`, `LlmJson`.
   `ShipMind` does the model's jobs: words each crew line from the game's decision (rejects a line that states what the speaker doesn't know, once, then keeps the template),
-  reads a player line with a grammar into the six kinds (an unusable reading records nothing and asks for `/fix`), and judges free-text statements yes/no against evidence.
+  reads a player line with a grammar into the six kinds (an unusable reading is applied as plain talk and recorded in the session log), and judges free-text statements yes/no against evidence.
 - **Game** (`src/TheShip.Game`): MonoGame DesktopGL window, FontStashSharp text, drawn with lines and outlines on one white pixel.
   - `ShipGame.Bridge.cs`: issue cards with Repair and Patch for the selected person, the clock (Advance, Drift), the wireframe ship plan
     (click a door to step open, closed, locked; pods; awake crew; fault markers), the log with the voice line and the waiting-line preview,
-    the reading picker, the crew cards (Wake, Sleep, File; click a card to speak to one person) and "Waiting on you".
+    the crew cards (Wake, Sleep, File; click a card to speak to one person) and "Waiting on you".
   - `ShipGame.Screens.cs`: the crew dossier (sheet, what they know, what you told them) and the record with the ship log entries (Open, Restrict, Alter).
   - The model loads in the background; without one the window says what is missing.
   - `Sounds.cs`: a short click made in code (35 ms sine tick, `ClickVolume` there), played from `Do(...)` so every button, card, door and tab has it; silent without an audio device.

@@ -15,7 +15,7 @@ public sealed class ShipMind : IDisposable
     private readonly LlmWorker _worker;
     private readonly MainThreadQueue _main;
     private readonly HashSet<string> _judged = new();
-    private int _reading;
+    private Task _sayChain = Task.CompletedTask;
 
     public ShipMind(Voyage voyage, ILlmProvider llm, MainThreadQueue main)
     {
@@ -27,8 +27,6 @@ public sealed class ShipMind : IDisposable
     }
 
     public ILlmProvider Llm => _worker.Llm;
-    /// <summary>A line the player typed is still being read.</summary>
-    public bool IsReading => _reading > 0;
     public bool Busy => _worker.Busy || _worker.Pending > 0;
     /// <summary>What the model answered, for the session log: raw readings, rejected crew lines, judgements. Raised on worker threads.</summary>
     public event Action<string>? Trace;
@@ -37,17 +35,50 @@ public sealed class ShipMind : IDisposable
     public int ReadFailures { get; private set; }
 
     /// <summary>
-    /// Reads a line the player wants to say, before it is said: nothing reaches the voyage here. Call on the game
-    /// thread. The result is null when the model's answer could not be used. The player sees the reading (never
-    /// whether it is true), may change it, and only then says the line with <see cref="Voyage.Say"/>.
+    /// Raised on the game thread when a said line has been read and applied: the text, the reading that was applied
+    /// (plain talk when the model's answer could not be used), and whether it could not be used.
     /// </summary>
-    public async Task<Reading?> Read(string text, IReadOnlyList<CrewMember> hearers)
+    public event Action<string, Reading, bool>? LineRead;
+
+    /// <summary>
+    /// The player pressed Enter (game thread). The line is in the log at once and cannot be taken back; the model
+    /// reads it right after and the reading is applied with <see cref="Voyage.Say"/> as soon as it arrives. Lines are
+    /// read and applied one after the other, in the order they were typed. An unusable reading is applied as plain talk.
+    /// </summary>
+    public void SayAtOnce(string text, IReadOnlyList<CrewMember> hearers)
+    {
+        var entry = _voyage.BeginSay(text);
+        var previous = _sayChain;
+        _sayChain = ReadAndSay(previous, entry, text, hearers);
+    }
+
+    private async Task ReadAndSay(Task previous, LogEntry entry, string text, IReadOnlyList<CrewMember> hearers)
+    {
+        try { await previous; } catch (Exception) { /* an earlier line failed; this one still goes */ }
+        Reading? reading = null;
+        try
+        {
+            reading = await Read(text, hearers);
+        }
+        catch (Exception e)
+        {
+            Trace?.Invoke("read failed: " + e.GetType().Name + ": " + e.Message);
+        }
+        await _main.Run(() =>
+        {
+            var applied = reading ?? Reading.Plain;
+            _voyage.Say(text, applied, hearers, entry);
+            LineRead?.Invoke(text, applied, reading is null);
+        });
+    }
+
+    /// <summary>The model's reading of one line; nothing reaches the voyage here. Null when the model's answer could not be used.</summary>
+    internal async Task<Reading?> Read(string text, IReadOnlyList<CrewMember> hearers)
     {
         var system = Prompts.ReadSystem(_voyage);
         var user = Prompts.ReadUser(text, hearers, _voyage);
         var options = new LlmOptions("read", MaxTokens: 80, Temperature: 0f,
             Grammar: Grammars.ReadingFor(_voyage.FactList.Select(f => f.Key)), Dialogue: false);
-        _reading++;
         var raw = "";
         try
         {
@@ -62,7 +93,6 @@ public sealed class ShipMind : IDisposable
         Trace?.Invoke("read \"" + text + "\" -> " + raw);
         return await _main.Run(() =>
         {
-            _reading--;
             var reading = Parse(raw);
             if (reading is null)
                 ReadFailures++;

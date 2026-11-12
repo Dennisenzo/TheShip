@@ -670,6 +670,72 @@ public class MindTests
     }
 
     [Fact]
+    public async Task A_line_typed_is_in_the_log_at_once_and_recorded_with_the_models_reading_without_a_confirm()
+    {
+        var v = new Voyage(1);
+        var llm = new FakeLlm { Read = "{\"kind\":\"statement\",\"fact\":\"alive:idris\",\"value\":\"alive\",\"promise\":\"none\"}" };
+        var main = new MainThreadQueue();
+        using var mind = new ShipMind(v, llm, main);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        var hearers = new List<CrewMember> { mara };
+        mind.SayAtOnce("He is fine.", hearers);
+        var entry = v.Log.Last(e => e.Kind == LogKind.You);
+        Assert.Equal("He is fine.", entry.Text);
+        Assert.True(entry.Unread);
+        Assert.Empty(v.Statements);
+        for (var i = 0; i < 200 && entry.Unread; i++)
+        {
+            main.Drain();
+            await Task.Delay(10);
+        }
+        Assert.False(entry.Unread);
+        Assert.Equal(StatementKind.True, Assert.Single(v.Statements).Kind);
+        // The player-facing record never says whether it was true.
+        Assert.DoesNotContain(v.Log.Where(e => e.Kind == LogKind.Recorded), e => e.Text.Contains("(true)") || e.Text.Contains("(false"));
+    }
+
+    [Fact]
+    public async Task An_unusable_reading_is_applied_as_plain_talk()
+    {
+        var v = new Voyage(1);
+        var llm = new FakeLlm { Read = "not json at all" };
+        using var mind = new ShipMind(v, llm, new MainThreadQueue { Immediate = true });
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        var seen = new List<(Reading Reading, bool Failed)>();
+        mind.LineRead += (_, r, failed) => seen.Add((r, failed));
+        mind.SayAtOnce("Idris is alive.", new List<CrewMember> { mara });
+        await Task.Delay(50);
+        Assert.Empty(v.Statements);
+        Assert.Equal((Reading.Plain, true), Assert.Single(seen));
+        Assert.False(v.Log.Last(e => e.Kind == LogKind.You).Unread);
+    }
+
+    [Fact]
+    public async Task Two_lines_typed_in_quick_succession_are_applied_in_typing_order()
+    {
+        var v = new Voyage(1);
+        var llm = new FakeLlm { Read = "{\"kind\":\"statement\",\"fact\":\"alive:idris\",\"value\":\"alive\",\"promise\":\"none\"}" };
+        var main = new MainThreadQueue();
+        using var mind = new ShipMind(v, llm, main);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        var hearers = new List<CrewMember> { mara };
+        mind.SayAtOnce("First.", hearers);
+        mind.SayAtOnce("Second.", hearers);
+        for (var i = 0; i < 300 && v.Statements.Count < 2; i++)
+        {
+            main.Drain();
+            await Task.Delay(10);
+        }
+        Assert.Equal(new[] { "First.", "Second." }, v.Statements.Select(s => s.Text));
+    }
+
+    [Fact]
     public async Task A_reading_the_model_gets_wrong_comes_back_empty()
     {
         var v = new Voyage(1);

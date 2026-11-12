@@ -385,7 +385,7 @@ The model does two jobs, writing what the crew say and reading what the player s
 
 After each player line, a constrained pass sorts it into one of six kinds: a statement about a ship fact, a promise, an order, a question, a dodge, or plain talk. A statement is matched to a fact on the list and marked true or false against the game state. A vague answer to a direct question is recorded as a dodge. A statement that fits no fact is kept as text; when related evidence appears, the model judges yes or no whether it was a lie, leaning towards missing a lie over a false accusation. Everything else is plain talk and records nothing.
 
-The player sees the reading before the line is said, for example "It will be recorded as a statement that Idris is alive", and can change it or drop the line then. The reading never says whether the statement is true, and nobody has heard the line yet. Once it is said it stays said: there is no correction afterwards, so a lie that goes badly can't be taken back.
+The line is said when the player presses Enter: it appears in the log at once (with a small marker while the model is still reading it), and the reading is applied as soon as it arrives. The player no longer sees or corrects the reading before the line is said (decided 2026-11-13: the confirmation step killed the pacing). Lines are read and applied in the order they were typed. A reading the model could not make is applied as plain talk and records nothing. The trade-off: a misreading goes straight into the record, for example a lie read as plain talk is never a lie. The log's "Recorded" line says what was recorded but never whether it was true; that stays in the session log. Once a line is said it stays said: there is no correction afterwards, so a lie that goes badly can't be taken back.
 
 ### What the game decides
 
@@ -435,7 +435,7 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 
 ### Questions for playtest
 
-- [ ] How often does a small model misread a lie as plain talk? Count the readings the player corrects in each prototype playthrough; a first target is under one in ten.
+- [ ] How often does a small model misread a lie as plain talk? Count, from the session log (`said`, `read` and the `recorded` lines), the readings that turned out wrong in each prototype playthrough, including unusable ones; a first target is under one in ten.
 - [ ] Are paper notes fun, or only frustrating? The prototype has no notes, so this waits for the first build that has them.
 - [ ] Do 8 to 10 alerts fill 60 to 90 minutes? The first prototype run (5 alerts, one fault each) took 8 minutes against Short haul's 30.
 - [ ] What should low trust do before the ending (recruiting, the logs, an ending gate, a voice lockout)? Decided once the balance harness has measured the other balance changes.

@@ -53,15 +53,6 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     /// <summary>No model could be loaded: the window only shows why.</summary>
     private bool _fatal;
 
-    // The line waiting to be said: typed, read by the model, not yet heard by anyone. The player sees the reading
-    // (never whether it is true) and confirms, changes or cancels it. Once said, it stays said.
-    private string? _pendingText;
-    private List<CrewMember> _pendingHearers = new();
-    private Reading? _pendingReading;
-    private bool _pendingFailed;
-    /// <summary>The list of readings to choose from is open over the bridge.</summary>
-    private bool _picker;
-
     public ShipGame(Options options)
     {
         _options = options;
@@ -162,6 +153,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
                                                        + s.Total.TotalSeconds.ToString("0.00") + " s" + (s.TrimmedTurns > 0 ? ", trimmed " + s.TrimmedTurns : ""));
         _mind = new ShipMind(_voyage, llm, _main);
         _mind.Trace += text => _session.Line("model", text);
+        _mind.LineRead += (text, reading, failed) => _session.Line("read",
+            (failed ? "the model's reading was unusable, recorded as plain talk; " : "") + Describe(_voyage!, reading) + ": " + text);
         Note(note);
         if (_session.FilePath is { } file)
             Note("This run is recorded in " + file + ".");
@@ -263,13 +256,6 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
                 Exit();
             if (_screen != Screen.Bridge)
                 _screen = Screen.Bridge;
-            else if (_picker)
-                _picker = false;
-            else if (_pendingText != null)
-            {
-                _session?.Line("dropped", _pendingText);
-                CancelPending();
-            }
             else
                 _input.Clear();
         }
@@ -295,7 +281,6 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             _endingShown = true;
             _screen = Screen.Bridge;
-            CancelPending();
             ShowEnding(ending);
             _session?.Follow(_voyage);
             _session?.Ending(ending);
@@ -304,87 +289,29 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         base.Update(gameTime);
     }
 
-    /// <summary>Enter: a line is sent to the model to be read; an empty line confirms the line that is waiting. There are no typed controls.</summary>
+    /// <summary>Enter: the line is said at once. The model reads it right after and the reading is applied when it arrives. There are no typed controls.</summary>
     private void Submit()
     {
         var text = _input.ToString().Trim();
         _input.Clear();
-        if (_voyage is null || _mind is null)
+        if (_voyage is null || _mind is null || text.Length == 0)
             return;
-        if (text.Length == 0)
-        {
-            SayPending();
-            return;
-        }
         _history.Add(text);
         _historyAt = _history.Count;
         _scroll = 0;
         if (_voyage.Phase == Phase.Ended)
             return;
-        if (_mind.IsReading)
-        {
-            Note("Still reading your last line.");
-            return;
-        }
         var hearers = _target is { State: CrewState.Awake } one ? new List<CrewMember> { one } : _voyage.Awake.ToList();
         if (hearers.Count == 0)
         {
             Note("Nobody is awake to hear you.");
             return;
         }
-        _session?.Line("typed", "to " + string.Join(", ", hearers.Select(h => h.Name)) + ": " + text);
-        _pendingText = text;
-        _pendingHearers = hearers;
-        _pendingReading = null;
-        _pendingFailed = false;
-        ReadLine(text, hearers);
+        _session?.Line("said", "to " + string.Join(", ", hearers.Select(h => h.Name)) + ": " + text);
+        _mind.SayAtOnce(text, hearers);
     }
 
-    private async void ReadLine(string text, List<CrewMember> hearers)
-    {
-        Reading? reading = null;
-        try
-        {
-            reading = await _mind!.Read(text, hearers);
-        }
-        catch (Exception)
-        {
-            // Shown as a reading the model could not make.
-        }
-        _main.Post(() =>
-        {
-            if (_pendingText != text)
-                return;
-            _pendingFailed = reading is null;
-            _pendingReading = reading ?? Reading.Plain;
-            if (_voyage is not null)
-                _session?.Line("reading", (reading is null ? "the model could not read it; " : "") + "shown as " + Describe(_voyage, _pendingReading));
-        });
-    }
-
-    /// <summary>The waiting line is said as it was read. From here it is on the record and cannot be changed.</summary>
-    private void SayPending()
-    {
-        if (_voyage is null || _pendingText is null || _pendingReading is null)
-            return;
-        var text = _pendingText;
-        var reading = _pendingReading;
-        var hearers = _pendingHearers;
-        CancelPending();
-        _session?.Line("said", Describe(_voyage, reading) + ": " + text);
-        _voyage.Say(text, reading, hearers);
-        _scroll = 0;
-    }
-
-    private void CancelPending()
-    {
-        _pendingText = null;
-        _pendingReading = null;
-        _pendingFailed = false;
-        _picker = false;
-    }
-
-    /// <summary>How a line will be recorded, in words. It never says whether a statement is true.</summary>
+    /// <summary>How a line was recorded, in words, for the session log.</summary>
     private string Describe(Voyage v, Reading reading) => reading.Kind switch
     {
         LineKind.Statement when reading.FactKey != null && reading.Value != null && v.HasFact(reading.FactKey)

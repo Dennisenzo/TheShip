@@ -130,7 +130,7 @@ public sealed partial class Voyage
     }
 
     private void Ship(string text) => Log.Add(new LogEntry(LogKind.Ship, "SHIP", text));
-    private void Recorded(string text) => Log.Add(new LogEntry(LogKind.Recorded, "", text));
+    private void Recorded(string text, string? secret = null) => Log.Add(new LogEntry(LogKind.Recorded, "", text) { Secret = secret });
 
     private void Speak(CrewMember c, string kind, string decision, string detail = "")
     {
