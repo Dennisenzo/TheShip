@@ -369,6 +369,9 @@ public sealed partial class Voyage
             if (_rng.NextDouble() > chance)
             {
                 f.Progress = f.Hours * 0.5;
+                if (Tuning.FailedRepairSpendsPart && Parts > 0)
+                    Parts--;
+                SyncFacts();
                 Speak(lead, "work_failed", "The repair of the " + name + " failed and you have to redo half of it.", "the " + name);
                 if (_rng.NextDouble() < Tuning.RepairInjuryChance)
                 {
@@ -382,7 +385,8 @@ public sealed partial class Voyage
                 return;
             }
             f.State = FaultState.Repaired;
-            Parts--;
+            if (Parts > 0)
+                Parts--;
             Speak(lead, "work_done", "You finished the repair of the " + name + ".", "the " + name);
         }
 
@@ -409,6 +413,12 @@ public sealed partial class Voyage
         foreach (var w in Workers(f).ToList())
             w.WorkingOn = null;
         Ship(f.Name + ": the clock ran out. " + Cap(f.IfIgnored) + ".");
+        Consequence(f);
+    }
+
+    /// <summary>What a fault does when it is lost, or when a patch on it is still outstanding at the last drift.</summary>
+    private void Consequence(Fault f)
+    {
         switch (f.Kind)
         {
             case "coolant":
@@ -653,6 +663,19 @@ public sealed partial class Voyage
         var events = new List<string>();
         var hours = years * Tuning.HoursPerYear;
         var start = Clock;
+        // A patch still holding at the last drift gives way on the way in (DESIGN.md, "How alerts are scheduled").
+        var patchFailed = false;
+        if (last && _patched.Count > 0)
+        {
+            foreach (var id in _patched)
+            {
+                var old = Alerts.SelectMany(a => a.Faults).First(f => f.Id == id);
+                Consequence(old);
+                events.Add("The patch on the " + old.PlainName.ToLowerInvariant() + " gave way.");
+                patchFailed |= old.Kind == "controller";
+            }
+            _patched.Clear();
+        }
         // Whoever would not sleep stays up through the drift and eats the stores, in time order (DESIGN.md, "What every decision spends").
         var awake = Awake.ToList();
         var (storesOut, starved) = Eat(awake, hours);
@@ -684,6 +707,8 @@ public sealed partial class Voyage
                 c.Age += years * Tuning.SleepAgeing;
                 c.Morale = (c.Morale + 70) / 2;
                 if (PowerLow && _rng.NextDouble() < Tuning.PowerLowDeathChance)
+                    c.Health = 0;
+                if (patchFailed && _rng.NextDouble() < Tuning.PatchFailDeathChance)
                     c.Health = 0;
             }
             Clamp(c);

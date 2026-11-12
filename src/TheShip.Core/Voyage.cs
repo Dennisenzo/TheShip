@@ -183,12 +183,12 @@ public sealed partial class Voyage
         _facts["alert:" + alert.Number].Truth = "happened";
 
         // An earlier patch gives way inside a later event (DESIGN.md, "How alerts are scheduled").
-        if (alert.Number >= 3 && _patched.Count > 0)
+        if (alert.Number >= 2 && _patched.Count > 0)
         {
             foreach (var id in _patched)
             {
                 var old = Alerts.SelectMany(a => a.Faults).First(f => f.Id == id);
-                alert.Faults.Add(old.Again(id + "-again", "Old patch gives way: " + old.Name.ToLowerInvariant()));
+                alert.Faults.Add(old.Again(id + "-again", old.Name));
             }
             _patched.Clear();
         }

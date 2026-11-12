@@ -19,7 +19,11 @@ public static class Tuning
     public const double WorkingAge = 65;
 
     public const double StartStores = 1500;     // person-days
-    public const int StartParts = 3;
+    public const int StartParts = 2;
+    /// <summary>A failed repair burns a spare part too.</summary>
+    public const bool FailedRepairSpendsPart = true;
+    /// <summary>Each sleeper's death chance when a patched pod controller gives way at the last drift.</summary>
+    public const double PatchFailDeathChance = 0.15;
     public const double ThawRiskPerWear = 0.012;
     public const double ThawInjury = 25;
     public const double PowerLowDeathChance = 0.10;

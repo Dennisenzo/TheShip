@@ -51,7 +51,7 @@ The player acts in steps 2 to 7. Steps 1 and 8 belong to the game.
 | --- | --- | --- |
 | Crew years | Every thaw, 3 to 5 years each; every ten years asleep, 1 year | People too old, or dead, before arrival |
 | Stores | Every person-day awake, at least three months per thaw | Shorter wakings, then hunger |
-| Spare parts | Each repair | Repairs that can only be patched |
+| Spare parts | Each repair, successful or failed (the Short haul starts with 2) | Repairs that can only be patched |
 | Pod health | Each thaw | Thaws that injure or kill |
 | Trust | Discovered lies and broken promises | Refusals, then lockouts |
 | Your senses | Time, and crew who cut them | Sections you can't see or speak in |
@@ -251,7 +251,7 @@ An event draws two to four faults from the tables below. A few rows, such as a s
 
 These never raise an alert by themselves. They make every other alert worse.
 
-- **Spare parts** run down with each repair.
+- **Spare parts** run down with each repair, and a failed repair burns a part too (decided 2026-11-12). Short haul starts with 2; at zero, a fault can only be patched.
 - **Pod wear** raises the risk of every thaw.
 - **Your own hardware** decays: cameras and microphones fail one by one over the voyage.
 
@@ -259,7 +259,7 @@ These never raise an alert by themselves. They make every other alert worse.
 
 - The first alert is always a single minor fault and teaches the loop.
 - The game picks the next event by weight from the ship's wear, the stores and what was left unrepaired.
-- An ignored or patched fault returns inside a later event, one severity higher.
+- An ignored or patched fault returns inside a later event, one severity higher. In the prototype a patch returns from alert 2 on (even in the signal alert, which then has a fault), with half the clock. A patch still outstanding at the last drift gives way on the way in: a patched pod controller adds 4 pod wear and gives each sleeper a 15% chance of dying; any other patched fault takes its "if ignored" consequence (a patched navigation fault ends the run as Adrift).
 - Two critical alerts never come back to back.
 - A run has at most two signals.
 

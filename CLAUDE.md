@@ -136,6 +136,7 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   charged for the older copy. 1 regression test (seed loop over the 0.6 spot roll).
 
 - 2026-11-12: balance harness (`tests/TheShip.Tests/BalanceBots.cs`, `BalanceTests.cs`, `[Trait("Category","Balance")]`): honest, careless and liar bots play whole voyages over seeds 1..200 through the public `Voyage` API and print a table (Landfall rate, endings, deaths, causes, ages, trust, lies) to the test output and `balance-report.txt`. Run: `dotnet test --filter Category=Balance` (about 5 s). Measures only; the 25-75% honest Landfall target test is skipped until tuning. Builds; passes.
+- 2026-11-13: balance step B3 (parts and patches that bite): `StartParts` 2, a failed repair spends a part too, patches return from alert 2 on, the doubled "Old patch gives way" prefix is fixed, and a patch still outstanding at the last drift takes its consequence (controller: +4 wear and `PatchFailDeathChance` per sleeper; nav: Adrift). Balance harness: Landfall for all bots 100% -> 0% (nav is patched at alert 3 once the parts are gone); tuning continues in later steps.
 
 ### Built
 
