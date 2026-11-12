@@ -34,7 +34,7 @@ The player acts in steps 2 to 7. Steps 1 and 8 belong to the game.
 4. **Brief.** They come round and ask questions before they work. You answer, dodge or lie in your own words.
 5. **Work.** The game resolves the repair in stages. Between stages you can talk, open doors and release information. Complications arrive here.
 6. **Aftermath.** With the fault fixed, the awake crew eat, talk, walk the ship and read what they can reach. They make requests. This lasts until each person has been awake three months, the minimum before a pod can take them again.
-7. **Sleep.** Once a person has been awake three months, you ask them to go back under. They may refuse, bargain or leave a note first.
+7. **Sleep.** Once a person has been awake three months, you ask them to go back under. They may refuse, bargain or leave a note first. When the stores can't feed everyone awake through a person's three months, the minimum is waived and the pod takes them back early (a shorter waking); waking someone onto stores that low is warned about at the wake.
 8. **Drift.** The clock jumps 5 to 40 years. Stores, wear, ages and deaths update. You get a short report of what your working sensors recorded; sections you have lost show as silence.
 
 ### Three time scales
@@ -139,7 +139,10 @@ Statements and evidence are stored against the same fact keys, with dates, so fi
 
 An altered log entry is one lie for as long as it says the same false thing: opening, restricting and altering it back to
 the same value again does not add a second lie to the record (a rewrite that someone has already found out does). A rewrite
-undone before anyone read it stays in the record, marked as read by nobody.
+undone before anyone read it stays in the record, marked as read by nobody. One rule covers every way a reader finds out a log
+rewrite (reading the truth, checking a doubt, being told, an engineer spotting it): one finding-out catches every copy of that
+false text they read and have not yet found out, at the cost of one lie. So a reader who read the same text before and after it
+was put back is caught once; a reader who caught it, then believed it again when it was put back, is caught again.
 
 ### What the log holds
 

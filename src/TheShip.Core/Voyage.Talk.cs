@@ -170,12 +170,15 @@ public sealed partial class Voyage
             return;
 
         var caught = false;
-        foreach (var s in Statements.Where(s => s.Kind == StatementKind.False && s.FactKey == key && s.Value != null
-                                                && s.Hearers.Contains(c.Id) && !s.FoundOutBy.ContainsKey(c.Id)
-                                                && !f.Same(s.Value, value)).ToList())
+        var heard = Statements.Where(s => s.Kind == StatementKind.False && s.FactKey == key && s.Value != null
+                                          && s.Hearers.Contains(c.Id) && !f.Same(s.Value, value)).ToList();
+        foreach (var s in heard.Where(s => !s.FoundOutBy.ContainsKey(c.Id)).ToList())
         {
-            DiscoverLie(s, c);
             caught = true;
+            // Already marked in this finding-out: the same log text as one caught a moment ago (FindOutLogText).
+            if (s.FoundOutBy.ContainsKey(c.Id))
+                continue;
+            DiscoverLie(s, c);
         }
         if (!caught && doubted && old is { Source: "ship" } && !news)
         {
@@ -198,12 +201,29 @@ public sealed partial class Voyage
     private void DiscoverLie(Statement s, CrewMember c)
     {
         var f = _facts[s.FactKey!];
-        s.FoundOutBy[c.Id] = Year;
+        FindOutLogText(s, c);
         c.Trust -= Tuning.LieTrust + (Matters(c, f) ? Tuning.LieMattersExtra : 0);
         c.CaughtLies++;
         c.Morale -= 5;
         Clamp(c);
         Speak(c, "caught", "You have found out that the ship lied to you. It said: \"" + s.Text + "\" The truth: " + f.Say(f.Truth) + ".", f.Say(f.Truth));
+    }
+
+    /// <summary>
+    /// Marks a statement found out by this reader. For a log rewrite, every log statement on the same fact with the same
+    /// false text that they heard is found out with it: one finding-out of a log text costs once, whatever the path
+    /// (reading the truth, checking a doubt, being told, an engineer spotting the rewrite). A statement they had already
+    /// found out stays as it was, so being fooled again later by a rewrite put back costs again.
+    /// </summary>
+    private void FindOutLogText(Statement s, CrewMember c)
+    {
+        s.FoundOutBy[c.Id] = Year;
+        if (!s.InLog)
+            return;
+        var f = _facts[s.FactKey!];
+        foreach (var o in Statements.Where(o => o.InLog && o.FactKey == s.FactKey && o.Value != null && o.Hearers.Contains(c.Id)
+                                                && !o.FoundOutBy.ContainsKey(c.Id) && f.Same(o.Value, s.Value!)))
+            o.FoundOutBy[c.Id] = Year;
     }
 
     /// <summary>
@@ -273,7 +293,7 @@ public sealed partial class Voyage
             if (c.SkillOf(Skill.Engineering) >= 1 && _rng.NextDouble() < Tuning.EngineerSpotsAlteredLog)
             {
                 if (s != null)
-                    s.FoundOutBy[c.Id] = Year;
+                    FindOutLogText(s, c);
                 c.Trust -= Tuning.AlteredLogTrust;
                 c.CaughtLies++;
                 Clamp(c);

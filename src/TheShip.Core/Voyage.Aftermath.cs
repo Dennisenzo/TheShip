@@ -71,7 +71,21 @@ public sealed partial class Voyage
             if (!c.CanSleepAnnounced && c.HoursAwake >= Tuning.MinAwakeHours)
             {
                 c.CanSleepAnnounced = true;
+                Attend(c.Name + " can go back to sleep");
                 Ship(c.Name + " has been awake three months. The pod can take them again.");
+            }
+            else if (!c.CanSleepAnnounced && !c.EarlySleepAnnounced && CanSleepNow(c))
+            {
+                // Its own flag: the offer can lapse (someone else goes to sleep and the stores last again), and the
+                // three-month line must still come.
+                c.EarlySleepAnnounced = true;
+                Attend(c.Name + " can go back to sleep early");
+                Ship("The stores won't last " + c.Name + " three months awake. The pod can take them back early.");
+            }
+            else if (c.EarlySleepAnnounced && !CanSleepNow(c))
+            {
+                // The early offer lapsed; if the stores run short again it is offered again.
+                c.EarlySleepAnnounced = false;
             }
             Clamp(c);
         }
@@ -116,7 +130,10 @@ public sealed partial class Voyage
         if (b.Beliefs.TryGetValue(key, out var mine) && !f.Same(mine.Value, belief.Value))
         {
             if (a.Doubts.Add(key) | b.Doubts.Add(key))
+            {
+                Attend("the accounts differ");
                 Ship(a.Name + " and " + b.Name + " compare what they heard about " + f.Label + ". The accounts differ.");
+            }
             return;
         }
         Ship(a.Name + " tells " + b.Name + ": " + f.Say(belief.Value) + ".");

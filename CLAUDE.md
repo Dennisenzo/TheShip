@@ -11,6 +11,7 @@ add a line for every non-trivial change, and move items between "Built" and "Not
 ```sh
 dotnet build TheShip.slnx
 dotnet test
+dotnet test --filter Category=Balance   # balance harness: bots play 200 seeds, prints a table, writes balance-report.txt
 dotnet run --project src/TheShip.Game -- [--seed <n>] [--llm <file.gguf>] [--gpu-layers <n>]
 ```
 
@@ -38,6 +39,7 @@ real-time stamp and a tag per line. The game's opening note gives the file's pat
 | `Y<year> ship/crew/you/recorded/help` | every ship log line; a crew line shows its template and the game's decision |
 | `voiced` | the model's wording of that crew line, or that it was rejected and the template stayed |
 | `click` | every click that changes the game: wake, sleep, repair, patch, advance, drift, doors, logs |
+| `advance` | the result of "advance until something happens": steps taken and why it stopped |
 | `typed`, `reading`, `said`, `dropped` | a line typed (with its hearers), how it was read or re-read by the player, and whether it was said or dropped |
 | `model` | the model's raw reading, rejected crew lines, yes/no judgements, failures |
 | `llm` | each model call: kind, prompt and generated tokens, first-token and total seconds |
@@ -107,6 +109,9 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-12: every run writes a session log (`SessionLog.cs`, Sessions/ next to the exe; see "Analysing the user's play sessions").
   Clicks that change the game go through `Act(...)`, which logs them; `ShipMind.Trace` reports the model's raw answers.
 - 2026-11-12: the working rules (branches, commits, models, sub-agent types `ship-*`) are taken over from the Cities repo.
+- 2026-11-12: "Advance until something happens" in the aftermath (`Voyage.GoUntilAttention`, `Voyage.Advance.cs`): runs two-week steps until a crew line, a person who can go back to sleep, a death, a lost fault, differing accounts or the stores running out; at most `Tuning.AdvanceMaxSteps`; the clock does not move when nobody is awake or everyone awake can already sleep. The clock box has it as the main button, with a small "2 WEEKS" for the old step. Session log tag `advance`. 7 tests in `AdvanceTests.cs`.
+  Merged with the stores follow-ups (validate/followups-advance-balance): "can go back to sleep" is `Voyage.CanSleepNow`, so the clock also
+  stays put when the stores are too low for everyone awake, and the aftermath's early-sleep line stops the advance. 9 tests.
 - 2026-11-12: running out of stores kills (fix/stores-run-out). Before, a drift with a refuser awake took the stores below zero and only
   cost 40 health, so Mara lived through 8 years on no food (session 2026-11-12_23-13-57). Now the awake eat one person-day each per day
   in time order (`Voyage.Eat`, used by the two-week clock and the drift); once the stores are empty, `Tuning.StarveDays` (60) hungry days
@@ -116,6 +121,21 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   per click (a reader is caught once); nobody reads log entries about alerts that haven't happened or about their own life;
   a log entry that changed since someone read it is unread again; "the spare parts are gone" at 0 parts; the ending lists
   the whole crew ("crew:" in the session log), with an unread log rewrite marked "Nobody read it.".
+- 2026-11-12: stores follow-ups (fix/stores-followups). Shorter wakings: when the stores can't feed everyone awake through a person's
+  three months (empty, or too low), the minimum is waived and they can be asked to sleep early (`Voyage.CanSleepNow`, the SLEEP button,
+  a SHIP line in the aftermath); the Wake click warns when the stores are empty or too low for a full waking. Before, every waking
+  onto empty stores was fatal (60 hungry days < 90-day minimum). A reader who read the same false log text twice (a rewrite put back
+  after someone else found it out) is caught once, not twice. Repair work is credited to a worker only until they starve. The
+  refusal warning says when the hungry days fall short of the 60 that kill, and names who starves. 5 regression tests.
+- 2026-11-12: dedupe and early-sleep fixes (fix/dedupe-and-early-sleep). The once-per-text log catch now only merges identical log
+  statements caught in the same finding-out; a reader who caught a rewrite, believed it again when it was put back and finds out
+  again is caught again (trust, CaughtLies, crew line). The early-sleep offer has its own flag (`EarlySleepAnnounced`), reset when
+  the offer lapses, so the three-month line still comes (and stops the advance) after the stores last again. 2 regression tests.
+  Follow-up: one rule for every path into a log finding-out (`Voyage.FindOutLogText`, used by `DiscoverLie` and the engineer's
+  spot): it marks every unfound copy of that text the reader read, so an engineer spotting a rewrite put back is no longer also
+  charged for the older copy. 1 regression test (seed loop over the 0.6 spot roll).
+
+- 2026-11-12: balance harness (`tests/TheShip.Tests/BalanceBots.cs`, `BalanceTests.cs`, `[Trait("Category","Balance")]`): honest, careless and liar bots play whole voyages over seeds 1..200 through the public `Voyage` API and print a table (Landfall rate, endings, deaths, causes, ages, trust, lies) to the test output and `balance-report.txt`. Run: `dotnet test --filter Category=Balance` (about 5 s). Measures only; the 25-75% honest Landfall target test is skipped until tuning. Builds; passes.
 
 ### Built
 
@@ -147,7 +167,9 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
 
 - Up to three people awake; alert 4 (the signal) has no fault and can be drifted past with nobody woken.
 - Losing the navigation fault ends the run as "Adrift" (no arrival slip of years).
-- Stores run out as hunger only, no shorter wakings: once they are empty, whoever is awake dies after `Tuning.StarveDays` (60 days).
+- Shorter wakings are all or nothing: the three-month minimum is waived as soon as the stores can't feed everyone up through a
+  person's remaining three months (`Voyage.CanSleepNow`); there is no rationing. Once the stores are empty, whoever stays awake dies
+  after `Tuning.StarveDays` (60 days).
 - "Landfall without you" can't happen: the logs are the only lockout.
 - Terminal notes and paper notes are not in. The drift report is complete because no sensors are lost yet.
 - Doors: only locking has an effect. Open and closed look different and behave the same. Nobody reacts to being locked in.

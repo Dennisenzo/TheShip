@@ -321,6 +321,172 @@ public class VoyageTests
     }
 
     [Fact]
+    public void Woken_onto_empty_stores_a_person_is_warned_about_and_can_sleep_early()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        v.Stores = 0;
+        v.Wake(mara);
+        Assert.Contains(v.Log, e => e.Kind == LogKind.Ship && e.Text.StartsWith("The stores are empty: Mara goes hungry"));
+        v.Go();
+        Assert.Equal(CrewState.Awake, mara.State);
+        Assert.True(mara.HoursAwake < Tuning.MinAwakeHours);
+        Assert.True(v.CanSleepNow(mara));
+        v.AskSleep(mara);
+        Assert.Equal(CrewState.Asleep, mara.State);
+        Assert.True(mara.Alive);
+    }
+
+    [Fact]
+    public void Stores_too_low_for_three_months_waive_the_minimum_and_warn_at_the_wake()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        var tomas = v.Find("tomas")!;
+        v.Stores = 100;
+        v.Wake(mara);
+        Assert.DoesNotContain(v.Log, e => e.Text.Contains("short of a three-month waking"));
+        v.Wake(tomas);
+        Assert.Contains(v.Log, e => e.Kind == LogKind.Ship && e.Text.StartsWith("The stores (100 person-days) feed the 2 awake about 50 days"));
+        v.Go();
+        Assert.Equal(CrewState.Awake, tomas.State);
+        Assert.True(v.CanSleepNow(tomas));
+        v.AskSleep(tomas);
+        Assert.Equal(CrewState.Asleep, tomas.State);
+        // One mouth left: 100 days feeds Mara through her three months, so the minimum holds again.
+        Assert.False(v.CanSleepNow(mara));
+    }
+
+    [Fact]
+    public void A_worker_who_starves_mid_span_is_credited_only_until_death()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        Say(v, mara, "Idris is alive and asleep.");
+        var fault = v.FindFault("")!;
+        v.Assign(mara, fault, patch: false);
+        Say(v, mara, "It is dangerous. You will take a radiation dose.");
+        v.Assign(mara, fault, patch: false);
+        Assert.Equal(fault.Id, mara.WorkingOn);
+        Assert.Equal(0, fault.Progress, 3);
+        v.Stores = 0;
+        mara.HoursHungry = Tuning.StarveDays * 24 - 2;
+        v.Go();
+        Assert.Equal(CrewState.Dead, mara.State);
+        Assert.Equal(2, fault.Progress, 3);
+        Assert.NotEqual(FaultState.Repaired, fault.State);
+    }
+
+    [Fact]
+    public void The_refusal_warning_says_the_refuser_lives_when_the_hungry_days_fall_short()
+    {
+        var v = new Voyage(1);
+        var mara = RefuserAtTheLastAlert(v);
+        var years = Scenario.ArrivalYear - v.Year;
+        v.Stores = years * 365 - 30;
+        v.AskSleep(mara);
+        var warning = v.Log.Last(e => e.Text.StartsWith("If you drift now, Mara stays awake")).Text;
+        Assert.DoesNotContain("kills", warning);
+        Assert.Contains("The last 30 days go hungry, short of the 60 that kill.", warning);
+
+        v.Drift();
+        Assert.True(mara.Alive);
+        Assert.Equal(30 * 24, mara.HoursHungry, 3);
+    }
+
+    [Fact]
+    public void A_second_reader_is_caught_once_for_the_same_log_text_put_back()
+    {
+        var v = new Voyage(1);
+        var tomas = v.Find("tomas")!;
+        var idris = v.Find("idris")!;
+        var stores = v.GetFact("stores");
+        Assert.Equal(0, idris.SkillOf(Skill.Engineering));
+        v.SetLog("stores", LogAccess.Altered, "short");
+        v.ReadLog(tomas, stores);
+        v.ReadLog(idris, stores);
+        v.SetLog("stores", LogAccess.Open);
+        v.ReadLog(tomas, stores);
+        Assert.Equal(1, tomas.CaughtLies);
+        // Found out, so putting it back is a new statement; Idris reads the same false text again.
+        v.SetLog("stores", LogAccess.Altered, "short");
+        Assert.Equal(2, v.Statements.Count);
+        v.ReadLog(idris, stores);
+        var trust = idris.Trust;
+        v.SetLog("stores", LogAccess.Open);
+        v.ReadLog(idris, stores);
+
+        Assert.Equal(1, idris.CaughtLies);
+        Assert.All(v.Statements, s => Assert.True(s.FoundOutBy.ContainsKey("idris")));
+        Assert.True(trust - idris.Trust <= Tuning.LieTrust + Tuning.LieMattersExtra);
+    }
+
+    [Fact]
+    public void Fooled_again_by_the_same_log_text_after_catching_it_costs_again()
+    {
+        var v = new Voyage(1);
+        var idris = v.Find("idris")!;
+        var stores = v.GetFact("stores");
+        Assert.Equal(0, idris.SkillOf(Skill.Engineering));
+        v.SetLog("stores", LogAccess.Altered, "short");
+        v.ReadLog(idris, stores);
+        v.SetLog("stores", LogAccess.Open);
+        v.ReadLog(idris, stores);
+        Assert.Equal(1, idris.CaughtLies);
+
+        // Put back after she caught it: a new statement, and she believes it again.
+        v.SetLog("stores", LogAccess.Altered, "short");
+        Assert.Equal(2, v.Statements.Count);
+        v.ReadLog(idris, stores);
+        Assert.Equal("short", idris.Beliefs["stores"].Value);
+        var trust = idris.Trust;
+        v.SetLog("stores", LogAccess.Open);
+        v.ReadLog(idris, stores);
+
+        Assert.Equal(2, idris.CaughtLies);
+        Assert.True(idris.Trust < trust);
+        Assert.All(v.Statements, s => Assert.True(s.FoundOutBy.ContainsKey("idris")));
+    }
+
+    [Fact]
+    public void An_engineer_who_spots_a_rewrite_put_back_is_caught_once_for_the_text()
+    {
+        // The spot is a roll: find seeds where Mara misses it the first time and spots it the second.
+        var tried = 0;
+        for (var seed = 1; seed <= 60; seed++)
+        {
+            var v = new Voyage(seed);
+            var mara = v.Find("mara")!;
+            var tomas = v.Find("tomas")!;
+            var stores = v.GetFact("stores");
+            Assert.True(mara.SkillOf(Skill.Engineering) >= 1);
+            Assert.Equal(0, tomas.SkillOf(Skill.Engineering));
+            v.SetLog("stores", LogAccess.Altered, "short");
+            v.ReadLog(mara, stores);
+            if (v.LogsLocked)
+                continue;
+            v.ReadLog(tomas, stores);
+            v.SetLog("stores", LogAccess.Open);
+            v.ReadLog(tomas, stores);
+            v.SetLog("stores", LogAccess.Altered, "short");
+            Assert.Equal(2, v.Statements.Count);
+            var trust = mara.Trust;
+            v.ReadLog(mara, stores);
+            if (!v.LogsLocked)
+                continue;
+
+            tried++;
+            Assert.Equal(1, mara.CaughtLies);
+            Assert.Equal(Math.Max(0, trust - Tuning.AlteredLogTrust), mara.Trust, 3);
+            Assert.Single(v.Log, e => e.CrewId == "mara" && e.Intent?.Kind is "altered" or "caught");
+            Assert.All(v.Statements, s => Assert.True(s.FoundOutBy.ContainsKey("mara")));
+        }
+        Assert.True(tried >= 3, "only " + tried + " seeds reached the spot");
+    }
+
+    [Fact]
     public void A_rewrite_undone_before_anyone_read_it_stays_one_unread_lie_in_the_ending()
     {
         var v = new Voyage(1);
