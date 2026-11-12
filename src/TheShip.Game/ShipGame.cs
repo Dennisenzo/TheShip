@@ -95,6 +95,12 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         return File.Exists(preferred) ? preferred : Directory.GetFiles(ModelDirectory, "*.gguf").OrderBy(f => f).FirstOrDefault();
     }
 
+    protected override void Initialize()
+    {
+        base.Initialize();
+        WindowState.Maximize(Window.Handle);
+    }
+
     protected override void LoadContent()
     {
         _batch = new SpriteBatch(GraphicsDevice);

@@ -61,7 +61,7 @@ real-time stamp and a tag per line. The game's opening note gives the file's pat
 - **Tests.** Dev and bugfix agents run targeted tests (`dotnet test --filter`); the validator runs the full suite.
 - **Validation.** Dev/bugfix branch, then `ship-validator`, then the merge. With several tasks running, validate once all are done; fix what
   it finds with `ship-bugfix` agents without asking, then validate again.
-- **The real model.** Before loading it (probes, runs), check no `TheShip.Game` process is running: the user may be playing.
+- **The real model.** Before loading it (probes, runs), check no `TheShip` process is running (the game's exe is `TheShip.exe`): the user may be playing.
 
 ## Rules for the code
 
@@ -142,6 +142,9 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   The 8-minute first run and the open low-trust question are playtest questions. Design text only.
 - 2026-11-13: balance step B3 (parts and patches that bite): `StartParts` 2, a failed repair spends a part too, patches return from alert 2 on, the doubled "Old patch gives way" prefix is fixed, and a patch still outstanding at the last drift takes its consequence (controller: +4 wear and `PatchFailDeathChance` per sleeper; nav: arrival slips `NavPatchArrivalSlipYears`, 9). Balance harness (200 seeds, after the validator fixes below): Landfall honest 96.5%, careless 85.5%, liar 61.5% (30.5% Adrift); tuning continues in later steps.
 - 2026-11-13: B3 validator fixes: the refusal warning and the drift share one end year (`DriftEndYear`, arrival slip included), so the warning no longer says the stores last when the slipped drift starves the refuser; sleepers killed by the controller patch die of it, not "on low power" (the harness's cause table splits them); a repair under way needs a part to finish or redo, and stops with none left (`work_no_parts`); crew say "the coolant leak again" for a returned fault (`Fault.CrewName`); Adrift wording covers a returned nav patch; `Tuning.cs` doc comments untangled.
+- 2026-11-13: the window starts maximized (`WindowState.Maximize`, SDL_MaximizeWindow on the SDL window after `Initialize`);
+  checked on Windows with `IsZoomed`. The view rescales as with a manual resize. Also: the game's process is `TheShip`, not
+  `TheShip.Game`; the real-model rule above now says so (earlier checks looked for the wrong name).
 
 ### Built
 
