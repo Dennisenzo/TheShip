@@ -657,25 +657,35 @@ public sealed partial class Voyage
         }
 
         var last = AlertIndex >= Alerts.Count - 1;
-        var target = last ? Scenario.ArrivalYear : Alerts[AlertIndex + 1].Year;
+        double target = last ? Scenario.ArrivalYear : Alerts[AlertIndex + 1].Year;
         var years = Math.Max(0, target - Year);
         var deaths = new List<string>();
         var events = new List<string>();
-        var hours = years * Tuning.HoursPerYear;
         var start = Clock;
         // A patch still holding at the last drift gives way on the way in (DESIGN.md, "How alerts are scheduled").
         var patchFailed = false;
+        double slip = 0;
         if (last && _patched.Count > 0)
         {
             foreach (var id in _patched)
             {
                 var old = Alerts.SelectMany(a => a.Faults).First(f => f.Id == id);
+                if (old.Kind == "nav")
+                {
+                    // A patched course correction does not hold: the ship arrives late, not lost (DESIGN.md, fault table).
+                    slip += Tuning.NavPatchArrivalSlipYears;
+                    events.Add($"Course correction was a patch: arrival slips {Tuning.NavPatchArrivalSlipYears:0} years, to year {Math.Floor(target + slip):0}.");
+                    continue;
+                }
                 Consequence(old);
                 events.Add("The patch on the " + old.PlainName.ToLowerInvariant() + " gave way.");
                 patchFailed |= old.Kind == "controller";
             }
             _patched.Clear();
         }
+        years += slip;
+        target += slip;
+        var hours = years * Tuning.HoursPerYear;
         // Whoever would not sleep stays up through the drift and eats the stores, in time order (DESIGN.md, "What every decision spends").
         var awake = Awake.ToList();
         var (storesOut, starved) = Eat(awake, hours);

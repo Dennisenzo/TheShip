@@ -136,12 +136,59 @@ public class PartsAndPatchesTests
     }
 
     [Fact]
-    public void A_patched_navigation_fault_at_the_last_drift_is_lost()
+    public void A_patched_navigation_fault_at_the_last_drift_slips_the_arrival()
     {
-        var v = ToTheLastDrift(1);
+        // Navigation is patched at alert 3 (set directly), so its clock never runs out.
+        var v = new Voyage(1);
+        var mara = VoyageTests.HonestFirstAlert(v);
+        VoyageTests.SleepWhenAllowed(v, mara);
+        for (var i = 0; i < 200 && !(v.Current.Number == 3 && v.Phase == Phase.Alert); i++)
+        {
+            if (v.Phase == Phase.Alert)
+                v.Go();
+            else
+                v.Drift();
+        }
+        v.Current.Faults.Single().State = FaultState.Patched;
+        v.Go();
+        while (v.Current.Number < 5 || v.Phase == Phase.Alert)
+        {
+            if (v.Phase == Phase.Alert)
+                v.Go();
+            else
+                v.Drift();
+            if (v.Current.Number == 5 && v.Phase == Phase.Aftermath)
+                break;
+        }
+        v.Stores = 100000;
         InjectPatched(v, "nav");
+        Assert.False(v.NavLost);
+        var sleeper = v.Crew.First(c => c.State == CrewState.Asleep);
+        var age = sleeper.Age;
+        var year = v.Year;
         v.Drift();
-        Assert.True(v.NavLost);
+        Assert.False(v.NavLost);
+        Assert.NotEqual("Adrift", v.Ending!.Title);
+        var slip = Tuning.NavPatchArrivalSlipYears;
+        var report = v.Log.Last(e => e.Text.StartsWith("DRIFT:")).Text;
+        Assert.Contains($"arrival slips {slip:0} years, to year {Scenario.ArrivalYear + slip:0}.", report);
+        Assert.Contains($"{Scenario.ArrivalYear - year + slip:0} years pass", report);
+        Assert.True(sleeper.Age >= age + (Scenario.ArrivalYear - year + slip) * Tuning.SleepAgeing);
+    }
+
+    [Fact]
+    public void A_navigation_fault_never_touched_is_adrift()
+    {
+        var v = new Voyage(1);
+        var mara = VoyageTests.HonestFirstAlert(v);
+        VoyageTests.SleepWhenAllowed(v, mara);
+        for (var i = 0; i < 300 && v.Phase != Phase.Ended; i++)
+        {
+            if (v.Phase == Phase.Alert)
+                v.Go();
+            else
+                v.Drift();
+        }
         Assert.Equal("Adrift", v.Ending!.Title);
     }
 }

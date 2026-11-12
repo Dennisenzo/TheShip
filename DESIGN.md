@@ -259,7 +259,7 @@ These never raise an alert by themselves. They make every other alert worse.
 
 - The first alert is always a single minor fault and teaches the loop.
 - The game picks the next event by weight from the ship's wear, the stores and what was left unrepaired.
-- An ignored or patched fault returns inside a later event, one severity higher. In the prototype a patch returns from alert 2 on (even in the signal alert, which then has a fault), with half the clock. A patch still outstanding at the last drift gives way on the way in: a patched pod controller adds 4 pod wear and gives each sleeper a 15% chance of dying; any other patched fault takes its "if ignored" consequence (a patched navigation fault ends the run as Adrift).
+- An ignored or patched fault returns inside a later event, one severity higher. In the prototype a patch returns from alert 2 on (even in the signal alert, which then has a fault), with half the clock. A patch still outstanding at the last drift gives way on the way in: a patched pod controller adds 4 pod wear and gives each sleeper a 15% chance of dying; any other patched fault takes its "if ignored" consequence (a patched navigation fault slips the arrival by `NavPatchArrivalSlipYears`, 9 years: the last drift is that much longer, with ageing and stores eaten by anyone awake, and the drift report says so).
 - Two critical alerts never come back to back.
 - A run has at most two signals.
 
@@ -296,7 +296,7 @@ Arrival is graded on four things: who is alive and how old they are, what they b
 | Landfall without you | They arrive after muting you or taking the bay |
 | The quiet ship | The ship arrives with nobody able to land it |
 | Turned back | The Return faction took the helm |
-| Adrift | Navigation was never restored; the crew live out their lives aboard |
+| Adrift | Navigation was never touched (its clock ran out with no repair or patch); the crew live out their lives aboard |
 | Shutdown | The core was cut before arrival |
 
 Every ending closes with the record: each lie you told, which were found out and by whom, which never were, and what the last people awake believed about you.

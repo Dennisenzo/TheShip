@@ -136,7 +136,7 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   charged for the older copy. 1 regression test (seed loop over the 0.6 spot roll).
 
 - 2026-11-12: balance harness (`tests/TheShip.Tests/BalanceBots.cs`, `BalanceTests.cs`, `[Trait("Category","Balance")]`): honest, careless and liar bots play whole voyages over seeds 1..200 through the public `Voyage` API and print a table (Landfall rate, endings, deaths, causes, ages, trust, lies) to the test output and `balance-report.txt`. Run: `dotnet test --filter Category=Balance` (about 5 s). Measures only; the 25-75% honest Landfall target test is skipped until tuning. Builds; passes.
-- 2026-11-13: balance step B3 (parts and patches that bite): `StartParts` 2, a failed repair spends a part too, patches return from alert 2 on, the doubled "Old patch gives way" prefix is fixed, and a patch still outstanding at the last drift takes its consequence (controller: +4 wear and `PatchFailDeathChance` per sleeper; nav: Adrift). Balance harness: Landfall for all bots 100% -> 0% (nav is patched at alert 3 once the parts are gone); tuning continues in later steps.
+- 2026-11-13: balance step B3 (parts and patches that bite): `StartParts` 2, a failed repair spends a part too, patches return from alert 2 on, the doubled "Old patch gives way" prefix is fixed, and a patch still outstanding at the last drift takes its consequence (controller: +4 wear and `PatchFailDeathChance` per sleeper; nav: arrival slips `NavPatchArrivalSlipYears`, 9). Balance harness: Landfall for all bots 100% -> 0% (nav is patched at alert 3 once the parts are gone); tuning continues in later steps.
 
 ### Built
 
@@ -167,7 +167,7 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
 ### Differences from DESIGN.md to settle
 
 - Up to three people awake; alert 4 (the signal) has no fault and can be drifted past with nobody woken.
-- Losing the navigation fault ends the run as "Adrift" (no arrival slip of years).
+- Adrift only when the navigation fault was never touched (its clock ran out); a patched one slips the arrival by 9 years instead. A slip by decades for other cases is not built.
 - Shorter wakings are all or nothing: the three-month minimum is waived as soon as the stores can't feed everyone up through a
   person's remaining three months (`Voyage.CanSleepNow`); there is no rationing. Once the stores are empty, whoever stays awake dies
   after `Tuning.StarveDays` (60 days).
