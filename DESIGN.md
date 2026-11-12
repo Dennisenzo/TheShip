@@ -325,6 +325,40 @@ Each is a switch that can be added to any mode.
 - **Failing hardware.** Your cameras and speakers decay twice as fast.
 - **Spoken.** The player talks by microphone and the crew answer aloud.
 
+### Run variation
+
+Proposed on 12 November 2026; not yet in the live document.
+
+Modes, missions and modifiers are chosen by the player. The seed varies everything below, so two runs with the same settings still differ. The aim is that no single policy for waking or lying is best in every run.
+
+| Source | What the seed varies | What it changes for the player |
+| --- | --- | --- |
+| Hidden truth | The state of Earth, the destination and the mission, drawn at the start and not shown | Signals reveal a different situation each run, so the player can't know in advance what they will want to hide |
+| Crew secrets | Two or three crew carry a private fact: a forged qualification, a hidden bond, knowledge of the mission, a promise made back home | The player sometimes catches a lie instead of telling one, and decides whether to expose it |
+| Bond graph | Who is partner, friend, rival, parent or child of whom | The reliable engineer of one run is the partner of the first person to die in the next |
+| Ship layout | Which lines run through which sections, and where the sensors have gaps from the start | Different interference between repairs, and different blind spots |
+| Ship class | A trade-off in starting stock, such as more pods and fewer spare parts, or a sound reactor and old cameras | Which resource runs out first |
+| Inherited record | A few statements and promises already on the record at the start, made by mission control or by you before departure | Every run opens with different promises to keep or break |
+| Rare events | One or two per run from a large pool: a stowaway, a derelict, a birth, a crew member's discovery | No single run shows everything |
+| Hidden causes | The same fault can come from wear, an old patch or a person | A familiar alert can't be read from its faults alone |
+
+Notes on the rows:
+
+- **Hidden truth and Sealed orders.** With the Sealed orders modifier the player knows the secret from the start. With a hidden truth the player learns it when the crew could, and has to decide on the spot.
+- **Crew secrets are ship facts.** Each has knowers and evidence like any other fact, so they need no new system. A crew member's false statement to you is stored and exposed the same way yours are.
+- **Fairness.** Everything drawn at the start can be discovered during the run, and the ending record shows all of it.
+
+Two choices belong to the player and also vary a run:
+
+- **Directive.** At the start, the player may take one self-imposed limit in exchange for an advantage, such as never restricting a log in return for higher starting trust. Breaking it counts as a broken promise to everyone who knew of it.
+- **Upkeep.** During each drift, the player picks one thing to maintain: a camera bank, the pods or their own memory. The others wear at the normal rate.
+
+One faction forms only out of a particular history:
+
+| Faction | Forms when | Wants | Danger to you |
+| --- | --- | --- | --- |
+| Devout | Three or more crew have high trust and have never caught you in a lie, late in the voyage | Your word as the final authority | They act on everything you say without checking, so one false statement spreads as fact and is defended against evidence |
+
 ## The language model's job
 
 The model does two jobs, writing what the crew say and reading what the player said, and decides one thing: whether a statement that fits no ship fact was a lie.
@@ -370,7 +404,7 @@ The first build is the Short haul mode in text only: 6 crew, 60 years, 5 scripte
 - **Numbers on screen:** trust and morale are shown, so the rules can be judged.
 - **One lockout:** the logs.
 - **One ending screen:** survivors and the full record of what you said.
-- **Left out:** the ship schematic, cameras, factions, children, signals from ahead, all modes and modifiers.
+- **Left out:** the ship schematic, cameras, factions, children, signals from ahead, all modes and modifiers, run variation.
 
 The prototype passes if, across three playthroughs, the player lies at least once without being prompted and calls a discovered lie fair.
 

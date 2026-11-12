@@ -45,6 +45,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-12: repository scaffolded (solution, projects, font, design copy). Written in a cloud session with no .NET SDK:
   **nothing has been compiled or run yet.** The first job in a session that has `dotnet` is `dotnet build TheShip.slnx`,
   then `dotnet test`, and fixing whatever they report.
+- 2026-11-12: DESIGN.md gained a "Run variation" section under "Gameplay variations" (what the seed varies per run).
+  It was written here first and is not yet in the live document. Design only; outside the prototype scope.
 
 ### Built
 
