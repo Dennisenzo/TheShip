@@ -88,6 +88,8 @@ public sealed partial class ShipGame
             report = line is null ? "" : line.Text["DRIFT:".Length..].Trim();
         }
         _transition = new Transition { Kind = kind, From = before, Start = _now, Banner = banner, Report = report };
+        if (kind == SkipKind.Drift)
+            _sounds.Drift();
     }
 
     private void ShowBanner(string text)
@@ -118,6 +120,7 @@ public sealed partial class ShipGame
         }
         t.Beat = 2;
         t.Start = _now;
+        _sounds.Alert();
     }
 
     /// <summary>A click, Enter or Esc during a transition: on to its next beat, or to its end.</summary>

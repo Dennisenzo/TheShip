@@ -323,7 +323,7 @@ public sealed partial class ShipGame
         {
             var points = Pts(run);
             for (var i = 0; i + 1 < points.Length; i++)
-                _p.Dashed(points[i], points[i + 1], Painter.Blue);
+                _p.Dashed(points[i], points[i + 1], Painter.Blue, offset: Motion.Still ? 0f : (float)(_now * 10 % 12));
         }
 
         // Doors: outlined = open, grey = closed, amber = locked. A click steps to the next state.
@@ -406,7 +406,8 @@ public sealed partial class ShipGame
                     _p.TextCentre(_p.Small, tag, centre.X, centre.Y - 8, Painter.Ink);
                     break;
                 case CrewState.Thawing:
-                    _p.Poly(outline, Painter.Accent, 2f);
+                    // A thawing pod breathes.
+                    _p.Poly(outline, Painter.Fade(Painter.Accent, 0.45f + 0.55f * Motion.Pulse(_now, 1.2f)), 2f);
                     _p.TextCentre(_p.Small, tag, centre.X, centre.Y - 16, Painter.Accent);
                     _p.TextCentre(_p.Small, "THAW", centre.X, centre.Y, Painter.Accent);
                     break;
@@ -445,7 +446,10 @@ public sealed partial class ShipGame
                 _hotFaultNext = f.Id;
             _p.Tip(mark, IssueCardLayout.CardName(f) + (f.Critical ? " (critical)" : "") + ": " + Voyage.Hours(ShownLeft(v, f)) + " left.");
             var faultLit = _p.Ease("fault:" + f.Id, _hotFault == f.Id ? 1f : 0f);
-            _p.Diamond(centre, 13 + 4 * faultLit, f.Critical || faultLit > 0.5f ? Painter.Bright : Painter.Accent, f.Critical ? 3f : 2f);
+            // A fault pulses, and faster once under a quarter of its clock is left.
+            var urgent = ShownLeft(v, f) < 0.25 * f.ClockHours;
+            var beat = 0.55f + 0.45f * Motion.Pulse(_now, urgent ? 0.5f : 1.8f);
+            _p.Diamond(centre, 13 + 4 * faultLit, Painter.Fade(f.Critical || faultLit > 0.5f ? Painter.Bright : Painter.Accent, beat), f.Critical ? 3f : 2f);
             _p.TextCentre(_p.Small, index.ToString(CultureInfo.InvariantCulture), centre.X, centre.Y - 8, Painter.Accent);
             var above = s.Spot.Y < 235;
             if (above && labelsAbove >= aboveRows.Length || !above && labelsBelow >= belowRows.Length)
@@ -506,6 +510,13 @@ public sealed partial class ShipGame
 
     // ---- The log and the voice line ----
 
+    /// <summary>How many log entries the last frame showed, and from which entry on (and since when) lines are fading in.</summary>
+    private int _logKnown;
+    private int _logFadeFrom;
+    private double _logFadeAt;
+    /// <summary>The log's length at the last clock move: entries from here on are new since then.</summary>
+    private int _logMark;
+
     private void DrawLog(Voyage v, Rectangle rect)
     {
         _p.Box(rect, Painter.Edge);
@@ -520,9 +531,21 @@ public sealed partial class ShipGame
         const int step = 20;
         var visible = Math.Max(1, (areaBottom - areaTop) / step);
 
-        var lines = new List<(string Text, Color Color)>();
-        foreach (var entry in v.Log.Take(ShownLogCount(v)))
+        // Lines that are new since the last frame fade in; lines since the last clock move have a mark in the margin.
+        var count = ShownLogCount(v);
+        if (count > _logKnown)
         {
+            _logFadeFrom = _logKnown;
+            _logFadeAt = _now;
+        }
+        _logKnown = count;
+        var fresh = Motion.Progress(_now, _logFadeAt, Motion.LogFade);
+
+        var lines = new List<(string Text, Color Color, int Entry)>();
+        var entryIndex = -1;
+        foreach (var entry in v.Log.Take(count))
+        {
+            entryIndex++;
             var color = entry.Kind switch
             {
                 LogKind.Ship => Painter.Accent,
@@ -539,14 +562,19 @@ public sealed partial class ShipGame
                 _ => entry.Text,
             };
             foreach (var line in Painter.Wrap(text, columns))
-                lines.Add((line, color));
+                lines.Add((line, color, entryIndex));
         }
         _scroll = Math.Min(_scroll, Math.Max(0, lines.Count - visible));
         var first = Math.Max(0, lines.Count - visible - _scroll);
         var last = Math.Min(lines.Count, first + visible);
         var y = areaBottom - (last - first) * step;
         for (var i = first; i < last; i++, y += step)
-            _p.Text(_p.Small, lines[i].Text, rect.X + 14, y, lines[i].Color);
+        {
+            var isFresh = lines[i].Entry >= _logFadeFrom && fresh < 1f;
+            _p.Text(_p.Small, lines[i].Text, rect.X + 14, y, isFresh ? Painter.Fade(lines[i].Color, 0.2f + 0.8f * fresh) : lines[i].Color);
+            if (_logMark > 0 && lines[i].Entry >= _logMark)
+                _p.Fill(new Rectangle(rect.X + 5, y + 2, 2, 15), Painter.Fade(Painter.Accent, 0.7f));
+        }
         if (_scroll > 0)
             _p.TextRight(_p.Small, "scrolled back " + _scroll + " lines (PageDown)", rect.Right - 14, areaTop - 4, Painter.Dim);
 

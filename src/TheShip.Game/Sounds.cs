@@ -10,7 +10,15 @@ public sealed class Sounds
     public const float ClickVolume = 0.25f;
 
     private const int SampleRate = 44100;
+    /// <summary>Loudness of the other interface sounds, 0 to 1.</summary>
+    public const float AlertVolume = 0.3f;
+    public const float DriftVolume = 0.3f;
+    public const float DeniedVolume = 0.25f;
+
     private SoundEffect? _click;
+    private SoundEffect? _alert;
+    private SoundEffect? _drift;
+    private SoundEffect? _denied;
     private bool _failed;
 
     /// <summary>Build the click once. Safe to call without an audio device.</summary>
@@ -19,6 +27,16 @@ public sealed class Sounds
         try
         {
             _click = new SoundEffect(MakeClick(), SampleRate, AudioChannels.Mono);
+            // A new alert: two rising notes, each struck and left to ring out.
+            _alert = new SoundEffect(Render(0.5, t => t < 0.16 ? 660 : 880, t =>
+            {
+                var local = t < 0.16 ? t : t - 0.16;
+                return Math.Min(1.0, local / 0.005) * Math.Exp(-8.0 * local);
+            }), SampleRate, AudioChannels.Mono);
+            // A drift: a low tone that sinks, swelling in and out.
+            _drift = new SoundEffect(Render(1.8, t => 190 - 70 * t / 1.8, t => Math.Sin(Math.PI * t / 1.8)), SampleRate, AudioChannels.Mono);
+            // A refused click: a short low thud.
+            _denied = new SoundEffect(Render(0.12, _ => 150, t => Math.Min(1.0, t / 0.004) * Math.Exp(-20.0 * t)), SampleRate, AudioChannels.Mono);
         }
         catch (Exception)
         {
@@ -39,6 +57,46 @@ public sealed class Sounds
         {
             _failed = true;
         }
+    }
+
+    /// <summary>The chime of a new alert.</summary>
+    public void Alert() => Play(_alert, AlertVolume);
+
+    /// <summary>The low sweep of a drift.</summary>
+    public void Drift() => Play(_drift, DriftVolume);
+
+    /// <summary>The thud of a click on something that cannot be used now.</summary>
+    public void Denied() => Play(_denied, DeniedVolume);
+
+    private void Play(SoundEffect? effect, float volume)
+    {
+        if (_failed || effect is null)
+            return;
+        try
+        {
+            effect.Play(volume, 0f, 0f);
+        }
+        catch (Exception)
+        {
+            _failed = true;
+        }
+    }
+
+    /// <summary>A sine tone of <paramref name="seconds"/>: its pitch in Hz and its loudness (0 to 1) as functions of the time in seconds.</summary>
+    private static byte[] Render(double seconds, Func<double, double> frequency, Func<double, double> envelope)
+    {
+        var count = (int)(SampleRate * seconds);
+        var bytes = new byte[count * 2];
+        var phase = 0.0;
+        for (var i = 0; i < count; i++)
+        {
+            var t = i / (double)SampleRate;
+            phase += 2 * Math.PI * frequency(t) / SampleRate;
+            var value = (short)(Math.Sin(phase) * Math.Clamp(envelope(t), 0.0, 1.0) * short.MaxValue * 0.8);
+            bytes[i * 2] = (byte)(value & 0xff);
+            bytes[i * 2 + 1] = (byte)((value >> 8) & 0xff);
+        }
+        return bytes;
     }
 
     /// <summary>About 35 ms: a soft sine tick at 1.2 kHz that falls a little in pitch, with a fast decay.</summary>

@@ -35,6 +35,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     /// <summary>Seconds since the game started; the clock of everything that moves in the interface (<see cref="Motion"/>).</summary>
     private double _now;
     private bool _handCursor;
+    /// <summary>The screen the last frame showed, and when it was switched to (for the fade between screens).</summary>
+    private Screen _shownScreen = Screen.Bridge;
+    private double _screenAt = double.NegativeInfinity;
 
     private SpriteBatch _batch = null!;
     private Texture2D _pixel = null!;
@@ -207,6 +210,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             Before? before = null;
             if (skip is not null && _voyage is not null)
                 before = Snapshot(_voyage);
+            if (snapshot && _voyage is not null)
+                _logMark = _voyage.Log.Count; // log lines from here on are new since this clock move
             _lastAdvance = null;
             action();
             if (before is not null && skip is { } kind)
@@ -433,6 +438,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _p.Delta = (float)gameTime.ElapsedGameTime.TotalSeconds;
         DrawScene();
         _click = false;
+        if (_p.Denied)
+            _sounds.Denied();
         if (_p.Hand != _handCursor)
         {
             _handCursor = _p.Hand;
@@ -480,6 +487,18 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         else
         {
             DrawBridge(_voyage);
+        }
+        if (_voyage is not null)
+        {
+            // A change of screen fades in; the ending takes its time.
+            if (_screen != _shownScreen)
+            {
+                _shownScreen = _screen;
+                _screenAt = _now;
+            }
+            var cover = 1f - Motion.Progress(_now, _screenAt, _screen == Screen.Ending ? Motion.EndingFade : Motion.ScreenFade);
+            if (cover > 0f)
+                _p.Fill(new Rectangle(0, 57, Painter.ScreenWidth, Painter.ScreenHeight - 57), Painter.Fade(Painter.Ground, cover));
         }
         if (overlay)
         {
