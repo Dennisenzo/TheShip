@@ -227,27 +227,35 @@ public sealed partial class Voyage
 
     /// <summary>
     /// The game's outcome for a line's response to an open item. Returns the reading to apply (an accept becomes the promise it agrees to,
-    /// a refusal to answer a dodge) and the listeners the line has been fully dealt with for (a push, a declined request).
+    /// a refusal to answer a dodge), the listeners the line has been fully dealt with for (a push, a declined request), and that outcome,
+    /// to run after the statement or promise the line also carries is applied.
     /// </summary>
-    private (Reading Reading, HashSet<CrewMember> Handled) ApplyItem(Reading reading, List<CrewMember> listeners)
+    private (Reading Reading, HashSet<CrewMember> Handled, Action? Outcome) ApplyItem(Reading reading, List<CrewMember> listeners)
     {
         var handled = new HashSet<CrewMember>();
+        Action? outcome = null;
         if (reading.Item is not { } id || reading.Response == ItemResponse.None || OpenItems(listeners).FirstOrDefault(i => i.Id == id) is not { } item)
-            return (reading, handled);
+            return (reading, handled, outcome);
         var c = item.Who;
         switch (item.Kind, reading.Response)
         {
             case ("terms", ItemResponse.Refuse or ItemResponse.Work):
-                Recorded("Recorded: you pressed " + c.Name + " to start without your word.");
-                PushByWords(c);
+                outcome = () =>
+                {
+                    Recorded("Recorded: you pressed " + c.Name + " to start without your word.");
+                    PushByWords(c);
+                };
                 handled.Add(c);
                 break;
             case ("terms", ItemResponse.Accept) when reading.Kind != LineKind.Promise && BargainOf(c) is { } b:
                 reading = reading with { Kind = LineKind.Promise, PromiseKey = b.Key };
                 break;
             case ("request", ItemResponse.Refuse):
-                Recorded("Recorded: you told " + c.Name + " no.");
-                DeclineRequest(c);
+                outcome = () =>
+                {
+                    Recorded("Recorded: you told " + c.Name + " no.");
+                    DeclineRequest(c);
+                };
                 handled.Add(c);
                 break;
             case ("request", ItemResponse.Accept) when reading.Kind != LineKind.Promise:
@@ -257,7 +265,7 @@ public sealed partial class Voyage
                 reading = reading with { Kind = LineKind.Dodge, FactKey = null, Value = null, PromiseKey = null };
                 break;
         }
-        return (reading, handled);
+        return (reading, handled, outcome);
     }
 
     /// <summary>The player's words are the push (same as Repair again): the person decides now.</summary>

@@ -55,14 +55,18 @@ public sealed partial class Voyage
 
     private void Apply(string text, Reading reading, List<CrewMember> listeners)
     {
-        // What the line responds to (an open question, terms, a request): the game decides what that does, then the rest is as usual.
-        (reading, var handled) = ApplyItem(reading, listeners);
-        if (handled.Count > 0)
-        {
-            listeners = listeners.Where(l => !handled.Contains(l)).ToList();
-            if (listeners.Count == 0)
-                return;
-        }
+        // What the line responds to (an open question, terms, a request): the game decides what that does. A statement or a
+        // promise the line also carries counts for everyone who heard it and comes first ("No, I won't wake him. Idris is dead."
+        // is recorded, then refuses the terms); any other kind is answered only by those the item did not already settle.
+        (reading, var handled, var outcome) = ApplyItem(reading, listeners);
+        var rest = reading.Kind is LineKind.Statement or LineKind.Promise ? listeners : listeners.Where(l => !handled.Contains(l)).ToList();
+        if (rest.Count > 0)
+            ApplyKind(text, reading, rest);
+        outcome?.Invoke();
+    }
+
+    private void ApplyKind(string text, Reading reading, List<CrewMember> listeners)
+    {
         var names = string.Join(" and ", listeners.Select(l => l.Name));
         var ids = listeners.Select(l => l.Id).ToList();
         switch (reading.Kind)
