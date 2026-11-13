@@ -226,8 +226,12 @@ public class ConditionsTests
             Assert.Contains(v.StakesText(mara), tip);
             Assert.Contains(v.BargainText(mara)!, tip);
             // 8 rows of 45 columns are what "Waiting on you" has with every crew card shown.
-            var rows = text.Split('\n').Sum(TermsTextTests.WaitingRows);
-            Assert.True(rows <= 8, seed + ": " + rows + " rows: " + text);
+            // Counted on what is drawn: the game's wrap, which breaks at each "\n" (it once showed them as "?" on one line).
+            var drawn = TheShip.Game.TextLayout.Wrap(text, 45);
+            Assert.True(drawn.Count <= 8, seed + ": " + drawn.Count + " rows: " + text);
+            Assert.Equal(text.Count(ch => ch == '?'), string.Concat(drawn).Count(ch => ch == '?'));
+            Assert.Contains(drawn, l => l.StartsWith("Answer: ", StringComparison.Ordinal));
+            Assert.Contains(drawn, l => l.StartsWith("Your word: ", StringComparison.Ordinal));
             // Without the stakes (another person's are shown) there is no Answer sub-line.
             Assert.DoesNotContain("Answer:", v.JobItem(mara, withStakes: false)!.Value.Text);
         }
@@ -244,7 +248,7 @@ public class ConditionsTests
         Assert.False(v.JobHoldsQuestion(mara));
         var (text, _) = v.JobItem(mara, withStakes: true)!.Value;
         Assert.Contains("without it about", text);
-        Assert.True(text.Split('\n').Sum(TermsTextTests.WaitingRows) <= 8);
+        Assert.True(TheShip.Game.TextLayout.Wrap(text, 45).Count <= 8);
     }
 
     /// <summary>An obedient person short of trusting, woken for the coolant leak, asked to repair: Asha at trust 45.</summary>

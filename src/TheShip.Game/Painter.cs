@@ -305,60 +305,9 @@ internal sealed class Painter
         Fill(new Rectangle(r.X, r.Y, (int)(r.Width * Math.Clamp(value, 0, 1)), r.Height), color);
     }
 
-    /// <summary>The model may write characters the bundled font lacks: map the common ones, replace the rest.</summary>
-    public static string Printable(string text)
-    {
-        var sb = new StringBuilder(text.Length);
-        foreach (var ch in text)
-        {
-            sb.Append(ch switch
-            {
-                '‘' or '’' => "'",
-                '“' or '”' => "\"",
-                '–' or '—' => "-",
-                '…' => "...",
-                '\t' => " ",
-                _ => ch is >= ' ' and <= 'ÿ' ? ch.ToString() : "?",
-            });
-        }
-        return sb.ToString();
-    }
+    /// <summary>The model may write characters the bundled font lacks: map the common ones, replace the rest; a line break is kept (<see cref="TextLayout.Printable"/>).</summary>
+    public static string Printable(string text) => TextLayout.Printable(text);
 
-    /// <summary>Word wrap for the monospaced font: by character count.</summary>
-    public static List<string> Wrap(string text, int columns)
-    {
-        var lines = new List<string>();
-        columns = Math.Max(8, columns);
-        foreach (var paragraph in Printable(text).Split('\n'))
-        {
-            var line = new StringBuilder();
-            foreach (var word in paragraph.Split(' '))
-            {
-                var piece = word;
-                while (piece.Length > columns)
-                {
-                    if (line.Length > 0)
-                    {
-                        lines.Add(line.ToString());
-                        line.Clear();
-                    }
-                    lines.Add(piece[..columns]);
-                    piece = piece[columns..];
-                }
-                if (line.Length > 0 && line.Length + 1 + piece.Length > columns)
-                {
-                    lines.Add(line.ToString());
-                    line.Clear();
-                }
-                if (line.Length > 0)
-                    line.Append(' ');
-                line.Append(piece);
-            }
-            lines.Add(line.ToString());
-        }
-        // A non-breaking space keeps a number with its unit on one line; it is drawn as an ordinary space.
-        for (var i = 0; i < lines.Count; i++)
-            lines[i] = lines[i].Replace('\u00A0', ' ');
-        return lines;
-    }
+    /// <summary>Word wrap for the monospaced font: by character count, a new line at each line break (<see cref="TextLayout.Wrap"/>).</summary>
+    public static List<string> Wrap(string text, int columns) => TextLayout.Wrap(text, columns);
 }
