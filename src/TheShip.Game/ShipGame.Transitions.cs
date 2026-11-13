@@ -124,7 +124,7 @@ public sealed partial class ShipGame
         }
         t.Beat = 2;
         t.Start = _now;
-        _sounds.Alert();
+        SoundAlarm();
     }
 
     /// <summary>The drift report's width on the plan.</summary>

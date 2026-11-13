@@ -108,6 +108,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     {
         _batch = new SpriteBatch(GraphicsDevice);
         _sounds.Load();
+        StartMusic();
         _pixel = new Texture2D(GraphicsDevice, 1, 1);
         _pixel.SetData(new[] { Color.White });
         _fonts = new FontSystem();
@@ -289,6 +290,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             }
         }
         _main.Drain();
+        UpdateMusic();
         // A person who died, or who went back to sleep, is no longer selected (a sleeper selected on purpose stays).
         if (_target is { Alive: false } || _target is { State: CrewState.Asleep } && _targetWasUp)
             _target = null;
@@ -443,6 +445,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
 
     protected override void UnloadContent()
     {
+        _music?.Dispose();
         _mind?.Dispose();
         _session?.Line("quit", _voyage?.Phase == Phase.Ended ? "after the ending" : "before the end of the voyage");
         _session?.Dispose();

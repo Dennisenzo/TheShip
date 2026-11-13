@@ -317,6 +317,8 @@ public sealed partial class ShipGame
         // The next useful step, where the eye already is.
         _p.TextRight(_p.Small, "NEXT: " + NextStep(v), rect.Right - 14, rect.Y + 10, Drifting ? Painter.Dim : Painter.Accent);
 
+        MusicButton(new Rectangle(rect.X + 140, rect.Y + 4, 120, 26));
+
         const float planTop = 24f;
         var k = (rect.Width - 8) / ShipPlan.Width;
         var ox = rect.X + 4f;

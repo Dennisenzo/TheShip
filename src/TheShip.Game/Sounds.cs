@@ -11,12 +11,10 @@ public sealed class Sounds
 
     private const int SampleRate = 44100;
     /// <summary>Loudness of the other interface sounds, 0 to 1.</summary>
-    public const float AlertVolume = 0.3f;
     public const float DriftVolume = 0.3f;
     public const float DeniedVolume = 0.25f;
 
     private SoundEffect? _click;
-    private SoundEffect? _alert;
     private SoundEffect? _drift;
     private SoundEffect? _denied;
     private bool _failed;
@@ -27,12 +25,6 @@ public sealed class Sounds
         try
         {
             _click = new SoundEffect(MakeClick(), SampleRate, AudioChannels.Mono);
-            // A new alert: two rising notes, each struck and left to ring out.
-            _alert = new SoundEffect(Render(0.5, t => t < 0.16 ? 660 : 880, t =>
-            {
-                var local = t < 0.16 ? t : t - 0.16;
-                return Math.Min(1.0, local / 0.005) * Math.Exp(-8.0 * local);
-            }), SampleRate, AudioChannels.Mono);
             // A drift: a low tone that sinks, swelling in and out.
             _drift = new SoundEffect(Render(1.8, t => 190 - 70 * t / 1.8, t => Math.Sin(Math.PI * t / 1.8)), SampleRate, AudioChannels.Mono);
             // A refused click: a short low thud.
@@ -58,9 +50,6 @@ public sealed class Sounds
             _failed = true;
         }
     }
-
-    /// <summary>The chime of a new alert.</summary>
-    public void Alert() => Play(_alert, AlertVolume);
 
     /// <summary>The low sweep of a drift.</summary>
     public void Drift() => Play(_drift, DriftVolume);

@@ -7,10 +7,15 @@ public sealed record Options(int Seed, string? Llm, int GpuLayers, string? TourD
 
 internal static class Program
 {
-    // Usage: TheShip [--seed <n>] [--llm <file.gguf>] [--gpu-layers <n>] [--tour <dir>]
+    // Usage: TheShip [--seed <n>] [--llm <file.gguf>] [--gpu-layers <n>] [--tour <dir>] [--render-music <dir>]
     // The game needs a GGUF model: without one it shows what is missing and does not start a voyage.
     private static void Main(string[] args)
     {
+        if (Argument(args, "--render-music") is { } musicDir)
+        {
+            MusicRender.Run(musicDir); // dev tool: WAV files of every mood and the alarm, no window
+            return;
+        }
         var options = new Options(
             Seed: int.TryParse(Argument(args, "--seed"), out var seed) ? seed : Environment.TickCount,
             Llm: Argument(args, "--llm"),
