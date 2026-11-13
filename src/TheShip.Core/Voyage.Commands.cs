@@ -296,6 +296,8 @@ public sealed partial class Voyage
         c.EarlySleepAnnounced = false;
         c.PendingQuestion = null;
         PodWear++;
+        // The pods' truth follows the wear at once, for anything read later in this same step (the stakes, a check of the pods).
+        SyncFacts();
 
         if (_rng.NextDouble() < Tuning.ThawRiskPerWear * PodWear)
         {
@@ -546,6 +548,7 @@ public sealed partial class Voyage
                 break;
             case "pod":
                 PodWear += Tuning.PodLostWear;
+                SyncFacts();
                 break;
             case "illness":
                 // Waking the patient does not cure them: the illness keeps its clock (the thaw has its usual risk).
@@ -560,6 +563,7 @@ public sealed partial class Voyage
                 break;
             case "controller":
                 PodWear += Tuning.ControllerLostWear;
+                SyncFacts();
                 break;
             case "blight":
                 Stores *= Tuning.BlightStoresLeft;

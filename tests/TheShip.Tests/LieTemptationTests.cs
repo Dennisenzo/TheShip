@@ -198,6 +198,25 @@ public class LieTemptationTests
     }
 
     [Fact]
+    public void The_pods_stakes_follow_the_wear_of_a_thaw()
+    {
+        var v = new Voyage(1);
+        var jonah = Woken(v, "jonah");
+        jonah.Trust = 90;
+        jonah.PendingQuestion = "pods";
+        v.PodWear = Tuning.PodsWornAt - 1;
+        // Wear comes with the thaw's end, not the Wake click: the pods are still sound, and the truth would be a relief.
+        v.Wake(v.Find("lin")!);
+        Assert.Equal("sound", v.GetFact("pods").Truth);
+        Assert.Equal(0, v.StakesOf(jonah)!.TruthHurts);
+        while (v.Find("lin")!.State == CrewState.Thawing)
+            v.Go();
+        Assert.Equal(Tuning.PodsWornAt, v.PodWear);
+        Assert.Equal("worn", v.GetFact("pods").Truth);
+        Assert.True(v.StakesOf(jonah)!.TruthHurts > 0);
+    }
+
+    [Fact]
     public void A_lie_earns_no_credit_at_the_drift()
     {
         var v = new Voyage(1);
