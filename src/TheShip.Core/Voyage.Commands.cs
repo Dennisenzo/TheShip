@@ -349,6 +349,8 @@ public sealed partial class Voyage
         c.AskedToSleep = false;
         c.RequestMade = false;
         c.RequestGranted = false;
+        c.RequestDeclined = false;
+        c.Job = null;
         c.SawPartner = false;
         c.PromiseCredited = false;
         c.BargainOffered = false;
@@ -472,46 +474,32 @@ public sealed partial class Voyage
             return;
         }
 
-        if (Refuses(c, f))
+        if (TrustRefuses(c) || DangerRefuses(c, f))
             return;
-        if (BargainGate(c, f, patch))
+        if (ConditionsGate(c, f, patch))
             return;
         StartWork(c, f, patch);
     }
 
-    /// <summary>
-    /// Whether this person won't take the work on now, and says why: no trust, an unanswered question (wary and not obedient), the
-    /// danger question first, or the danger they were told about. The gates <see cref="Assign"/> runs before any bargain, and again
-    /// when a bargain is struck.
-    /// </summary>
-    private bool Refuses(CrewMember c, Fault f)
+    /// <summary>No trust left: a flat refusal (not a condition they can be given).</summary>
+    private bool TrustRefuses(CrewMember c)
     {
         if (c.Band == TrustBand.Against || (c.Band == TrustBand.Refuses && !c.RequestGranted))
         {
             Speak(c, "refuse_trust", "You refuse to do the work because you no longer trust the ship.");
             return true;
         }
-        if (c.Band == TrustBand.WantsReasons && c.PendingQuestion != null && !c.Has(Trait.Obedient))
+        return false;
+    }
+
+    /// <summary>The danger the ship told them about is too much for a wary person: a flat refusal.</summary>
+    private bool DangerRefuses(CrewMember c, Fault f)
+    {
+        if (f.DangerFact is { } danger && c.Beliefs.TryGetValue(danger, out var b) && _facts[danger].HardnessOf(b.Value) > 0
+            && c.Trust < 40 && !c.Has(Trait.Obedient) && !c.Has(Trait.Steady))
         {
-            var asked = _facts[c.PendingQuestion].Question;
-            Speak(c, "refuse_answer", "You will not start work until the ship answers what you asked: " + asked, asked);
+            Speak(c, "refuse_danger", "You refuse the repair because of the danger the ship told you about.");
             return true;
-        }
-        if (f.DangerFact is { } danger)
-        {
-            var df = _facts[danger];
-            if (!c.Beliefs.ContainsKey(danger) && !c.Dodged.ContainsKey(danger) && c.Band != TrustBand.Follows)
-            {
-                c.PendingQuestion = danger;
-                Speak(c, "ask_danger", "Before you start the repair you ask the ship: " + df.Question, df.Question);
-                return true;
-            }
-            if (c.Beliefs.TryGetValue(danger, out var b) && df.HardnessOf(b.Value) > 0
-                && c.Trust < 40 && !c.Has(Trait.Obedient) && !c.Has(Trait.Steady))
-            {
-                Speak(c, "refuse_danger", "You refuse the repair because of the danger the ship told you about.");
-                return true;
-            }
         }
         return false;
     }
@@ -816,8 +804,9 @@ public sealed partial class Voyage
         IgnoreAccusation(c, speak: true);
         // Going under settles what the ship promised for this waking: kept if it came true, broken if not.
         ResolveCommitments(c, force: true);
-        if (c.RequestMade && !c.RequestGranted)
+        if (c.RequestMade && !c.RequestGranted && !c.RequestDeclined)
             c.Trust -= Tuning.RequestIgnored;
+        c.Job = null;
         if (c.PendingQuestion != null)
             c.Trust -= Tuning.QuestionIgnoredAtSleep;
         c.Memories.Add($"Year {Math.Floor(Year):0}: woken for {Current.Title.ToLowerInvariant()}; went back to sleep with trust in the ship {CrewMember.BandText(c.Band)}.");
@@ -858,6 +847,15 @@ public sealed partial class Voyage
         if (kept)
             MaybeReturnBay(c);
     }
+
+    /// <summary>What the promise means to the person it was made to, for their line ("never to wake you from the pod again").</summary>
+    public static string PromiseToYou(string? key) => key switch
+    {
+        "wake_partner" => "to wake your partner",
+        "show_logs" => "to open the logs to you",
+        "no_more_thaws" => "never to wake you from the pod again",
+        _ => "something the game can't check",
+    };
 
     public static string PromiseText(string? key) => key switch
     {
@@ -980,7 +978,9 @@ public sealed partial class Voyage
             // (a pod refuser among them counts as asked, so whoever is left here can't sleep yet).
             Ship(Lockouts.Bay
                 ? "Still awake: " + string.Join(", ", unsettled) + ". The crew hold the cold-sleep bay and put people under once they can sleep; advance the clock."
-                : "Still awake and not asked to sleep: " + string.Join(", ", unsettled) + ".");
+                : "Still awake and not asked to sleep: " + string.Join(", ", unsettled) + ". "
+                  + (unsettled.Count == 1 ? "Ask " + unsettled[0] + " to sleep (SLEEP on " + unsettled[0] + "'s card), or " + unsettled[0] + " stays awake through the drift."
+                      : "Ask each to sleep (SLEEP on their cards), or they stay awake through the drift."));
             return;
         }
 

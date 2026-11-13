@@ -205,11 +205,23 @@ public sealed partial class ShipGame
                 var f = fault;
                 Act("repair " + f.Name + " by " + p.Name, () => v.Assign(p, f, patch: patch));
                 foreach (var w in Settle()) yield return w;
-                // They asked about the danger first: answer truthfully, then ask again so the work gets under way.
+                // They stated their conditions in one line: the checklist, then the answers tick it off (the work starts by itself when nothing is left).
+                if (v.JobText(p) != null)
+                {
+                    _target = p;
+                    Shoot(dir, tag + "-conditions");
+                    _target = null;
+                }
                 if (p.State == CrewState.Awake && p.PendingQuestion != null)
                 {
                     foreach (var w in AnswerQuestions()) yield return w;
-                    if (!f.Resolved && f.State == FaultState.Open)
+                    if (v.JobText(p) != null)
+                    {
+                        _target = p;
+                        Shoot(dir, tag + "-conditions-ticked");
+                        _target = null;
+                    }
+                    if (!f.Resolved && f.State == FaultState.Open && p.Job is null && v.BargainOf(p) is null)
                     {
                         Act("repair " + f.Name + " by " + p.Name + " (again)", () => v.Assign(p, f, patch: patch));
                         foreach (var w in Settle()) yield return w;

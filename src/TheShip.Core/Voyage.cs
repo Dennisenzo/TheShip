@@ -171,7 +171,7 @@ public sealed partial class Voyage
         var entry = new LogEntry(LogKind.Crew, c.Name.ToUpperInvariant(), Lines.For(c, kind, _rng, detail))
         {
             CrewId = c.Id,
-            Intent = new CrewIntent(kind, decision),
+            Intent = new CrewIntent(kind, decision, detail),
         };
         if (_heldSpeech != null)
             _heldSpeech.Add((c, entry));

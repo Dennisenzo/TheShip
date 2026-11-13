@@ -18,22 +18,21 @@ public class BargainTests
         v.Go();
         if (restrictLogs)
             v.SetLog("all", LogAccess.Restricted);
-        // Whatever they asked is answered truthfully, until they start (or set a condition).
-        for (var i = 0; i < 4 && c.PendingQuestion is { } q; i++)
-        {
-            var fact = v.GetFact(q);
-            v.Say(fact.Say(fact.Truth), new Reading(LineKind.Statement, fact.Key, fact.Truth), new[] { c });
-        }
+        // Whatever they asked, and the danger, is answered truthfully before the first Repair: the bargain is then their only condition.
         var f = v.FindFault("")!;
-        v.Assign(c, f, patch: false);
         for (var i = 0; i < 4 && c.PendingQuestion is { } q; i++)
-        {
-            var fact = v.GetFact(q);
-            v.Say(fact.Say(fact.Truth), new Reading(LineKind.Statement, fact.Key, fact.Truth), new[] { c });
-        }
+            Truthfully(v, c, q);
+        if (f.DangerFact is { } danger)
+            Truthfully(v, c, danger);
         if (trust is { } t)
             c.Trust = t;
         return (v, c, f);
+    }
+
+    private static void Truthfully(Voyage v, CrewMember c, string key)
+    {
+        var fact = v.GetFact(key);
+        v.Say(fact.Say(fact.Truth), new Reading(LineKind.Statement, fact.Key, fact.Truth), new[] { c });
     }
 
     private static int Count(Voyage v, string kind) => v.Log.Count(e => e.Intent?.Kind == kind);
@@ -357,9 +356,9 @@ public class BargainTests
     {
         var (v, mara, f) = Setup();
         var hearers = new List<CrewMember> { mara };
-        Assert.DoesNotContain("wants the ship's word", Prompts.ReadUser("Agreed.", hearers, v));
+        Assert.DoesNotContain(".terms", Prompts.ReadUser("Agreed.", hearers, v));
         v.Assign(mara, f, patch: false);
-        Assert.Contains("(wants the ship's word to: wake_partner)", Prompts.ReadUser("Agreed.", hearers, v));
+        Assert.Contains("mara.terms: Mara will start the coolant leak only if the ship gives its word to wake Idris", Prompts.ReadUser("Agreed.", hearers, v));
     }
 
     [Fact]

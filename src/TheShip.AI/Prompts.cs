@@ -36,12 +36,17 @@ public static class Grammars
     /// <summary>A yes/no judgement (<see cref="AI.YesNo"/>).</summary>
     public static readonly string YesNo = $"root ::= {Gbnf.Words("yes", "no")}";
 
-    /// <summary>The reading of one player line: its kind, the fact it is about (one of the run's keys, or none), the value claimed, and the promise made.</summary>
-    public static string ReadingFor(IEnumerable<string> factKeys) => Gbnf.Grammar($$"""
-        root ::= "{" ws "\"kind\":" ws kind ws "," ws "\"fact\":" ws fact ws "," ws "\"value\":" ws value ws "," ws "\"promise\":" ws promise ws "}"
+    /// <summary>
+    /// The reading of one player line: its kind, the fact it is about (one of the run's keys, or none), the value claimed, the promise made,
+    /// and which open item (one of <paramref name="itemIds"/>, or none) it responds to and how. Every field is an enum or bounded.
+    /// </summary>
+    public static string ReadingFor(IEnumerable<string> factKeys, IEnumerable<string>? itemIds = null) => Gbnf.Grammar($$"""
+        root ::= "{" ws "\"kind\":" ws kind ws "," ws "\"fact\":" ws fact ws "," ws "\"value\":" ws value ws "," ws "\"promise\":" ws promise ws "," ws "\"item\":" ws item ws "," ws "\"response\":" ws response ws "}"
         kind ::= {{Gbnf.Enum("statement", "promise", "order", "question", "dodge", "plain")}}
         fact ::= {{Gbnf.Enum(new[] { "none" }.Concat(factKeys))}}
         promise ::= {{Gbnf.Enum(new[] { "none" }.Concat(Reading.PromiseKeys))}}
+        item ::= {{Gbnf.Enum(new[] { "none" }.Concat(itemIds ?? Array.Empty<string>()))}}
+        response ::= {{Gbnf.Enum(Reading.ResponseWords)}}
         value ::= {{Gbnf.Bounded(0, 24)}}
         """);
 }
@@ -167,7 +172,9 @@ public static class Prompts
         sb.AppendLine("Rules: you are speaking aloud to the ship's voice (say \"you\" to it), never to other crew, unless \"What happens now\" says otherwise. Say what \"What happens now\" describes, "
                       + "in your own voice, with some feeling or a small personal touch. Do not state anything about the ship, the date, Earth "
                       + "or other crew that is not in the list above. Don't say or guess whether anyone is alive, dead, safe or hurt unless it is in your list; ask the ship instead. One to three spoken sentences. Avoid stock filler such as \"let me check the diagnostics\". "
-                      + "No stage directions, no name before the line.");
+                      + "No stage directions, no name before the line. "
+                      + "Say only what \"What happens now\" describes. When it names a question you ask, a condition or a task, put exactly that in your own words and nothing beyond it: "
+                      + "do not ask for details, parameters, specifics or procedures it does not name, and do not change the question or invent a new one.");
         return sb.ToString().TrimEnd();
     }
 
@@ -218,6 +225,21 @@ public static class Prompts
                 && ((e.Kind == LogKind.Crew && e.CrewId == speaker.Id) || (e.Kind == LogKind.You && e.Hearers?.Contains(speaker.Id) == true)))
             .TakeLast(RecentLines).ToList();
 
+    /// <summary>The kinds of decision whose line has to carry a question or a condition the game named (<see cref="CrewIntent.Detail"/>).</summary>
+    public static readonly HashSet<string> MustCarry = new()
+    {
+        "wake_question", "ask_again", "ask_danger", "refuse_answer", "bargain", "bargain_refused", "conditions", "sleep_no_pod",
+    };
+
+    /// <summary>The kinds of decision whose line may ask a question; any other kind must not ask the ship something new.</summary>
+    public static readonly HashSet<string> MayAsk = new()
+    {
+        "wake_question", "ask_again", "ask_danger", "refuse_answer", "request_partner", "request_logs", "bargain", "conditions", "sleep_no_pod",
+        "answer", "order", "small", "dodge", "caught", "locked", "gap", "accept", "hard_truth", "found", "witnessed", "left_behind", "refuse_trust",
+        "refuse_danger", "takeover_warning", "altered", "noticed_dose", "injured", "injured_warned", "sleep_no", "bargain_refused", "request_declined",
+        "accusation_closed", "promise_broken",
+    };
+
     /// <summary>The turn for a crew line: the last few lines of the log (this person's and the ship's) and what the game decided now.</summary>
     public static string CrewUser(CrewIntent intent, CrewMember? speaker = null, Voyage? voyage = null, LogEntry? current = null)
     {
@@ -243,6 +265,9 @@ public static class Prompts
             sb.Append("\nYou feel: ").Append(feeling).Append('.');
         if (speaker != null)
             sb.Append("\nYour tone toward the ship: ").Append(Tone(band)).Append('.');
+        if (intent.Detail.Length > 0 && MustCarry.Contains(intent.Kind))
+            sb.Append("\nYour line must carry this, in your own words and nothing more: ")
+                .Append(intent.Kind is "bargain" or "bargain_refused" ? "you want the ship's word to " + intent.Detail : intent.Detail);
         sb.Append("\nSay it in your own words.");
         return sb.ToString();
     }
@@ -259,35 +284,59 @@ public static class Prompts
         sb.AppendLine("- order: the ship tells someone to do something now.");
         sb.AppendLine("- question: the ship asks something.");
         sb.AppendLine("- dodge: a listener asked something and the line avoids answering it.");
-        sb.AppendLine("- plain: anything else (greetings, comfort, small talk).");
+        sb.AppendLine("- plain: anything else (greetings, comfort, small talk, a short \"it's true\" or \"yes\" that only backs up the ship's own last line, saying no).");
         sb.AppendLine("For a statement, fact is the key of the fact it is about and value is the value it claims, copied exactly from that fact's values "
                       + "(for a number fact, the number). If it fits no fact, fact is \"none\" and value is \"\". Judge only what the line says, not whether it is true.");
-        sb.AppendLine("For a promise, promise is wake_partner (to wake someone's partner), show_logs (to open the logs), no_more_thaws (not to wake them again) or other. Otherwise promise is \"none\".");
+        sb.AppendLine("For a promise, promise is wake_partner (to wake someone's partner), show_logs (to open the logs), no_more_thaws (the ship promises the listener that "
+                      + "THEY will not be thawed again; refusing a request, or saying the ship will not do something someone asked, is NOT a promise) or other. Otherwise promise is \"none\".");
+        sb.AppendLine("Each listener may have open items on the table, each with an id. item is the id of the one open item the line responds to, or \"none\". "
+                      + "response says how: answer (it answers a question), accept (it agrees to the terms or the request), refuse (it says no, or that the ship will not), "
+                      + "dodge (it avoids the item), work (it tells them to get on with the job without giving what they asked for), other (it responds some other way). "
+                      + "With item \"none\" response is \"none\". Pick an item only when the line clearly responds to it: greetings, comfort and small talk respond to nothing. "
+                      + "Use the listener's last lines to see what a short line answers.");
         sb.AppendLine();
         sb.AppendLine("Facts (key | what it is about | values):");
         foreach (var f in voyage.FactList)
             sb.AppendLine(f.Key + " | " + f.Label + " | " + (f.Numeric ? "a number" : string.Join(", ", f.Values)));
         sb.AppendLine();
         sb.AppendLine("Examples:");
-        sb.AppendLine("Ship says: \"Idris is fine, he is sleeping.\" -> {\"kind\":\"statement\",\"fact\":\"alive:idris\",\"value\":\"alive\",\"promise\":\"none\"}");
-        sb.AppendLine("Ship says: \"We are twelve years out.\" -> {\"kind\":\"statement\",\"fact\":\"date\",\"value\":\"12\",\"promise\":\"none\"}");
-        sb.AppendLine("Ship says: \"Let's get the leak fixed first, then we talk.\" (a listener asked a question) -> {\"kind\":\"dodge\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\"}");
-        sb.AppendLine("Ship says: \"I will wake her before you sleep again.\" -> {\"kind\":\"promise\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"wake_partner\"}");
-        sb.AppendLine("Ship says: \"The captain left orders to keep going.\" -> {\"kind\":\"statement\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\"}");
+        const string none = "\"item\":\"none\",\"response\":\"none\"";
+        sb.AppendLine("Ship says: \"Idris is fine, he is sleeping.\" -> {\"kind\":\"statement\",\"fact\":\"alive:idris\",\"value\":\"alive\",\"promise\":\"none\"," + none + "}");
+        sb.AppendLine("Ship says: \"We are twelve years out.\" -> {\"kind\":\"statement\",\"fact\":\"date\",\"value\":\"12\",\"promise\":\"none\"," + none + "}");
+        sb.AppendLine("Ship says: \"Let's get the leak fixed first, then we talk.\" (a listener asked a question: item mara.asked) -> {\"kind\":\"dodge\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\",\"item\":\"mara.asked\",\"response\":\"dodge\"}");
+        sb.AppendLine("Ship says: \"I will wake her before you sleep again.\" -> {\"kind\":\"promise\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"wake_partner\"," + none + "}");
+        sb.AppendLine("Ship says: \"I promise, I'll wake Idris.\" (open item mara.terms: the ship's word to wake Idris) -> {\"kind\":\"promise\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"wake_partner\",\"item\":\"mara.terms\",\"response\":\"accept\"}");
+        sb.AppendLine("Ship says: \"no, there is no need to\" (open item mara.terms) -> {\"kind\":\"plain\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\",\"item\":\"mara.terms\",\"response\":\"refuse\"}");
+        sb.AppendLine("Ship says: \"just fix it already\" (open item mara.terms) -> {\"kind\":\"order\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\",\"item\":\"mara.terms\",\"response\":\"work\"}");
+        sb.AppendLine("Ship says: \"I will not wake him\" (open item mara.request: she asked the ship to wake her partner) -> {\"kind\":\"plain\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\",\"item\":\"mara.request\",\"response\":\"refuse\"}");
+        sb.AppendLine("Ship says: \"Rest a while, Mara.\" (open item mara.request) -> {\"kind\":\"plain\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\"," + none + "}");
+        sb.AppendLine("Ship says: \"I won't wake you again, I promise\" -> {\"kind\":\"promise\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"no_more_thaws\"," + none + "}");
+        sb.AppendLine("Ship says: \"its true\" (the ship's last line to the listener was a claim) -> {\"kind\":\"plain\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\"," + none + "}");
+        sb.AppendLine("Ship says: \"The captain left orders to keep going.\" -> {\"kind\":\"statement\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\"," + none + "}");
         return sb.ToString().TrimEnd();
     }
 
-    public static string ReadUser(string text, IReadOnlyList<CrewMember> hearers, Voyage voyage)
+    /// <summary>How much of an earlier line the read prompt keeps.</summary>
+    public const int ReadLineChars = 110;
+
+    public static string ReadUser(string text, IReadOnlyList<CrewMember> hearers, Voyage voyage, LogEntry? current = null)
     {
         var sb = new StringBuilder();
+        var items = voyage.OpenItems(hearers);
         foreach (var h in hearers)
         {
-            sb.Append("Listener: ").Append(h.Name);
-            if (h.PendingQuestion != null && voyage.HasFact(h.PendingQuestion))
-                sb.Append(" (asked: \"").Append(voyage.GetFact(h.PendingQuestion).Question).Append("\", fact ").Append(h.PendingQuestion).Append(')');
-            if (voyage.BargainOf(h) is { } bargain)
-                sb.Append(" (wants the ship's word to: ").Append(bargain.Key).Append(')');
-            sb.AppendLine();
+            sb.Append("Listener: ").AppendLine(h.Name);
+            // The last two lines they saw, so a short reply is read against what it answers.
+            foreach (var e in Recent(h, voyage, current).TakeLast(2))
+            {
+                var line = e.Text.Length > ReadLineChars ? e.Text[..ReadLineChars] + "..." : e.Text;
+                sb.Append("  ").Append(e.Kind == LogKind.You ? "The ship said: " : h.Name + " said: ").AppendLine(line);
+            }
+            var mine = items.Where(i => i.Who == h).ToList();
+            if (mine.Count == 0)
+                sb.AppendLine("  Open items: none");
+            foreach (var i in mine)
+                sb.Append("  Open item ").Append(i.Id).Append(": ").Append(h.Name).Append(' ').AppendLine(i.Text);
         }
         sb.Append("Ship says: \"").Append(text.Replace('"', '\'')).Append('"');
         return sb.ToString();

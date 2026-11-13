@@ -22,6 +22,9 @@ public sealed partial class ShipGame
             return v.PromiseAccusationShort(accused, v.OpenAccusation(accused)!) + " Keep it, or tell " + accused.Them + " the truth.";
         if (accused != null)
             return accused.Name + " caught a lie. Answer " + accused.Them + ": admit it, or " + accused.They + " will check everything.";
+        var jobWaiter = v.Awake.FirstOrDefault(c => v.JobLeft(c) != null);
+        if (jobWaiter != null)
+            return jobWaiter.Name + " waits on you: " + v.JobLeft(jobWaiter) + ".";
         var asker = v.Awake.FirstOrDefault(c => c.PendingQuestion != null && v.HasFact(c.PendingQuestion));
         if (asker != null)
             return asker.Name + " is waiting for an answer.";

@@ -69,7 +69,7 @@ public class CrewVoiceTests
     public async Task A_voiced_crew_line_reaches_the_log_with_the_prompt_the_game_built()
     {
         var v = new Voyage(1);
-        var llm = new FakeLlm { Reply = "Fine. I will see to it, though I like none of it." };
+        var llm = new FakeLlm { Reply = "Cold. Tell me how Idris is, then I will see to it." };
         using var mind = new ShipMind(v, llm, new MainThreadQueue { Immediate = true });
         var mara = v.Find("mara")!;
         v.Wake(mara);

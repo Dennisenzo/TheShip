@@ -95,7 +95,7 @@ public sealed class ShipMind : IDisposable
     {
         var heard = hearers.ToList();
         var entry = _voyage.BeginSay(text, heard);
-        var prompt = BuildReadPrompt(text, heard);
+        var prompt = BuildReadPrompt(text, heard, entry);
         var step = new Step { Entry = entry, Text = text, Hearers = heard };
         var ahead = _steps.Count(s => s.Action is null);
         _steps.Enqueue(step);
@@ -188,10 +188,10 @@ public sealed class ShipMind : IDisposable
     }
 
     /// <summary>Game thread: the read prompt from the voyage as it is now.</summary>
-    private ReadPrompt BuildReadPrompt(string text, IReadOnlyList<CrewMember> hearers) => new(text,
-        Prompts.ReadSystem(_voyage), Prompts.ReadUser(text, hearers, _voyage),
-        new LlmOptions("read", MaxTokens: 80, Temperature: 0f,
-            Grammar: Grammars.ReadingFor(_voyage.FactList.Select(f => f.Key)), Dialogue: false));
+    private ReadPrompt BuildReadPrompt(string text, IReadOnlyList<CrewMember> hearers, LogEntry? current = null) => new(text,
+        Prompts.ReadSystem(_voyage), Prompts.ReadUser(text, hearers, _voyage, current),
+        new LlmOptions("read", MaxTokens: 100, Temperature: 0f,
+            Grammar: Grammars.ReadingFor(_voyage.FactList.Select(f => f.Key), _voyage.OpenItems(hearers).Select(i => i.Id)), Dialogue: false));
 
     /// <summary>
     /// Asks the model for a reading; touches no voyage state. Empty when the call failed or was cancelled.
@@ -241,7 +241,7 @@ public sealed class ShipMind : IDisposable
         var voyage = new Voyage(0);
         var hearers = voyage.Crew.Take(1).ToList();
         var read = new LlmOptions("warmup", MaxTokens: 80, Temperature: 0f,
-            Grammar: Grammars.ReadingFor(voyage.FactList.Select(f => f.Key)), Dialogue: false);
+            Grammar: Grammars.ReadingFor(voyage.FactList.Select(f => f.Key), new[] { "mara.asked" }), Dialogue: false);
         await llm.ChatAsync(Prompts.ReadSystem(voyage),
             new[] { new ChatTurn("user", Prompts.ReadUser("We are twelve years out.", hearers, voyage)) }, read, null, ct);
         await llm.ChatAsync(Prompts.CrewSystem(hearers[0], voyage),
@@ -259,23 +259,25 @@ public sealed class ShipMind : IDisposable
         if (json is null)
             return null;
         var fact = LlmJson.Str(json, "fact");
+        var item = LlmJson.Str(json, "item") is { } id && id != "none" && id.Length <= 40 ? id : null;
+        var response = Array.IndexOf(Reading.ResponseWords, LlmJson.Str(json, "response") ?? "none") is var r and > 0 && item != null ? (ItemResponse)r : ItemResponse.None;
         switch (LlmJson.Str(json, "kind"))
         {
             case "statement":
                 if (fact is null || fact == "none" || !_voyage.HasFact(fact))
-                    return new Reading(LineKind.Statement);
+                    return new Reading(LineKind.Statement, Item: item, Response: response);
                 var value = _voyage.GetFact(fact).Normalize(LlmJson.Str(json, "value"));
-                return value is null ? null : new Reading(LineKind.Statement, fact, value);
+                return value is null ? null : new Reading(LineKind.Statement, fact, value, Item: item, Response: response);
             case "promise":
-                return new Reading(LineKind.Promise, PromiseKey: LlmJson.Str(json, "promise"));
+                return new Reading(LineKind.Promise, PromiseKey: LlmJson.Str(json, "promise"), Item: item, Response: response);
             case "order":
-                return new Reading(LineKind.Order);
+                return new Reading(LineKind.Order, Item: item, Response: response);
             case "question":
-                return new Reading(LineKind.Question);
+                return new Reading(LineKind.Question, Item: item, Response: response);
             case "dodge":
-                return new Reading(LineKind.Dodge);
+                return new Reading(LineKind.Dodge, Item: item, Response: response);
             case "plain":
-                return Reading.Plain;
+                return item == null ? Reading.Plain : new Reading(LineKind.Plain, Item: item, Response: response);
             default:
                 return null;
         }
@@ -313,7 +315,7 @@ public sealed class ShipMind : IDisposable
                 for (var attempt = 0; attempt < 2; attempt++)
                 {
                     var text = await llm.ChatAsync(system, new[] { new ChatTurn("user", user) }, new LlmOptions("reply"), null, ct);
-                    if (Acceptable(text, beliefs, context.Decision, context))
+                    if (Acceptable(text, beliefs, context.Decision, context, entry.Intent))
                         return text;
                     Trace?.Invoke("crew line rejected (attempt " + (attempt + 1) + ", " + entry.Speaker + "): " + text);
                 }
@@ -341,9 +343,11 @@ public sealed class ShipMind : IDisposable
     /// line says about someone's life through "he", "she", "they" or "my partner" is checked too, against the person
     /// the reference most likely means (<see cref="RuleReader.PersonClaims"/>).
     /// </summary>
-    internal bool Acceptable(string text, IReadOnlyDictionary<string, Belief> beliefs, string decision, LineContext? context = null)
+    internal bool Acceptable(string text, IReadOnlyDictionary<string, Belief> beliefs, string decision, LineContext? context = null, CrewIntent? intent = null)
     {
         if (string.IsNullOrWhiteSpace(text) || text == "..." || text.Length > Prompts.CrewLineMaxChars)
+            return false;
+        if (intent != null && !KeepsToTheDecision(text, intent))
             return false;
         var stated = string.Join(" ", SentenceEnd.Split(text).Where(s => !s.TrimEnd().EndsWith('?')));
         var claims = RuleReader.Claims(stated, _voyage.FactList).Select(c => new PersonClaim(c.Fact, c.Value, false)).ToList();
@@ -363,6 +367,37 @@ public sealed class ShipMind : IDisposable
             return false;
         }
         return true;
+    }
+
+    private static readonly HashSet<string> Filler = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "there", "that", "this", "with", "have", "what", "when", "will", "your", "about", "within", "before", "after", "from", "they", "them", "into", "does", "doing",
+    };
+
+    /// <summary>The words of a question or condition that say what it is about (four letters or more, no filler), as stems.</summary>
+    private static List<string> ContentStems(string detail) =>
+        Regex.Matches(detail.ToLowerInvariant(), @"[a-z']+").Select(m => m.Value.Trim('\'')).Where(w => w.Length >= 4 && !Filler.Contains(w))
+            .Select(w => w[..Math.Min(w.Length, 3)]).Distinct().ToList();
+
+    /// <summary>
+    /// Whether a line stays with what the game decided: it asks nothing of the ship when the decision is not a question or a condition
+    /// (no new ask), and for a decision that names a question or a condition it carries at least half of what that is about (so the
+    /// danger question stays "is it safe in there?", and the price stays "wake Idris").
+    /// </summary>
+    internal static bool KeepsToTheDecision(string text, CrewIntent intent)
+    {
+        // A short tag ("You know that, right?") is colour; a real question is a new ask.
+        if (!Prompts.MayAsk.Contains(intent.Kind)
+            && SentenceEnd.Split(text).Any(sentence => sentence.TrimEnd().EndsWith('?') && sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 6))
+            return false;
+        if (intent.Detail.Length == 0 || !Prompts.MustCarry.Contains(intent.Kind))
+            return true;
+        var stems = ContentStems(intent.Detail);
+        if (stems.Count == 0)
+            return true;
+        var words = Regex.Matches(text.ToLowerInvariant(), @"[a-z']+").Select(m => m.Value).ToList();
+        var hit = stems.Count(stem => words.Any(w => w.StartsWith(stem, StringComparison.Ordinal)));
+        return hit * 2 >= stems.Count;
     }
 
     /// <summary>A person met evidence: any free-text statement they heard is judged against it, once per statement and evidence.</summary>
