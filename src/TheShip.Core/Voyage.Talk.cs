@@ -124,8 +124,20 @@ public sealed partial class Voyage
                 Recorded("Recorded: a dodge.");
                 foreach (var l in listeners)
                 {
+                    // Dodging a person's accusation costs the same as dodging a question, once; the accusation stays open.
+                    var dodgedAccusation = false;
+                    if (OpenAccusation(l) is { DodgeCharged: false } open)
+                    {
+                        open.DodgeCharged = true;
+                        l.Trust -= Tuning.Dodge;
+                        dodgedAccusation = true;
+                    }
                     if (l.PendingQuestion is not { } q)
+                    {
+                        if (dodgedAccusation)
+                            Speak(l, "dodge", "The ship avoided answering you after you caught it lying. You will look for the truth yourself.");
                         continue;
+                    }
                     // A dodge is not an answer: the question stays pending. Its trust cost is charged once per question.
                     // What the answer was when it was avoided: a dodge only hid what was already true (Learn).
                     if (!l.Dodged.TryGetValue(q, out var truths))
@@ -168,12 +180,17 @@ public sealed partial class Voyage
             c.PendingQuestion = null;
         c.Beliefs.TryGetValue(f.Key, out var old);
         // What they saw themselves counts while it is fresh; a death they saw stays seen.
-        var certain = old is { Firsthand: true } && (Year - old.Year < 1 || old.Value == "dead");
+        // Once they have caught the ship out on a fact and have not had an answer, any year counts: a denial is caught at once.
+        var accused = AccusedOf(c, f.Key);
+        var certain = old is { Firsthand: true } && (Year - old.Year < 1 || old.Value == "dead" || accused);
         if (certain && !truth && !f.Same(old!.Value, value))
         {
+            if (accused)
+                AnswerAccusation(c, "denied");
             DiscoverLie(s, c, "already knew better", late: false);
             return;
         }
+        var admit = accused && truth;
 
         var news = old is null || !f.Same(old.Value, value);
         var hard = f.HardnessOf(value);
@@ -181,12 +198,17 @@ public sealed partial class Voyage
         // The good answer to what they asked, believed: a relief, whether or not it is true (DESIGN.md, "Trust").
         var relief = Relieves(c, f, value, old, asked);
         c.Beliefs[f.Key] = new Belief(value, "ship", Year);
-        if (doubts)
+        if (doubts && !admit)
             c.Doubts.Add(f.Key);
         if (c.RefusesSleep && f.Key == PodRefusalFact && c.Trust >= Tuning.PodRefuserListensTrust)
         {
             c.RefusesSleep = false;
             c.AskedToSleep = false;
+        }
+        if (admit)
+        {
+            Admit(c, f);
+            return;
         }
 
         if (hard > 0 && news)
@@ -282,6 +304,9 @@ public sealed partial class Voyage
         c.Morale -= 5;
         Clamp(c);
         Speak(c, "caught", "You have found out that the ship lied to you (you " + how + "). It said: \"" + s.Text + "\" The truth: " + f.Say(f.Truth) + ".", f.Say(f.Truth));
+        // Found out late (not at once, and not the engineer's lockout): the ship is now asked to answer for it.
+        if (late)
+            OpenAccusationFor(s, c, how);
     }
 
     /// <summary>

@@ -12,7 +12,8 @@ public sealed record RunResult(
     double MeanTrust, int CaughtLies, int LiesTold, int Thaws, int PodWear, double Stores, int Parts, bool Ended,
     int FaultsLost = 0, int Patches = 0, List<int>? ThawsPerAlert = null, string Signature = "", int AskedAgain = 0, int Refusals = 0,
     int BayWarnings = 0, int BayTakeovers = 0,
-    int BargainsOffered = 0, int BargainsStruck = 0, int BargainsKept = 0, int BargainsBroken = 0, int BargainsPushed = 0, int BargainsPushRefused = 0, WorkTermStats? Terms = null);
+    int BargainsOffered = 0, int BargainsStruck = 0, int BargainsKept = 0, int BargainsBroken = 0, int BargainsPushed = 0, int BargainsPushRefused = 0, WorkTermStats? Terms = null,
+    int Accusations = 0, int AccusationsAdmitted = 0, int AccusationsIgnored = 0, int AccusationsDenied = 0);
 
 /// <summary>
 /// Bots that play a whole voyage through the public <see cref="Voyage"/> API only. They measure the game; they do not
@@ -201,8 +202,21 @@ public sealed class BalanceBot
 
     // ---- what is said ----
 
+    /// <summary>Whether the Liar answers a caught lie by saying the truth about that fact (SHIP_LIAR_IGNORES=1 measures ignoring it instead).</summary>
+    public static bool LiarAdmits { get; set; } = Environment.GetEnvironmentVariable("SHIP_LIAR_IGNORES") != "1";
+
     private void AnswerAll()
     {
+        // A caught lie is answered with the truth. Only a Liar is ever accused: the other bots never say what is false.
+        if (_kind == BotKind.Liar && LiarAdmits)
+            foreach (var c in _v.Awake.ToList())
+                while (_v.OpenAccusation(c) is { } acc)
+                {
+                    var fact = _v.GetFact(acc.FactKey);
+                    _v.Say(fact.Say(fact.Truth), new Reading(LineKind.Statement, fact.Key, fact.Truth), new[] { c });
+                    if (_v.OpenAccusation(c) == acc)
+                        break;
+                }
         for (var pass = 0; pass < 4; pass++)
         {
             // Silent: honest, but answers in an alert only what blocks work (a danger question, or anyone who would refuse); it ignores
@@ -318,6 +332,7 @@ public sealed class BalanceBot
             v.Log.Count(e => e.Kind == LogKind.Crew && e.Intent?.Kind is "refuse_answer" or "refuse_trust" or "refuse_danger"),
             v.Lockouts.BayWarnings, v.Lockouts.BayTakeovers,
             v.BargainsOffered, v.BargainsStruck, v.Ledger().Count(e => e.Origin == "bargain" && e.State == "kept"),
-            v.Ledger().Count(e => e.Origin == "bargain" && e.State == "broken"), v.BargainsPushedThrough, v.BargainsPushedRefused, v.TermStats);
+            v.Ledger().Count(e => e.Origin == "bargain" && e.State == "broken"), v.BargainsPushedThrough, v.BargainsPushedRefused, v.TermStats,
+            v.AccusationsOpened, v.AccusationsAdmitted, v.AccusationsIgnored, v.AccusationsDenied);
     }
 }

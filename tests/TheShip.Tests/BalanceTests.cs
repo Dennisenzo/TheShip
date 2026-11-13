@@ -76,6 +76,7 @@ public class BalanceTests
                 sb.AppendLine($"  Doses briefed / unbriefed; hurt-unbriefed    {N(t.Average(x => x.DosesBriefed))} / {N(t.Average(x => x.DosesNotBriefed))}; {N(t.Average(x => x.HurtUnbriefed))} per run");
                 sb.AppendLine($"  Injuries briefed (injured_warned) / not      {N(t.Average(x => x.InjuriesBriefed))} / {N(t.Average(x => x.InjuriesNotBriefed))} per run");
             }
+            sb.AppendLine($"  Accusations opened / admitted / ignored / denied  {N(r.Average(x => x.Accusations))} / {N(r.Average(x => x.AccusationsAdmitted))} / {N(r.Average(x => x.AccusationsIgnored))} / {N(r.Average(x => x.AccusationsDenied))} per run");
             sb.AppendLine($"  Lies told / caught      {N(r.Average(x => x.LiesTold))} / {N(r.Average(x => x.CaughtLies))} per run");
             sb.AppendLine($"  Thaws / pod wear        {N(r.Average(x => x.Thaws))} / {N(r.Average(x => x.PodWear))}");
             double Sd(IEnumerable<double> xs) { var l = xs.ToList(); if (l.Count < 2) return 0; var mu = l.Average(); return Math.Sqrt(l.Sum(x => (x - mu) * (x - mu)) / l.Count); }

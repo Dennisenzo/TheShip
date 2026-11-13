@@ -228,6 +228,8 @@ public sealed class Accusation
     /// <summary>Aftermath beats left before it closes unanswered; counts down only while it is the open one.</summary>
     public int BeatsLeft { get; set; } = Tuning.AccusationBeats;
     public bool DodgeCharged { get; set; }
+    /// <summary>The aftermath beat it opened in: it does not run down in that same beat.</summary>
+    public int OpenedBeat { get; set; }
 }
 
 public enum StatementKind { True, False, Promise, Dodge, Unkeyed }

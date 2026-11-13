@@ -144,6 +144,8 @@ A crew member tests what you tell them when they hear it, and again whenever the
 
 Statements and evidence are stored against the same fact keys, with dates, so finding a keyed lie is a lookup.
 
+A found-out lie says how it was found (`Statement.FoundOutHow`, per person): "read the log entry", "read a console", "walked to the pod bay", "ran a scan in the medical bay", "saw it when the work finished", "was told by Lin what Lin saw", "watched Idris die", "saw the dosimeter turn red", "was hurt by the repair", "already knew better" for a lie caught as it was said. The `caught` line's decision text carries it ("you read the log entry") and the ending record shows "Found out by Mara in year 31 (read the log entry), admitted". A lie found late opens an accusation (see "Agendas"). Telling someone the truth after a lie does not take the lie off the record: a later finding-out of the truth still charges the earlier lie in full (verified by test; self-correction is not built).
+
 A death outside the pods (someone awake, or coming round from a thaw that kills them) happens in front of everyone awake: they know it firsthand at once, as they know who is up when someone is thawed, so a later "they are fine" is caught as it is said. Seeing the answer to a question they asked the ship settles that question. A thaw that kills never logs "is awake". A witness says they saw it, not that they went and looked. Only those alive at the end of a step say anything about it: two who starve in the same hours say nothing of each other, and deaths in a drift come out in the drift report, the awake taking them in silently, with any crew line from the drift said after the report.
 
 An altered log entry is one lie for as long as it says the same false thing: opening, restricting and altering it back to
@@ -192,7 +194,7 @@ The game picks one agenda for each conversation from the person's sheet and the 
 | Question | Asks for a fact | They lack a fact that matters to them; the default (built) | A statement or a dodge |
 | Bargain | Sets a condition before they work, sleep or keep quiet | Trust 30 to 59, or the request touches their want (built for work: wake the partner, open the logs) | A promise with a due date, or a refusal |
 | Test | Asks something they already know | Sceptical temperament, or they hold a note or another person's account | A lie caught at once, or a small rise in trust |
-| Accusation | Puts evidence against one of your statements in front of you | They have met that evidence | A true statement that corrects it, or a second false one |
+| Accusation | Puts evidence against one of your statements in front of you | They have met that evidence (built for keyed lies found out late; see below) | A true statement that corrects it, or a second false one |
 | Confidence | Tells you something and asks you to keep it from a named person | Trust 60 and up, and a bond under strain | A promise of silence that a later question from that person will strain |
 | Proposal | Offers their own plan for the repair | Skill 2 or more in the fault's system, and trust under 60 | Their plan or yours, with the blame attached |
 
@@ -202,6 +204,7 @@ How the hard ones resolve:
   *Built for work (step 2 of the bargains plan).* When the player asks a wary person to repair or patch (trust 30 to 59, not Obedient; asked after the trust-band refusals, the pending question and the danger question) and the ship can grant their want, they set one condition per waking instead of starting: Mara-like (wants her partner) asks the ship's word to wake the partner if he is asleep and alive and a slot is free; Lin-like (wants the logs) asks the word to open the logs if any log is restricted (all logs are open until the player restricts one, so this is rare). The line is a `bargain` crew line; the work does not start. The player accepts by saying the matching promise to them (a promise reading with the same key): the work starts, the ledger gets the commitment with origin "bargain" and a due date `BargainDueDays` (40) away, and there is no `PromiseMade` trust. The same gates as a Repair click run again at that moment: if trust has fallen out of the wary band, a question now waits, or the danger stops them, they say that refusal instead; the condition closes, the ship's word stands as an ordinary promise, and a later Repair or Patch starts the work once the gate is clear, with no new price. A promise with another key is an ordinary promise and the bargain stays open. Pressing Repair or Patch again is a push (the click is "without your word"): one roll, they start with chance trust / 100 + `BargainPushBase` (0.10), and it costs `BargainPushedTrust` (3) either way. A failed push declines: they refuse until the matching promise. The condition lapses silently when its fault is resolved, the alert changes, the person goes to sleep, their trust leaves the wary band, or the ship meets the condition another way (checked after each step); they set no second condition that waking. The player-facing text (`Voyage.BargainText`) states the price, the stakes and the odds of a push, and never whether a statement is true. "Waiting on you" shows the selected person's condition, or the first one's with a hint to select the others; the next-step line asks for the word only while the fault still waits on that person. A bargain costs no clock yet (that comes with work terms).
 - **Test.** The player is never told a question is a test. A truthful answer raises trust more than an ordinary truth does.
 - **Accusation.** Telling the truth now stops the fall in trust at the discovered-lie cost. A denial is a new false statement, caught as it is said. This is a new statement, not a take-back: the first one stays in the record.
+  *Built (feature/lie-comes-due, step 2).* A keyed lie found out late (not caught as it was said, not an engineer's log lockout, not a free-text statement) opens an accusation on that person and fact; the discovery cost is unchanged (`LieTrust`). One is open at a time, the oldest first; a second late finding-out waits behind it and opens, with its full beats, when the first closes. The crew line `caught` names how it was found (see "How a lie is caught"). The ship answers in four ways. *Admit:* say the true value of that fact to them; `AccusationAdmitTrust` (6) of the lost trust comes back, once per person and fact, and they say `accusation_admitted`. *Deny:* a false statement on that fact while it is open is caught as it is said, whatever the year (the "within a year" window of a fresh sight does not apply), at `LieTrust` again; the accusation closes as denied. *Dodge:* the dodge reading costs `Dodge` (3) once and the accusation stays open. *Ignore:* after `AccusationBeats` (2) aftermath beats (four weeks), or when they go to sleep, or at a drift they stay awake through, it closes unanswered with `accusation_closed`: `AccusationIgnoredTrust` (4), and they doubt every fact they hold from the ship, so the existing doubt check audits one per beat (the true ones pay `ConfirmedTruth`, the false ones are caught, and those open accusations of their own). Their death closes it with no line. The text for the bridge (`Voyage.AccusationText`) names the person, what the ship said, how they found out and the weeks left, and never says whether any other statement was true. Broken promises open no accusation. Session log: the `state` line has `accused: <name> <fact> beats <n>`.
 - **Confidence.** If the named person later asks about it, the player must break the promise, dodge, or lie to them.
 - **Proposal.** If you accept and the plan fails, trust doesn't move. If you overrule and your plan fails, it counts as an order that got someone hurt.
 
@@ -580,6 +583,17 @@ Decided by the main session while the user was away, 2026-11-13 (work terms, ste
 | Q6: a Shaken mood | No; the morale hit of a hard truth stands in |
 | Q7: injury and dose sizes | Unchanged |
 | Q8: risk facts for power sag and blight | Not yet |
+
+Decided by the main session while the user was away, 2026-11-13 (the lie comes due):
+
+| Question | Decision |
+| --- | --- |
+| Admission refund | 6 of the 22 (`AccusationAdmitTrust`), once per person and fact |
+| Ignoring an accusation | Costs 4 and makes the person audit everything the ship told them (doubts), one fact per beat |
+| Self-correction (telling the truth before the lie is found) | To be built in a later step (`SelfCorrectTrust` 8, a Corrector bot as guard); today the old lie is still charged in full |
+| The Waiting text | Names how they found out |
+| Broken promises | Open no accusation in this step |
+| Denying | A false statement on the accused fact is caught as it is said, whatever the year |
 
 ### Questions for playtest
 

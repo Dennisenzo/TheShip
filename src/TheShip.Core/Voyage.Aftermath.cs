@@ -7,6 +7,7 @@ public sealed partial class Voyage
     private void AftermathBeat()
     {
         // Promises that fell due, or came true, in these two weeks (before anyone asks for the same thing).
+        _beat++;
         ResolveCommitments();
         var up = Awake.ToList();
         foreach (var c in up)
@@ -44,6 +45,9 @@ public sealed partial class Voyage
                 if (unread.Count > 0)
                     ReadLog(c, unread[_rng.Next(unread.Count)]);
             }
+
+            // A found-out lie left unanswered: the accusation runs down and closes.
+            AccusationBeat(c);
 
             // A question left unanswered: they ask again, twice at most, then check it themselves.
             if (c.PendingQuestion is { } pq && c.QuestionRepeats < Tuning.QuestionRepeatsMax)

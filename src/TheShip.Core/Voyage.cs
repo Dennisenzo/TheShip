@@ -233,6 +233,7 @@ public sealed partial class Voyage
         var seen = c.State is CrewState.Awake or CrewState.Thawing;
         c.State = CrewState.Dead;
         c.WorkingOn = null;
+        c.Accusations.Clear();
         _facts["alive:" + c.Id].Truth = "dead";
         Attend(c.Name + " died");
         if (!quiet)

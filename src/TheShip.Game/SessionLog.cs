@@ -105,6 +105,9 @@ public sealed class SessionLog : IDisposable
                 .Append(c.Doubts.Count > 0 ? ", doubts " + string.Join(" ", c.Doubts) : "")
                 .Append(c.WorkingOn != null ? ", working on " + c.WorkingOn : "")
                 .Append(c.RefusesSleep ? ", REFUSES SLEEP" : "");
+        foreach (var c in v.Crew.Where(c => c.Accusations.Count > 0))
+            sb.Append("\naccused: ").Append(c.Name).Append(' ').Append(c.Accusations[0].FactKey).Append(" beats ").Append(c.Accusations[0].BeatsLeft)
+                .Append(c.Accusations.Count > 1 ? " (+" + (c.Accusations.Count - 1) + " waiting)" : "");
         foreach (var e in v.Ledger().Where(e => e.State == "open"))
             sb.Append("\nowes: ").Append(e.Person.Name).Append(' ').Append(e.Key)
                 .Append(e.DueBy is { } due ? " due in " + v.DaysLeft(due).ToString(Inv) + " d" : " until arrival");

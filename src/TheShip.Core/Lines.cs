@@ -37,6 +37,8 @@ public static class Lines
             "caught" => Pick(rng,
                 "That's not true, and you know it: " + detail + ". Why would you lie to me?",
                 "You lied. " + Cap(detail) + ". What else have you told me?"),
+            "accusation_admitted" => Pick(rng, "Thank you for saying it. It doesn't undo it.", "So you can tell the truth. I'll remember you did, this time."),
+            "accusation_closed" => Pick(rng, "You never answered. You will check everything yourself now.", "Nothing to say? Then I'll check everything you told me myself."),
             "dodge" => Pick(rng, sceptical ? "That isn't an answer. I'll find out myself." : "You're not telling me. Fine.",
                 "I'll ask again later, then."),
             "promise" => Pick(rng, "I'll hold you to that.", sceptical ? "We'll see." : "Thank you. I'll remember it."),

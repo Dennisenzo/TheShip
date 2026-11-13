@@ -736,6 +736,8 @@ public sealed partial class Voyage
 
     private void Sleep(CrewMember c)
     {
+        // Going under with a caught lie unanswered closes it.
+        IgnoreAccusation(c, speak: true);
         // Going under settles what the ship promised for this waking: kept if it came true, broken if not.
         ResolveCommitments(c, force: true);
         if (c.RequestMade && !c.RequestGranted)
@@ -968,6 +970,8 @@ public sealed partial class Voyage
                     // Someone who would not sleep ages, eats and reads everything, for as long as they live.
                     c.Age += hours / Tuning.HoursPerYear;
                     c.HoursAwake += hours;
+                    // An accusation the ship let run through the drift closes unanswered (they read everything anyway).
+                    IgnoreAccusation(c, speak: false);
                     foreach (var f in FactList)
                         ReadLog(c, f, quiet: true);
                 }
