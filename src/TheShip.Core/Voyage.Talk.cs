@@ -400,9 +400,14 @@ public sealed partial class Voyage
         Learn(c, f.Key, f.Truth, "evidence");
     }
 
-    /// <summary>A person goes to check a fact for themselves: the pod, a console, a scan, or the log.</summary>
+    /// <summary>
+    /// A person goes to check a fact for themselves: the pod, a console, a scan, or the log. Nothing shows a fact the ship has no record of
+    /// yet (<see cref="InLog"/>: an alert that hasn't happened, the cause of a fault that hasn't appeared): the doubt stays until it does.
+    /// </summary>
     private void CheckEvidence(CrewMember c, Fact f)
     {
+        if (!InLog(f))
+            return;
         if (f.Evidence == EvidenceKind.Logs)
         {
             ReadLog(c, f);
