@@ -79,10 +79,15 @@ public class MainValidationTests
     {
         var v = new Voyage(1);
         var mara = Woken(v, "mara");
+        var jonah = Woken(v, "jonah");
         v.Go();
         var fault = v.FindFault("coolant")!;
         AssignAnswering(v, mara, fault);
-        mara.Morale = 60;
+        AssignAnswering(v, jonah, fault);
+        Assert.Equal(2, v.Crew.Count(c => c.WorkingOn == fault.Id));
+        // A team at far apart morale: the hours follow the team's average (the asker alone would quote 1 h, the team takes 0.5 h).
+        jonah.Morale = 100;
+        mara.Morale = 50;
         mara.Beliefs.Remove("dose");
         mara.PendingQuestion = "dose";
         var s = v.StakesOf(mara)!;
