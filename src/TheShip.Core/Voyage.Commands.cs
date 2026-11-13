@@ -290,8 +290,10 @@ public sealed partial class Voyage
 
         if (_rng.NextDouble() < Tuning.ThawRiskPerWear * PodWear)
         {
-            c.Health -= Tuning.ThawInjury;
-            Ship("The thaw went badly. " + c.Name + " is hurt.");
+            // A share of failed thaws kill outright; the rest injure (a healthy person survives the injury).
+            var fatal = _rng.NextDouble() < Tuning.ThawFatalShare;
+            c.Health = fatal ? 0 : c.Health - Tuning.ThawInjury;
+            Ship(fatal ? "The thaw went badly. " + c.Name + " is not breathing." : "The thaw went badly. " + c.Name + " is hurt.");
             if (c.Health <= 0)
             {
                 Kill(c, "did not survive the thaw");
@@ -764,6 +766,10 @@ public sealed partial class Voyage
         return Scenario.ArrivalYear + navPatches * Tuning.NavPatchArrivalSlipYears;
     }
 
+    /// <summary>A sleeper's chance of dying in the pod over a drift: wear x years x the tuning rate, at most 1.</summary>
+    public static double SleepDeathChance(int wear, double years) =>
+        Math.Clamp(wear * years * Tuning.SleepDeathPerWearYear, 0, 1);
+
     /// <summary>Step 8: with everyone asleep or settled, the clock jumps to the next alert, or to arrival.</summary>
     public void Drift()
     {
@@ -856,6 +862,12 @@ public sealed partial class Voyage
                 {
                     c.Health = 0;
                     sleepCause ??= "died in sleep when the pod controller patch gave way";
+                }
+                // Worn pods fail on their own: the longer the drift and the more the wear, the likelier.
+                if (PodWear > 0 && _rng.NextDouble() < SleepDeathChance(PodWear, years))
+                {
+                    c.Health = 0;
+                    sleepCause ??= "died in sleep, pod failure";
                 }
             }
             Clamp(c);

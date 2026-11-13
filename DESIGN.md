@@ -52,7 +52,7 @@ The player acts in steps 2 to 7. Steps 1 and 8 belong to the game.
 | Crew years | Every thaw, 3 to 5 years each; every ten years asleep, 1 year | People too old, or dead, before arrival |
 | Stores | Every person-day awake, at least three months per thaw | Shorter wakings, then hunger |
 | Spare parts | Each repair, successful or failed (the Short haul starts with 2) | Repairs that can only be patched |
-| Pod health | Each thaw | Thaws that injure or kill |
+| Pod health | Each thaw | Thaws that injure or kill (30% of failed thaws are fatal); sleepers die in worn pods over long drifts |
 | Trust | Discovered lies and broken promises | Refusals, then lockouts |
 | Your senses | Time, and crew who cut them | Sections you can't see or speak in |
 
@@ -256,7 +256,7 @@ An event draws two to four faults from the tables below. A few rows, such as a s
 These never raise an alert by themselves. They make every other alert worse.
 
 - **Spare parts** run down with each repair, and a failed repair burns a part too (decided 2026-11-12). Short haul starts with 2; at zero, a fault can only be patched. A repair under way needs a part to finish, and its redo after a failure needs one like a fresh repair: with none left the work stops, the worker says so, and the fault can only be patched.
-- **Pod wear** raises the risk of every thaw.
+- **Pod wear** raises the risk of every thaw (`ThawRiskPerWear` x wear; decided 2026-11-13: 30% of failed thaws kill outright, `ThawFatalShare`, the rest injure) and wears the sleepers too: in every drift each sleeper has a death chance of wear x years x `SleepDeathPerWearYear` ("died in sleep, pod failure", named in the DRIFT report). Fewer thaws mean less wear and fewer deaths.
 - **Your own hardware** decays: cameras and microphones fail one by one over the voyage.
 
 ### How alerts are scheduled

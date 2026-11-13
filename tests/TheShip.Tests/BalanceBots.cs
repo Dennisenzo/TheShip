@@ -232,7 +232,7 @@ public sealed class BalanceBot
     // ---- results ----
 
     private static readonly Regex Cause = new(
-        "(?<what>died in sleep when the pod failed|died of the illness|died of injuries|did not survive the thaw|starved|died awake|died in sleep on low power|died in sleep when the pod controller patch gave way|died in sleep during the drift)",
+        "(?<what>died in sleep when the pod failed|died in sleep, pod failure|died of the illness|died of injuries|did not survive the thaw|starved|died awake|died in sleep on low power|died in sleep when the pod controller patch gave way|died in sleep during the drift)",
         RegexOptions.Compiled);
 
     private static RunResult Summarise(int seed, Voyage v)
