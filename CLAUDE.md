@@ -181,6 +181,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 
 - 2026-11-13: UI polish from the screenshot tour (`fix/ui-polish`): the plan legend is two lines (plan panel 456 px high, log starts at 540), dossier trust labels wrap inside their segment, issue cards size to their text (buttons right below it) and keep "12 h" together with a non-breaking space (`Painter.Wrap` shows it as a space), section names read "Pod bank A", and the ending has its own screen (`Screen.Ending`: crew, beliefs, scrolling record; Bridge, Record and Quit buttons; an ENDING button in the other headers reopens it, Esc on the record returns to it). No new voyage button: restarting needs a new `ShipMind` and worker, not built.
 
+- 2026-11-13: DESIGN.md gained a "Conversations" section (feature/conversations-design): agendas (question, bargain, test, accusation, confidence, proposal), asking the crew, outcomes (promise ledger, work terms, independent action, spread, stance), pressure (clock cost, patience, audience, disagreement, mood). Design only; nothing built. First build: bargains with promises, then work terms. Two playtest questions added.
+
 ### Balance table (B1, 200 seeds, Short haul)
 
 | Bot | Landfall | Quiet ship | Adrift | Survivors | Deaths excl. scripted | End trust | Thaws | Main causes (per run) |
@@ -254,7 +256,7 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
 ### Not built yet
 
 Everything the design lists outside the prototype scope: lights, power routing, cameras and microphones,
-factions, children, the other events and faults, the other lockouts and endings, modes, mission types, modifiers, run variation, voice input.
+conversations beyond the question agenda (DESIGN.md, "Conversations"), factions, children, the other events and faults, the other lockouts and endings, modes, mission types, modifiers, run variation, voice input.
 
 ### Next steps
 

@@ -172,6 +172,95 @@ A faction forms when three or more living crew share a stance. It acts as a grou
 | Return | To turn back to Earth | They take the helm |
 | Settlers | To stop sleeping and live aboard | They drain the stores and stop repairs that need sleep |
 
+## Conversations
+
+Designed 2026-11-13; not built, except where a rule says so. All numbers are starting values for playtest and belong in `Tuning.cs`.
+
+A conversation is a scene with an agenda, a cost and an outcome. The crew member wants something from it, it takes time off the clock, and it ends in a result the player can see on the ship. What exists today is the Question agenda only: a person asks, the ship answers, trust moves.
+
+### Agendas
+
+The game picks one agenda for each conversation from the person's sheet and the ship's state. The model only words it.
+
+| Agenda | What the person does | Picked when | What it leaves behind |
+| --- | --- | --- | --- |
+| Question | Asks for a fact | They lack a fact that matters to them; the default (built) | A statement or a dodge |
+| Bargain | Sets a condition before they work, sleep or keep quiet | Trust 30 to 59, or the request touches their want | A promise with a due date, or a refusal |
+| Test | Asks something they already know | Sceptical temperament, or they hold a note or another person's account | A lie caught at once, or a small rise in trust |
+| Accusation | Puts evidence against one of your statements in front of you | They have met that evidence | A true statement that corrects it, or a second false one |
+| Confidence | Tells you something and asks you to keep it from a named person | Trust 60 and up, and a bond under strain | A promise of silence that a later question from that person will strain |
+| Proposal | Offers their own plan for the repair | Skill 2 or more in the fault's system, and trust under 60 | Their plan or yours, with the blame attached |
+
+How the hard ones resolve:
+
+- **Bargain.** The condition comes from the person's want and bonds: wake someone, show a log, stay awake longer. Accepting records a promise. Refusing leaves the compliance roll to trust alone, with a penalty.
+- **Test.** The player is never told a question is a test. A truthful answer raises trust more than an ordinary truth does.
+- **Accusation.** Telling the truth now stops the fall in trust at the discovered-lie cost. A denial is a new false statement, caught as it is said. This is a new statement, not a take-back: the first one stays in the record.
+- **Confidence.** If the named person later asks about it, the player must break the promise, dodge, or lie to them.
+- **Proposal.** If you accept and the plan fails, trust doesn't move. If you overrule and your plan fails, it counts as an order that got someone hurt.
+
+### Asking the crew
+
+The player can ask questions too. The crew hold facts the ship doesn't: the text of a paper note, what was said in a closed meeting, what a section looks like where the cameras are dead.
+
+| Their trust in you | How they answer |
+| --- | --- |
+| 60 and up | Tells you what they know |
+| 30 to 59 | Tells you what costs them nothing, and may ask why you want it |
+| 15 to 29 | Dodges |
+| Under 15 | Lies, if the lie serves their faction |
+
+Whether a person lies is the game's decision, and the model words it. What they tell you is stored in the same statement record as what you tell them, so you catch their lie the way they catch yours: by meeting evidence. The check that rejects a crew line stating what the speaker doesn't believe ("Keeping the model inside the facts") has to let through the one false value the game decided on, and nothing else.
+
+### Outcomes
+
+Every conversation closes with at least one outcome, shown in the log like the "Recorded" line. Like that line, it says what happened and never whether a statement was true.
+
+| Outcome | Example | What it changes |
+| --- | --- | --- |
+| Commitment | "You promised Mara to wake Idris at the next alert." | Goes on a promise ledger with a due date; a broken promise lowers trust |
+| Work terms | Told about the radiation dose, the engineer takes precautions | The repair's time, odds and injury risk in the Work step |
+| Independent action | After a dodge, Mara walks to the pod bay | They check for themselves (built: a dodge or a twice-repeated question makes them doubt the fact and check it) |
+| Spread | "Mara will tell Idris." | Knowers of the fact, at the next shared shift or in a note |
+| Stance | "Mara now doubts the pods." | One step towards or away from a faction's stance |
+
+Work terms tie the briefing to the repair. Each fault lists what a repairer can be told before starting, and each item changes how the work goes:
+
+| Briefing | Effect on the work |
+| --- | --- |
+| Told the risk | Slower; the risk is halved; no trust lost if it happens anyway |
+| Not told the risk | Faster; full risk; if it happens, it counts as an order that got someone hurt |
+| Told the cause | Better odds; the cause becomes a fact they know and may spread |
+| Told nothing beyond the task | Standard time and odds; they meet the fault's exposure unprepared |
+
+### Pressure
+
+- **Clock.** During an alert, every exchange takes 5 minutes off each running fault clock. With a slack of 1 to 6 hours ("The clock rule"), a long briefing is a real trade.
+- **Patience.** During an alert, each person allows 2 to 5 exchanges before the work starts, set by temperament and trust. A dodge costs two. When patience runs out they end the conversation and act on their own judgement. In the aftermath the existing rule for unanswered questions applies instead.
+- **Audience.** A line is heard by everyone it is said to (built: hearers are recorded, and differing accounts come out in the aftermath). New: a private word needs the two people in different sections, and sending someone out is visible to them.
+- **Disagreement.** When two awake crew want different things, they ask you to choose. The one you overrule loses trust in you, and their bond with the other shifts.
+- **Mood.** Each person has one mood per waking, set by what they have just been through:
+
+| Mood | Set by | Effect |
+| --- | --- | --- |
+| Steady | The default | None |
+| Shaken | A rough thaw, an injury, a near miss | A hard truth told before or during the work lowers the repair's odds; the same truth in the aftermath doesn't |
+| Angry | A caught lie, a broken promise | Patience is halved; every request becomes a bargain |
+| Grieving | Learning of a death | Won't bargain; morale falls further on any dodge about the dead |
+
+### Keeping conversations inside the rules
+
+- **The game decides.** The agenda, the condition of a bargain, the mood and whether a person lies are all chosen by the game. The model writes the lines.
+- **Reading stays as it is.** Accepting a bargain or a confidence is read as a promise, an admission and a denial as statements. No new kinds of player line are needed, and there is still no correction of a reading.
+- **Nothing happens unseen.** Every outcome is in the log when the conversation ends, and the promise ledger is always open to the player.
+
+### First build
+
+Two of these come first, because they reuse the statement record and the compliance roll the prototype already has:
+
+1. Bargains that create promises with a due date.
+2. Work terms set by the briefing.
+
 ## Alerts
 
 An alert is one event that breaks several things at once, and the player can rarely fix all of them in time. Every fault has its own severity, a clock, a skill need, a cost if ignored, and an exposure: what the people fixing it will see or learn while they work.
@@ -430,6 +519,7 @@ The first build is the Short haul mode in text only, smaller than the mode table
 - **One lockout:** the logs.
 - **One ending screen:** survivors and the full record of what you said.
 - **Ship plan:** a wireframe schematic with sections, doors (only locking has an effect), coolant and power lines, pods and fault markers.
+- **Conversations (designed, not built):** bargains with promises and work terms set by the briefing; see "Conversations".
 - **Left out:** cameras, factions, children, signals from ahead, all modes and modifiers, run variation except: the alert-2 victim and patient, side-fault draws, clock slack, year jitter.
 
 The prototype passes if, across three playthroughs, the player lies at least once without being prompted and calls a discovered lie fair.
@@ -453,6 +543,8 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 - [ ] Are paper notes fun, or only frustrating? The prototype has no notes, so this waits for the first build that has them.
 - [ ] Do 8 to 10 alerts fill 60 to 90 minutes? The first prototype run (5 alerts, one fault each) took 8 minutes against Short haul's 30.
 - [ ] What should low trust do before the ending (recruiting, the logs, an ending gate, a voice lockout)? Decided once the balance harness has measured the other balance changes.
+- [ ] Does the clock cost of talking make players too terse? Watch whether briefings shrink to one line once an exchange costs 5 minutes.
+- [ ] Is a hidden test fair? Ask players whether a caught test felt earned or like a trap.
 
 ## Balance (Short haul, 2026-11-13)
 
