@@ -400,8 +400,8 @@ public sealed partial class ShipGame
     /// </summary>
     private void DrawEnding(Voyage v, Ending ending)
     {
-        Header(v, "VOYAGE ENDED", back: false);
         var right = Painter.ScreenWidth - 16;
+        Header(v, "VOYAGE ENDED", back: false, limit: right - 400 - 12);
         if (_p.Button(new Rectangle(right - 80, 8, 80, 40), "QUIT"))
             Do(Exit);
         if (_p.Button(new Rectangle(right - 288, 8, 200, 40), "RECORD AND LOGS"))

@@ -533,8 +533,11 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _batch.End();
     }
 
-    /// <summary>The bar on top of every screen: where you are, the year, and the phase of the voyage.</summary>
-    private void Header(Voyage v, string title, bool back)
+    /// <summary>
+    /// The bar on top of every screen: where you are, the year, and the phase of the voyage. <paramref name="limit"/> is where the
+    /// caller's own header content starts (the bridge's numbers, the ending's buttons); the lock chip stays left of it.
+    /// </summary>
+    private void Header(Voyage v, string title, bool back, float? limit = null)
     {
         _p.Fill(new Rectangle(0, 0, Painter.ScreenWidth, 56), Painter.Panel);
         _p.Fill(new Rectangle(0, 56, Painter.ScreenWidth, 1), Painter.Edge);
@@ -571,12 +574,17 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _p.Frame(chip, alert ? Painter.Accent : Painter.Wire);
         _p.Text(_p.Small, phase, chip.X + 10, chip.Y + 6, alert ? Painter.Accent : Painter.Ink);
         // The lockouts the crew hold: a chip each, so the loss of Wake and Sleep is never a mystery.
-        var lockText = v.Lockouts.Bay ? "BAY TAKEN BY THE CREW" : v.Lockouts.BayWarned.Count > 0 ? "CREW WILL TAKE THE BAY" : null;
-        if (lockText != null)
+        // The short text when the long one would reach the numbers or buttons on the right; none when neither fits (the Wake and
+        // Sleep buttons and "Waiting on you" still say it).
+        var room = (limit ?? (v.Phase == Phase.Ended && _screen != Screen.Ending ? Painter.ScreenWidth - 16 - 110 - 12 : Painter.ScreenWidth - 16)) - (chip.Right + 12);
+        var lockTexts = v.Lockouts.Bay ? new[] { "BAY TAKEN BY THE CREW", "BAY: CREW" }
+            : v.Lockouts.BayWarned.Count > 0 ? new[] { "CREW WILL TAKE THE BAY", "BAY WARNED" }
+            : Array.Empty<string>();
+        if (lockTexts.Select(t => (Text: t, Width: (int)(t.Length * _p.SmallWidth) + 20)).FirstOrDefault(t => t.Width <= room) is { Text: not null } fit)
         {
-            var lock1 = new Rectangle(chip.Right + 12, 14, (int)(lockText.Length * _p.SmallWidth) + 20, 28);
+            var lock1 = new Rectangle(chip.Right + 12, 14, fit.Width, 28);
             _p.Frame(lock1, Painter.Accent);
-            _p.Text(_p.Small, lockText, lock1.X + 10, lock1.Y + 6, Painter.Accent);
+            _p.Text(_p.Small, fit.Text, lock1.X + 10, lock1.Y + 6, Painter.Accent);
         }
     }
 }

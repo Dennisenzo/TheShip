@@ -29,8 +29,9 @@ public sealed partial class ShipGame
         _hotCrew = _hotCrewNext;
         _hotFaultNext = null;
         _hotCrewNext = null;
-        Header(v, "THE SHIP", back: false);
         var right = Painter.ScreenWidth - 16;
+        var statsRight = right - (v.Phase == Phase.Ended ? 532 : 412);
+        Header(v, "THE SHIP", back: false, limit: statsRight - StatsWidth(v) - 12);
         if (_p.Button(new Rectangle(right - 80, 8, 80, 40), "QUIT"))
             Do(Exit);
         if (_p.Button(new Rectangle(right - 288, 8, 200, 40), "RECORD AND LOGS"))
@@ -41,7 +42,7 @@ public sealed partial class ShipGame
                 _briefing = true;
                 _session?.Line("click", "briefing reopened");
             });
-        DrawStats(v, right - (v.Phase == Phase.Ended ? 532 : 412));
+        DrawStats(v, statsRight);
 
         DrawIssues(v, 16, 72, 330, Painter.ScreenHeight - 16);
         DrawPlan(v, PlanRect);

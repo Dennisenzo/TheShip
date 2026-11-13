@@ -115,10 +115,33 @@ public sealed partial class ShipGame
     };
 
     /// <summary>The ship's numbers in the header, each with its own colour, tooltip and change flash. Drawn from the right edge leftwards.</summary>
+    /// <summary>The header's numbers, right to left: label, shown text, whether it warns, the key and value that flash, and the tooltip.</summary>
+    private List<(string Label, string Text, bool Warn, string Key, double Value, string Tip)> Stats(Voyage v) => new()
+    {
+        ("COURSE", v.NavLost ? "LOST" : "held", v.NavLost, "course", v.NavLost ? 1 : 0,
+            "The course to the destination. With the course lost the ship never arrives."),
+        ("POWER", v.PowerLow ? "LOW" : "normal", v.PowerLow, "power", v.PowerLow ? 1 : 0,
+            "The reactor's output. On low power, people asleep in the pods are at risk."),
+        ("POD WEAR", ShownPodWear(v).ToString(CultureInfo.InvariantCulture), false, "wear", v.PodWear,
+            "Wear of the cold-sleep pods. Every thaw adds to it, and worn pods fail."),
+        ("PARTS", ShownParts(v).ToString(CultureInfo.InvariantCulture), v.Parts == 0, "parts", v.Parts,
+            "Spare parts. A repair needs one; with none left a fault can only be patched."),
+        ("STORES", N(ShownStores(v)) + " d", v.Stores <= 0, "stores", v.Stores,
+            "Food, in person-days. Each person awake eats one a day."),
+    };
+
+    /// <summary>How far the header's numbers reach left of their right edge (<see cref="DrawStats"/>).</summary>
+    private float StatsWidth(Voyage v) =>
+        Stats(v).Sum(s => _p.Small.MeasureString(s.Text).X + _p.Small.MeasureString(s.Label).X + 7 + 20) - 20;
+
     private void DrawStats(Voyage v, int right)
     {
         var hold = _transition is not null;
         var x = (float)right;
+        foreach (var s in Stats(v))
+            Stat(s.Label, s.Text, s.Warn, s.Key, s.Value, s.Tip);
+        return;
+
         void Stat(string label, string text, bool warn, string key, double value, string tip)
         {
             Track(key, value, hold, out var flash, out var delta);
@@ -136,16 +159,6 @@ public sealed partial class ShipGame
             _p.Tip(new Rectangle((int)x - 4, 10, (int)(labelWidth + 7 + textWidth) + 8, 38), tip);
             x -= 20;
         }
-        Stat("COURSE", v.NavLost ? "LOST" : "held", v.NavLost, "course", v.NavLost ? 1 : 0,
-            "The course to the destination. With the course lost the ship never arrives.");
-        Stat("POWER", v.PowerLow ? "LOW" : "normal", v.PowerLow, "power", v.PowerLow ? 1 : 0,
-            "The reactor's output. On low power, people asleep in the pods are at risk.");
-        Stat("POD WEAR", ShownPodWear(v).ToString(CultureInfo.InvariantCulture), false, "wear", v.PodWear,
-            "Wear of the cold-sleep pods. Every thaw adds to it, and worn pods fail.");
-        Stat("PARTS", ShownParts(v).ToString(CultureInfo.InvariantCulture), v.Parts == 0, "parts", v.Parts,
-            "Spare parts. A repair needs one; with none left a fault can only be patched.");
-        Stat("STORES", N(ShownStores(v)) + " d", v.Stores <= 0, "stores", v.Stores,
-            "Food, in person-days. Each person awake eats one a day.");
     }
 
     // ---- Repair with nobody selected: a picker ----
