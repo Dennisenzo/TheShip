@@ -574,7 +574,8 @@ Decided by the main session while the user was away, 2026-11-13 (first build of 
 | Do promises move morale? | Yes: kept +3, broken -8, and morale moves work speed |
 | How long does a promise last? | 45 days (`PromiseDueDays`); a warning at 14 days left stops Advance |
 | What does pushing past a bargain look like? | The Repair/Patch button of a person with an open bargain reads "WITHOUT YOUR WORD" (tooltip: the price and the odds); a push within 0.6 s real time of any Repair/Patch click for a person is ignored, so a double click (the first makes the offer) cannot push |
-| Is breaking a promise a winning strategy? | A promise that is broken but then granted when asked costs a little (Breaker 43.2% against Honest 46.7%); one that is never kept at all wins, because the partner stays asleep and the thaws are saved (strict Breaker 63.8%): see "Balance", "Broken promises open an accusation" (open for the user) |
+| Is breaking a promise a winning strategy? | No longer (decided by the user, 2026-11-13: waking the partner pays). A reunion makes keeping the word worth its cost instead of punishing the break: see "Waking the partner pays" under "Balance". A strict Breaker (never wakes the partner) lands 64.8% against Honest 64.0% (before: 63.8% against 43.3%) |
+| What does waking the partner give? | When partners are awake together (a reunion, on the thaw that completes it) both get `ReunionMorale` (8) once, and `Tuning.ReunionPodCare` (2) pod wear is cleared (they look after the pod bank together, which cancels the thaw's own wear); while both are awake each works `PairRate` (x1.10) faster and the pair grows `PairGardenPerDay` (1.2) person-days of stores a day tending the hydroponics. Each says a `reunion` line (templated, model-worded from the sheets' bonds); the bargain text says "Waking Idris lifts them both" |
 
 Decided by the main session while the user was away, 2026-11-13 (work terms, steps 1 and 2):
 
@@ -696,7 +697,7 @@ Honest" test. Why not clearly below: one accusation is one person's -4 trust and
 finding for the user: **a promise to wake a partner that is never kept saves a thaw (the partner stays asleep), and the thaws are what age and wear the crew**, so the strict Breaker
 beats Honest by 17 points (Honest wakes the partner and pays the thaw). The accusation cannot fix that; the price of the saved thaw would have to be the person's refusal or
 worse. Candidates: the person whose word was broken refuses the pod or the work for a time (tried before and removed: Careless and Silent to 0%), or a promise to wake a partner
-that is not kept by the next alert counts as a request ignored in the ending. To choose.
+that is not kept by the next alert counts as a request ignored in the ending. Decided by the user, 2026-11-13: waking the partner pays (below).
 
 | Bot | 600 seeds before bargains (main) | 600 seeds now | 200 seeds now |
 | --- | --- | --- | --- |
@@ -708,6 +709,38 @@ that is not kept by the next alert counts as a request ignored in the ending. To
 | Breaker (new) | | 43.8% | 44.5% |
 
 Thaws per run (Honest) 13.12 before, 13.13 now. Run with `SHIP_SEEDS=600 dotnet test --filter Category=Balance`.
+
+### Waking the partner pays (2026-11-13, 600 seeds, the user's decision)
+
+The strict Breaker (`SHIP_BREAKER_STRICT=1`) lands 63.8% against Honest 43.3%. The measured cause was not the thaw but the **stores**: keeping the promise keeps a second person awake
+for a three-month waking, and Honest starved 0.62 people a run (the strict Breaker 0.00). The user's decision is to make keeping the word worth it, not to punish breaking it.
+A reunion (two partners awake together, counted on the thaw that completes it) now gives: `ReunionMorale` 8 to both (once per reunion), `ReunionPodCare` 2 pod wear cleared, `PairRate`
+1.10 on the work of anyone whose partner is awake, and `PairGardenPerDay` person-days of stores a day while the pair is awake together. Crew line kind `reunion`; `Voyage.Reunions` counts them.
+The thaw's cost stays (wear, risk, age). What I tried (Landfall %, Honest / Thrifty / Corrector / strict Breaker; 600 seeds, one value changed at a time from the first row):
+
+| Garden / day | Pair rate | Morale | Pod care | Honest | Thrifty | Corrector | Breaker (strict) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 (none) | 1.00 | 0 | 0 | 43.3 | 43.0 | 49.0 | 63.8 |
+| 0 | 1.10 | 8 | 0 | 42.3 | 45.7 | 45.8 | 64.8 |
+| 0.8 | 1.10 | 8 | 0 | 43.7 | 55.0 | 47.7 | 64.8 |
+| 1.0 | 1.10 | 8 | 0 | 43.7 | 54.5 | 47.7 | 64.8 |
+| 1.0 | 1.25 | 8 | 0 | 44.0 | 54.3 | 47.5 | 64.7 |
+| 1.0 | 1.10 | 20 | 0 | 44.2 | 55.0 | 48.0 | 65.0 |
+| 1.5 | 1.25 | 20 | 0 | 58.7 | 54.5 | 54.5 | 65.0 |
+| 2.0 | 1.10 | 8 | 0 | 57.8 | 53.8 | 54.3 | 64.8 |
+| 1.5 | 1.5 / 2.0 | 30 | 0 | 59.8 / 59.2 | 54.7 | 54.7 / 54.3 | 64.8 / 65.0 |
+| 1.5 | 1.10 | 8 | 1 | 60.8 | 57.7 | 55.8 | 64.8 |
+| 1.0 | 1.10 | 8 | 2 | 49.2 | 59.7 | 49.5 | 64.8 |
+| 1.2 | 1.10 | 8 | 1 | 60.5 | 58.3 | 55.8 | 64.8 |
+| **1.2** | **1.10** | **8** | **2** | **64.0** | **60.0** | **56.2** | **64.8** |
+| 1.2 | 1.10 | 8 | 3 | 64.0 | 60.7 | 56.2 | 64.8 |
+| 1.5 | 1.10 | 8 | 2 | 64.3 | 59.8 | 56.0 | 64.8 |
+
+Findings: morale and work speed barely move Landfall (a reunion is one event a run and repairs are short), so they stay small; the garden removes the starvation (Honest 0.62 to 0.00 starved a run;
+there is a cliff between 1.0 and 1.2 a day); the rest of the gap is the extra thaw's pod wear, which the pair's care cancels (2 wear). Smallest values that put Honest level with the strict Breaker: garden 1.2, care 2.
+Final table, 600 seeds (Landfall / survivors / thaws per run): Honest 64.0 / 4.07 / 13.18 (was 43.3 / 3.35 / 13.19), Breaker 64.5 default, 64.8 strict (was 44.2, 63.8), Thrifty 60.0 / 3.99 / 10.13
+(was 43.0), Corrector 56.2 / 3.81 (was 49.0), Careless 34.8 (unchanged), Silent 31.8 (unchanged), Liar 14.8 (was 9.7). Honest moves from 43 to 64 and is now above the design's "one run in two";
+it keeps the 35-65 band and beats Liar, Careless and Silent by 29 points or more. Moving it back down is a separate tuning choice (e.g. fewer stores), not part of this decision.
 
 ### Work terms and the balance bots (2026-11-13, 600 seeds, bots unchanged)
 

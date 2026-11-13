@@ -185,6 +185,8 @@ public sealed partial class Voyage
 
     /// <summary>Bargains offered, struck, pushed past (they started anyway) and pushed into a refusal, over the voyage (for the balance table).</summary>
     public int BargainsOffered { get; private set; }
+    /// <summary>Reunions over the voyage (two partners awake together after a thaw), for the balance table.</summary>
+    public int Reunions { get; private set; }
     public int BargainsStruck { get; private set; }
     public int BargainsPushedThrough { get; private set; }
     public int BargainsPushedRefused { get; private set; }
@@ -391,6 +393,8 @@ public sealed partial class Voyage
         var f = Current.Faults.First(x => x.Id == b.FaultId);
         var cond = CommitmentText(c, b.Key);
         var text = FormattableString.Invariant($"{c.Name} will start {TaskText(f, b.Patch)} if you promise to {cond} within {Tuning.BargainDueDays:0} days. Kept +{Tuning.PromiseKept:0} trust, broken -{Tuning.PromiseBroken:0}. ");
+        if (b.Key == "wake_partner")
+            text += FormattableString.Invariant($"Waking {Crew.First(x => x.Id == c.PartnerId).Name} lifts them both: +{Tuning.ReunionMorale:0} morale, and together they work faster and grow stores. ");
         text += c.BargainDeclined
             ? "They refuse to start without your word. Say it to them."
             : FormattableString.Invariant($"Without it: about {PushChance(c) * 100:0}% {StartsText(c)}, -{Tuning.BargainPushedTrust:0} trust. Say it to them.");

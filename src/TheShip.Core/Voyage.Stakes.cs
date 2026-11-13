@@ -124,9 +124,9 @@ public sealed partial class Voyage
             var left = Math.Max(0, job.Hours - (job.State == FaultState.InRepair ? job.Progress : 0));
             var skilled = c.SkillOf(job.Skill) >= job.Level || team.Any(w => w.SkillOf(job.Skill) >= job.Level);
             var baseHours = left / (skilled ? 1 : Tuning.UnskilledRate) / (job.Patching && job.State == FaultState.InRepair ? Tuning.PatchRate : 1);
-            var others = team.Sum(w => TermsOf(w, job).Speed);
+            var others = team.Sum(w => TermsOf(w, job).Speed * PairFactor(w));
             double Hours(double morale, WorkTerms terms) =>
-                baseHours / (MoraleRate((team.Sum(w => w.Morale) + morale) / (team.Count + 1)) * ((others + terms.Speed) / (team.Count + 1)));
+                baseHours / (MoraleRate((team.Sum(w => w.Morale) + morale) / (team.Count + 1)) * ((others + terms.Speed * PairFactor(c)) / (team.Count + 1)));
             var current = TermsOf(c, job);
             var now = Hours(c.Morale, current);
             var told = TermsIfBelieved(c, job, key, f.Truth);

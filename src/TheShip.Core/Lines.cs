@@ -45,6 +45,7 @@ public static class Lines
             "promise" => Pick(rng, "I'll hold you to that.", sceptical ? "We'll see." : "Thank you. I'll remember it."),
             "promise_broken" => "You gave me your word and it meant nothing: " + detail + ".",
             "promise_kept" => "You kept your word. I won't forget that.",
+            "reunion" => Pick(rng, "You're here. " + detail + ", you're really here. That helps more than I can say.", "Seeing " + detail + " awake again. I can work with that."),
             "request_partner" => "I want to see " + detail + ". Wake " + detail + " while I'm up.",
             "request_logs" => "Open the logs to me. All of them. I want to read what happened.",
             "request_granted" => Pick(rng, "Thank you. That mattered.", "Good. That's what I asked for."),

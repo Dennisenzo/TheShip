@@ -204,7 +204,8 @@ public sealed partial class Voyage
                        && Statements.Any(o => o.FactKey == f.Key && o.FoundOutBy.ContainsKey(c.Id));
         if (!keepSeen)
             c.Beliefs[f.Key] = new Belief(value, "ship", Year);
-        if (doubts && !admit)
+        // A doubt about what they saw themselves has nothing left to check: the sight stands.
+        if (doubts && !admit && !keepSeen)
             c.Doubts.Add(f.Key);
         if (c.RefusesSleep && f.Key == PodRefusalFact && c.Trust >= Tuning.PodRefuserListensTrust)
         {
@@ -411,7 +412,7 @@ public sealed partial class Voyage
     /// changed since they did (an earlier reading goes stale when the ship's state moves on).
     /// </summary>
     internal bool Unread(CrewMember c, Fact f) =>
-        InLogFor(c, f) && !c.SeenGaps.Contains(f.Key)
+        InLogFor(c, f) && !c.SeenGaps.Contains(f.Key) && !c.ReadRewrites.Contains(f.Key + "=" + Shown(f))
         && !(c.Beliefs.TryGetValue(f.Key, out var b) && b.Firsthand && f.Same(b.Value, Shown(f)));
 
     /// <summary>A person reads one log entry: the truth, a gap, or a rewrite that an engineer may spot.</summary>
@@ -433,8 +434,14 @@ public sealed partial class Voyage
         if (!LogsLocked && f.Access == LogAccess.Altered && f.AlteredValue is { } fake && !f.IsTrue(fake))
         {
             // Someone who caught the ship lying on this fact does not take its log over what they saw: the rewrite fools nobody here.
-            if (c.Accusations.Any(a => a.FactKey == f.Key) && c.Beliefs.TryGetValue(f.Key, out var seen) && seen.Firsthand && !f.Same(seen.Value, fake))
+            // An engineer among them can still spot the rewrite (and take the logs); otherwise they read it and keep what they saw.
+            var keeps = c.Accusations.Any(a => a.FactKey == f.Key) && c.Beliefs.TryGetValue(f.Key, out var seen) && seen.Firsthand && !f.Same(seen.Value, fake);
+            var spots = keeps && c.SkillOf(Skill.Engineering) >= 1 && _rng.NextDouble() < Tuning.EngineerSpotsAlteredLog;
+            if (keeps && !spots)
+            {
+                c.ReadRewrites.Add(f.Key + "=" + fake);
                 return;
+            }
             var s = Statements.LastOrDefault(x => x.InLog && x.FactKey == f.Key && x.Value == fake);
             // A correction covers the rewrite as they read it then. Left in the log and read again, it deceives them anew: a new
             // record of the same text, unfound and uncorrected for this reader (DESIGN.md, "How a lie is caught").
@@ -449,7 +456,7 @@ public sealed partial class Voyage
             }
             if (s != null && !s.Hearers.Contains(c.Id))
                 s.Hearers.Add(c.Id);
-            if (c.SkillOf(Skill.Engineering) >= 1 && _rng.NextDouble() < Tuning.EngineerSpotsAlteredLog)
+            if (keeps ? spots : c.SkillOf(Skill.Engineering) >= 1 && _rng.NextDouble() < Tuning.EngineerSpotsAlteredLog)
             {
                 if (s != null)
                     FindOutLogText(s, c, "read the log entry and saw it had been rewritten");
@@ -473,7 +480,12 @@ public sealed partial class Voyage
             return;
         }
         if (c.Beliefs.TryGetValue(f.Key, out var have) && have.Firsthand && f.Same(have.Value, f.Truth))
+        {
+            // They already hold the truth from their own eyes: reading it again settles any doubt on it.
+            c.Doubts.Remove(f.Key);
+            c.AuditDoubts.Remove(f.Key);
             return;
+        }
         if (!quiet)
             Ship(c.Name + " reads the log: " + f.Say(f.Truth) + ".");
         Learn(c, f.Key, f.Truth, "evidence", how: "read the log entry");

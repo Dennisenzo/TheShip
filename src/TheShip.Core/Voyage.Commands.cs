@@ -204,6 +204,7 @@ public sealed partial class Voyage
     {
         var start = Clock;
         var awake = Awake.ToList();
+        Stores += PairsAwake(awake) * Tuning.PairGardenPerDay * hours / 24;
         var (storesOut, starved) = Eat(awake, hours);
         // A worker who starves in this span works only until they die.
         foreach (var f in Current.Faults.Where(f => f.State == FaultState.InRepair && Staffed(f)))
@@ -234,6 +235,10 @@ public sealed partial class Voyage
                 ReleaseSpeech();
         }
     }
+
+    /// <summary>Partner pairs awake together (each pair once).</summary>
+    private int PairsAwake(IReadOnlyList<CrewMember> awake) =>
+        awake.Count(c => c.PartnerId is { } p && string.CompareOrdinal(c.Id, p) < 0 && awake.Any(o => o.Id == p));
 
     /// <summary>
     /// Hours of progress a staffed repair makes in <paramref name="hours"/>, counting each worker only until they die
@@ -343,6 +348,19 @@ public sealed partial class Voyage
         {
             Meet(c, other);
             Meet(other, c);
+        }
+        // Awake together: a reunion lifts them both (waking the partner pays).
+        if (c.PartnerId is { } pid && Crew.First(x => x.Id == pid) is { State: CrewState.Awake } mate)
+        {
+            foreach (var (a, b) in new[] { (c, mate), (mate, c) })
+            {
+                a.Morale += Tuning.ReunionMorale;
+                Clamp(a);
+                Speak(a, "reunion", "Your partner " + b.Name + " is awake with you. You are together again, and it lifts you.", b.Name);
+            }
+            Reunions++;
+            PodWear = Math.Max(0, PodWear - Tuning.ReunionPodCare);
+            SyncFacts();
         }
         // Meeting the partner (or this thaw itself) may keep a promise to wake them.
         ResolveCommitments();

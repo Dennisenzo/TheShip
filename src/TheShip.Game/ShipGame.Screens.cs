@@ -294,7 +294,7 @@ public sealed partial class ShipGame
                         notes.Add("Found out by " + Names(s.FoundOutBy.Keys) + ".");
                     notes.AddRange(s.Corrected.Select(kv => "Corrected for " + Names(new[] { kv.Key }) + " in year " + N(Math.Floor(kv.Value)) + "."));
                     // Someone who heard it and was neither corrected nor has found it out can still find it.
-                    var open = s.Hearers.Any(h => !s.FoundOutBy.ContainsKey(h) && !s.Corrected.ContainsKey(h));
+                    var open = s.Hearers.Any(h => !s.FoundOutBy.ContainsKey(h) && !s.Corrected.ContainsKey(h) && v.Find(h) is { Alive: true });
                     if (open)
                         notes.Add("Not found out by the rest. Could be: " + v.Exposure(s) + ".");
                     return ("LIE", s.FoundOutBy.Count > 0 || open, string.Join(" ", notes));

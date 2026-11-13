@@ -85,6 +85,8 @@ public sealed class CrewMember
     public HashSet<string> SeenLocks { get; } = new();
     /// <summary>Restricted log entries they have already run into.</summary>
     public HashSet<string> SeenGaps { get; } = new();
+    /// <summary>Rewritten log entries (fact key = shown value) this person read and did not take over what they saw: read, though their belief stays.</summary>
+    public HashSet<string> ReadRewrites { get; } = new();
     /// <summary>Fact keys they will notice by themselves at the next aftermath beat (a dosimeter reading, ...).</summary>
     public List<string> ToNotice { get; } = new();
     /// <summary>One line per earlier waking, for the crew-speech prompt.</summary>

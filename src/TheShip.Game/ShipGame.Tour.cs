@@ -87,6 +87,25 @@ public sealed partial class ShipGame
         }
     }
 
+    /// <summary>Answers each awake person's pending question with the true value, the way Enter does it (at most a few, one after the other).</summary>
+    private IEnumerable<int> AnswerQuestions()
+    {
+        var v = _voyage!;
+        for (var i = 0; i < 6; i++)
+        {
+            var asker = v.Awake.FirstOrDefault(c => c.PendingQuestion != null && v.HasFact(c.PendingQuestion));
+            if (asker is null)
+                yield break;
+            var fact = v.GetFact(asker.PendingQuestion!);
+            _target = asker;
+            _input.Clear().Append(Capitalise(fact.Say(fact.Truth)) + ".");
+            _session?.Line("click", "tour: Enter on a line to " + asker.Name);
+            Submit();
+            foreach (var w in Settle()) yield return w;
+            _target = null;
+        }
+    }
+
     private IEnumerable<int> TourScript(string dir)
     {
         var v = _voyage!;
@@ -173,6 +192,8 @@ public sealed partial class ShipGame
                 _target = null;
                 Shoot(dir, tag + "-line-said");
             }
+            // Every other question waiting (the danger question included) gets its true answer before the repairs.
+            foreach (var w in AnswerQuestions()) yield return w;
 
             // Patches in the first two alerts (they come back later, so the later alerts have three or four faults); plain repairs after that.
             var patch = v.Current.Number <= 2;
@@ -184,6 +205,16 @@ public sealed partial class ShipGame
                 var f = fault;
                 Act("repair " + f.Name + " by " + p.Name, () => v.Assign(p, f, patch: patch));
                 foreach (var w in Settle()) yield return w;
+                // They asked about the danger first: answer truthfully, then ask again so the work gets under way.
+                if (p.State == CrewState.Awake && p.PendingQuestion != null)
+                {
+                    foreach (var w in AnswerQuestions()) yield return w;
+                    if (!f.Resolved && f.State == FaultState.Open)
+                    {
+                        Act("repair " + f.Name + " by " + p.Name + " (again)", () => v.Assign(p, f, patch: patch));
+                        foreach (var w in Settle()) yield return w;
+                    }
+                }
                 // A wary person sets the ship's word as the price: the shot shows it, then the tour gives its word.
                 if (v.BargainOf(p) is { } deal)
                 {

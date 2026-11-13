@@ -76,6 +76,14 @@ public static class Tuning
     /// <summary>A kept promise lifts morale; a broken one hurts more (and, through the morale rate, the work).</summary>
     public const double PromiseKeptMorale = 3;
     public const double PromiseBrokenMorale = 8;
+    /// <summary>Waking a partner pays: both get this much morale once when they are awake together (a reunion), and work faster while the other is up (<see cref="PairRate"/>).</summary>
+    public const double ReunionMorale = 8;
+    /// <summary>Person-days of stores a pair awake together grows per day (they tend the hydroponics side by side).</summary>
+    public const double PairGardenPerDay = 1.2;
+    /// <summary>Pod wear a reunited pair clears by looking after the pod bank together, once per reunion.</summary>
+    public const int ReunionPodCare = 2;
+    /// <summary>Work speed of someone whose partner is awake too.</summary>
+    public const double PairRate = 1.10;
     /// <summary>Days from a keyed promise to its due date (wake the partner, open the logs).</summary>
     public const double PromiseDueDays = 45;
     /// <summary>Days from a bargain being struck to its due date.</summary>
