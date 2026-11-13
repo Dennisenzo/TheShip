@@ -354,7 +354,7 @@ Modes, missions and modifiers are chosen by the player. The seed varies everythi
 | Rare events | One or two per run from a large pool: a stowaway, a derelict, a birth, a crew member's discovery | No single run shows everything |
 | Hidden causes | The same fault can come from wear, an old patch or a person | A familiar alert can't be read from its faults alone |
 
-The prototype draws a small part of this (`Variation.cs`, from a random generator of its own so a seed draws the same whatever the player does): who dies in alert 2 (Idris weighted 3, else Tomas, Asha or Jonah, never Mara or Lin), a bank neighbour of the victim as the alert-2 patient, a side fault for alerts 3 and 5 (alert 3: blight or power sag; alert 5: always power sag, also after a sag in alert 3), clock slack per alert (1 to 6 hours, none for alert 1) and a year jitter of up to 2 years per alert (order kept, arrival stays year 60). Filters that depend on who is alive belong to the steps that use the draws. `Variation.Classic` is the fixed scenario of the unit tests. Faults carry `Critical` (ignoring it ends or cripples the voyage: coolant, navigation) and a `SubjectId`.
+The prototype draws a small part of this (`Variation.cs`, from a random generator of its own so a seed draws the same whatever the player does): who dies in alert 2 (Idris weighted 3, else Tomas, Asha or Jonah, never Mara or Lin), a bank neighbour of the victim as the alert-2 patient (alert 2's two faults both sit in that bank, so one locked door blocks both; clocks are thaw + work + slack; the unit-test Classic patient is Tomas, so Mara stays alive for the older tests), a side fault for alerts 3 and 5 (alert 3: blight or power sag; alert 5: always power sag, also after a sag in alert 3), clock slack per alert (1 to 6 hours, none for alert 1) and a year jitter of up to 2 years per alert (order kept, arrival stays year 60). Filters that depend on who is alive belong to the steps that use the draws. `Variation.Classic` is the fixed scenario of the unit tests. Faults carry `Critical` (ignoring it ends or cripples the voyage: coolant, navigation) and a `SubjectId`.
 
 Notes on the rows:
 
@@ -416,7 +416,7 @@ The first build is the Short haul mode in text only, smaller than the mode table
 
 ### Prototype scope
 
-- **Alerts, in order:** coolant leak, death in sleep, navigation drift, signal from Earth, pod controller fault (the person woken for it refuses to go back to sleep).
+- **Alerts, in order:** coolant leak, death in sleep (a pod fails and its sleeper dies; a bank neighbour has a sleeper illness: Medicine 2, 12 hours, clock = thaw 6 h + work + the run's slack, untreated the patient dies, and every awake crew member says "You let them die in there" and loses 4 trust), navigation drift, signal from Earth, pod controller fault (the person woken for it refuses to go back to sleep).
 - **Facts:** about 20, with knowers and the statement record.
 - **Numbers on screen:** trust and morale are shown, so the rules can be judged.
 - **One lockout:** the logs.

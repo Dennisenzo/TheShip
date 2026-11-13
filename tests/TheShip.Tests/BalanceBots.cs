@@ -20,6 +20,8 @@ public sealed class BalanceBot
 {
     private readonly Voyage _v;
     private readonly BotKind _kind;
+    /// <summary>Whether a bot patches a minor fault to keep a spare part for a critical one still waiting (set to compare the table with and without).</summary>
+    public static bool ReserveParts { get; set; } = true;
     /// <summary>Who is meant to work on which fault.</summary>
     private readonly Dictionary<string, string> _plan = new();
     /// <summary>Person+fault pairs the bot gave up on (a refusal; asking again would only keep the clock from running out).</summary>
@@ -140,7 +142,8 @@ public sealed class BalanceBot
         for (var attempt = 0; attempt < 3 && c.WorkingOn != f.Id; attempt++)
         {
             var patch = _kind == BotKind.Careless ? _v.Parts <= Tuning.PartsShortAt
-                : _kind == BotKind.Thrifty && f.Id != _primary ? true : _v.Parts <= 0;
+                : _kind == BotKind.Thrifty && f.Id != _primary ? true
+                : _v.Parts <= 0 || (ReserveParts && !f.Critical && _v.Parts <= _v.Current.Faults.Count(x => x.Critical && !x.Resolved));
             _v.Assign(c, f, patch);
             AnswerAll();
         }
@@ -222,7 +225,7 @@ public sealed class BalanceBot
     // ---- results ----
 
     private static readonly Regex Cause = new(
-        "(?<what>died in sleep when the pod failed|died of injuries|did not survive the thaw|starved|died awake|died in sleep on low power|died in sleep when the pod controller patch gave way|died in sleep during the drift)",
+        "(?<what>died in sleep when the pod failed|died of the illness in their pod|died of injuries|did not survive the thaw|starved|died awake|died in sleep on low power|died in sleep when the pod controller patch gave way|died in sleep during the drift)",
         RegexOptions.Compiled);
 
     private static RunResult Summarise(int seed, Voyage v)

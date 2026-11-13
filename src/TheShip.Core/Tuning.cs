@@ -57,6 +57,10 @@ public static class Tuning
     public const double LogGap = 5;
     public const double LockedDoor = 5;
     public const double ConfirmedTruth = 3;
+    /// <summary>A sleeper died of a fault left to run out: each awake crew member loses this trust ("You let them die in there"), and the morale of learning a death.</summary>
+    public const double LeftBehindTrust = 4;
+    /// <summary>The patient of the sleeper illness is treated: a small lift for whoever treated them.</summary>
+    public const double IllnessTreatedMorale = 4;
     public const double DoubtThreshold = 55;
 
     // Repairs

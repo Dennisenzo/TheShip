@@ -216,7 +216,7 @@ public sealed class Fault
     public int People { get; init; } = 1;
     public required double Hours { get; init; }
     /// <summary>Hours from the alert until the fault becomes its consequence.</summary>
-    public required double ClockHours { get; init; }
+    public required double ClockHours { get; set; }
     public required string IfIgnored { get; init; }
     /// <summary>The fact the people fixing it learn while they work.</summary>
     public string? ExposureFact { get; set; }

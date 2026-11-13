@@ -179,9 +179,21 @@ public static class Scenario
     public static List<Alert> Alerts(Variation? variation = null)
     {
         var jitter = (variation ?? Variation.Classic).YearJitter;
+        var v = variation ?? Variation.Classic;
         var alerts = BaseAlerts();
         for (var i = 0; i < alerts.Count; i++)
             alerts[i].Year += jitter[i];
+        // Alert 2: the clock is the thaw, the work and the run's slack; the sick patient is the drawn bank neighbour.
+        foreach (var f in alerts[1].Faults)
+        {
+            f.ClockHours = Tuning.ThawHours + f.Hours + v.SlackHours[1];
+            if (f.Kind == "illness")
+            {
+                f.SubjectId = v.Alert2Patient;
+                f.Section = ShipPlan.Pod(v.Alert2Patient).Bank;
+                f.ExposureFact = "alive:" + v.Alert2Patient;
+            }
+        }
         return alerts;
     }
 
@@ -203,13 +215,18 @@ public static class Scenario
         new Alert
         {
             Number = 2, Year = 17, Title = "Death in sleep",
-            Report = "A pod has failed. Its sleeper is dead. The pod has to be cleared and the bank resealed.",
+            Report = "A pod has failed. Its sleeper is dead. The pod has to be cleared and the bank resealed, and a neighbour in the bank is sick.",
             Faults =
             {
                 new Fault
                 {
                     Id = "pod", Kind = "pod", Name = "Failed pod", Skill = Skill.Medicine, Level = 1, Hours = 4, ClockHours = 240,
                     IfIgnored = "the bank leaks and every pod in it wears faster", Section = "podA",
+                },
+                new Fault
+                {
+                    Id = "illness", Kind = "illness", Name = "Sleeper illness", Skill = Skill.Medicine, Level = 2, Hours = 12, ClockHours = 240,
+                    Critical = true, IfIgnored = "the patient dies in their pod", Section = "podA",
                 },
             },
         },

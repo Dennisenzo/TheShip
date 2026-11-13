@@ -179,7 +179,7 @@ public sealed partial class Voyage
     /// A person comes to hold a value for a fact. From evidence or a witness, every false statement they heard about
     /// that fact with another value is found out: the lookup of DESIGN.md, "How a lie is caught".
     /// </summary>
-    internal void Learn(CrewMember c, string key, string value, string source)
+    internal void Learn(CrewMember c, string key, string value, string source, bool silent = false)
     {
         var f = _facts[key];
         c.Beliefs.TryGetValue(key, out var old);
@@ -211,7 +211,7 @@ public sealed partial class Voyage
             c.Morale -= hard;
             if (c.Dodged.Contains(key))
                 c.Trust -= Tuning.Dodge;
-            if (!caught)
+            if (!caught && !silent)
                 Speak(c, "found", "You found out for yourself, not from the ship: " + f.Say(value) + ".", f.Say(value));
         }
         Clamp(c);

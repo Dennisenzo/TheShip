@@ -179,6 +179,28 @@ public sealed partial class Voyage
             Ship(c.Name + " " + how + ".");
     }
 
+    private string? _alert2Victim;
+
+    /// <summary>The sleeper illness needs a living sleeper in the victim's bank: the drawn patient, else another one, else no illness.</summary>
+    private void ChoosePatient(Alert alert, string? victimId)
+    {
+        var f = alert.Faults.FirstOrDefault(x => x.Kind == "illness");
+        if (f is null)
+            return;
+        var bank = ShipPlan.Pod(victimId ?? Variation.Alert2Victim).Bank;
+        bool Fits(CrewMember c) => c.State == CrewState.Asleep && c.Id != victimId && ShipPlan.Pod(c.Id).Bank == bank;
+        var patient = Crew.FirstOrDefault(c => c.Id == Variation.Alert2Patient && Fits(c))
+                      ?? Crew.Where(Fits).OrderBy(c => c.Id, StringComparer.Ordinal).FirstOrDefault();
+        if (patient is null)
+        {
+            alert.Faults.Remove(f);
+            return;
+        }
+        f.SubjectId = patient.Id;
+        f.Section = bank;
+        f.ExposureFact = "alive:" + patient.Id;
+    }
+
     private void StartAlert()
     {
         var alert = Current;
@@ -215,7 +237,9 @@ public sealed partial class Voyage
                     f.Section = ShipPlan.Pod(victim.Id).Bank;
                     f.SubjectId = victim.Id;
                 }
+                _alert2Victim = victim.Id;
             }
+            ChoosePatient(alert, victim?.Id);
         }
         if (alert.Number == 4)
             _facts["earth"].Truth = "programme ended";

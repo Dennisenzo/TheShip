@@ -415,6 +415,13 @@ public sealed partial class Voyage
             }
             if (f.ExposureFact is { } seen)
                 Learn(w, seen, _facts[seen].Truth, "evidence");
+            if (f.Kind == "illness")
+            {
+                // Treating the patient they stand next to the dead pod of the one who was lost.
+                w.Morale += Tuning.IllnessTreatedMorale;
+                if (_alert2Victim is { } v)
+                    Learn(w, "alive:" + v, _facts["alive:" + v].Truth, "evidence");
+            }
             Clamp(w);
         }
     }
@@ -438,6 +445,21 @@ public sealed partial class Voyage
             w.WorkingOn = null;
         Ship(f.Name + ": the clock ran out. " + Cap(f.IfIgnored) + ".");
         Consequence(f);
+        if (f.Kind == "illness" && f.SubjectId is { } sid && Crew.First(c => c.Id == sid) is { State: CrewState.Dead } gone)
+            LeftBehind(gone);
+    }
+
+    /// <summary>Everyone awake saw the clock run out on a sleeper: they say so, and trust and morale drop.</summary>
+    private void LeftBehind(CrewMember gone)
+    {
+        foreach (var c in Awake.ToList())
+        {
+            c.Trust -= Tuning.LeftBehindTrust;
+            // Learning of the death is the morale cost (the hardness of the fact); the left_behind line replaces the "found out" line.
+            Learn(c, "alive:" + gone.Id, "dead", "evidence", silent: true);
+            Clamp(c);
+            Speak(c, "left_behind", "You say to the ship that it let " + gone.Name + " die in the pod when the clock ran out on the illness.", gone.Name);
+        }
     }
 
     /// <summary>What a fault does when it is lost, or when a patch on it is still outstanding at the last drift.</summary>
@@ -451,6 +473,10 @@ public sealed partial class Voyage
                 break;
             case "pod":
                 PodWear += 3;
+                break;
+            case "illness":
+                if (f.SubjectId is { } sick && Crew.First(c => c.Id == sick) is { State: CrewState.Asleep } patient)
+                    Kill(patient, "died of the illness in their pod");
                 break;
             case "nav":
                 NavLost = true;
