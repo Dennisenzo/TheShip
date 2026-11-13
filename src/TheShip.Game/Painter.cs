@@ -39,6 +39,7 @@ internal sealed class Painter
     public SpriteFontBase Big { get; }
     public float SmallWidth { get; }
     public float BodyWidth { get; }
+    public float HeadWidth { get; }
 
     /// <summary>The mouse in the 1600 x 900 space, and whether the left button was released since the last frame drawn.</summary>
     public Vector2 Mouse { get; set; }
@@ -54,6 +55,7 @@ internal sealed class Painter
         Big = fonts.GetFont(32);
         SmallWidth = Math.Max(1, Small.MeasureString("M").X);
         BodyWidth = Math.Max(1, Body.MeasureString("M").X);
+        HeadWidth = Math.Max(1, Head.MeasureString("M").X);
     }
 
     public void Fill(Rectangle r, Color color) => _batch.Draw(_pixel, r, color);
@@ -246,6 +248,9 @@ internal sealed class Painter
             }
             lines.Add(line.ToString());
         }
+        // A non-breaking space keeps a number with its unit on one line; it is drawn as an ordinary space.
+        for (var i = 0; i < lines.Count; i++)
+            lines[i] = lines[i].Replace('\u00A0', ' ');
         return lines;
     }
 }

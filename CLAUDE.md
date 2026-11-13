@@ -45,6 +45,7 @@ real-time stamp and a tag per line. The game's opening note gives the file's pat
 | `model` | the model's raw reading, rejected crew lines, yes/no judgements, failures |
 | `llm` | each model call: kind, prompt and generated tokens, first-token and total seconds |
 | `ending` | the ending, the crew (living and dead), beliefs and the record |
+| `tour` | a screenshot saved by the `--tour` dev tool (`ShipGame.Tour.cs`) |
 
 ## Working with Claude (rules taken from the Cities repo, 2026-11-12)
 
@@ -168,6 +169,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 
 - 2026-11-13: `--tour <dir>` dev tool: unattended screenshot tour (render-target PNGs of the bridge, dossier, record and ending). No in-game control.
 
+- 2026-11-13: UI polish from the screenshot tour (`fix/ui-polish`): the plan legend is two lines (plan panel 456 px high, log starts at 540), dossier trust labels wrap inside their segment, issue cards size to their text (buttons right below it) and keep "12 h" together with a non-breaking space (`Painter.Wrap` shows it as a space), section names read "Pod bank A", and the ending has its own screen (`Screen.Ending`: crew, beliefs, scrolling record; Bridge, Record and Quit buttons; an ENDING button in the other headers reopens it, Esc on the record returns to it). No new voyage button: restarting needs a new `ShipMind` and worker, not built.
+
 ### Built
 
 Written on 2026-11-12 in sessions without a compiler. The first version builds and runs; changes after it are marked in Status.
@@ -189,7 +192,7 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
   - `ShipGame.Bridge.cs`: issue cards with Repair and Patch for the selected person, the clock (Advance, Drift), the wireframe ship plan
     (click a door to step open, closed, locked; pods; awake crew; fault markers), the log with the voice line and the waiting-line preview,
     the crew cards (Wake, Sleep, File; click a card to speak to one person) and "Waiting on you".
-  - `ShipGame.Screens.cs`: the crew dossier (sheet, what they know, what you told them) and the record with the ship log entries (Open, Restrict, Alter).
+  - `ShipGame.Screens.cs`: the crew dossier (sheet, what they know, what you told them) and the record with the ship log entries (Open, Restrict, Alter), and the ending screen (`DrawEnding`: title, crew, beliefs, scrolling record). `ShipGame.Tour.cs`: the `--tour` dev tool.
   - The model loads in the background; without one the window says what is missing.
   - `Sounds.cs`: a short click made in code (35 ms sine tick, `ClickVolume` there), played from `Do(...)` so every button, card, door and tab has it; silent without an audio device.
 - **Tests** (`tests/TheShip.Tests`): the loop, the lie lookup, the reader, the grammar, `ShipMind`'s parsing and the warm-up. All pass (2026-11-12).
