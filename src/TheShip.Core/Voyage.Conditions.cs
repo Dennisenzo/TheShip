@@ -57,7 +57,7 @@ public sealed partial class Voyage
         var stated = job?.Stated ?? new List<JobCondition>();
         foreach (var cond in left.Where(l => !stated.Any(s => s.Kind == l.Kind && s.Key == l.Key)))
             stated.Add(cond);
-        c.Job = new JobTerms(f.Id, patch, stated);
+        c.Job = new JobTerms(f.Id, patch, stated) { Open = left };
         SayConditions(c, f, patch, left, again: job != null);
         return true;
     }
@@ -159,8 +159,16 @@ public sealed partial class Voyage
         if (c.PendingQuestion == null && left.FirstOrDefault(l => l.Kind == "danger") is { } danger)
             c.PendingQuestion = danger.Key;
         if (left.Count > 0)
+        {
+            j.Open = left;
             return;
+        }
         c.Job = null;
+        // What met the last conditions: a death they saw (or their partner's death) is no relief, and the work does not start by itself;
+        // the job is off until the player asks again.
+        var (met, grief) = MetText(c, j.Open);
+        if (grief)
+            return;
         if (Locked(f.Section))
         {
             Ship("The door to the " + GetSection(f.Section)!.Name.ToLowerInvariant() + " is locked. Nobody can reach the " + f.Name.ToLowerInvariant() + ".");
@@ -173,7 +181,57 @@ public sealed partial class Voyage
         }
         if (TrustRefuses(c) || DangerRefuses(c, f))
             return;
-        StartWork(c, f, j.Patch, kind, decision ?? "You have what you asked for. You start " + TaskText(f, j.Patch) + ".");
+        StartWork(c, f, j.Patch, kind, decision ?? (met ?? "You have what you asked for.") + " You start " + TaskText(f, j.Patch) + ".");
+    }
+
+    /// <summary>
+    /// What met the conditions that were open until this step, in the person's terms ("You found out for yourself that Idris is alive.",
+    /// "The ship is waking Idris, as you asked."); null when nothing can be named. Grief: one was met by a death they saw or heard from
+    /// a witness, or their partner's death ended the price of waking them.
+    /// </summary>
+    private (string? Text, bool Grief) MetText(CrewMember c, List<JobCondition> met)
+    {
+        var parts = new List<string>();
+        var grief = false;
+        foreach (var m in met)
+        {
+            if (m.Kind == "bargain")
+            {
+                if (m.Key == "wake_partner" && c.PartnerId is { } pid && Crew.First(x => x.Id == pid) is var partner)
+                {
+                    if (!partner.Alive)
+                        grief = true;
+                    else if (partner.State == CrewState.Thawing)
+                        parts.Add("The ship is waking " + partner.Name + ", as you asked.");
+                    else if (partner.State == CrewState.Awake)
+                        parts.Add(partner.Name + " is awake, as you asked.");
+                    else if (Lockouts.Bay)
+                        parts.Add("The crew hold the cold-sleep bay now: waking " + partner.Name + " is in your own hands, not the ship's.");
+                }
+                else if (m.Key != "wake_partner" && AllLogsOpen)
+                    parts.Add("The logs are open, as you asked.");
+                continue;
+            }
+            if (c.Beliefs.TryGetValue(m.Key, out var b) && _facts.TryGetValue(m.Key, out var fact))
+            {
+                if (m.Key.StartsWith("alive:", StringComparison.Ordinal) && b.Value == "dead" && b.Firsthand)
+                {
+                    grief = true;
+                    continue;
+                }
+                var said = fact.Say(b.Value);
+                parts.Add(b.Source switch
+                {
+                    "ship" => "The ship told you that " + said + ".",
+                    "evidence" => "You found out for yourself that " + said + ".",
+                    "witness" => "Someone who saw it told you that " + said + ".",
+                    _ => "You heard from the crew that " + said + ".",
+                });
+            }
+            else if (c.Dodged.ContainsKey(m.Key))
+                parts.Add("The ship would not say; you go ahead without an answer.");
+        }
+        return (parts.Count > 0 ? string.Join(" ", parts) : null, grief);
     }
 
     /// <summary>The checklist of the person's conditions for their job, in "Waiting on you": each with whether it is met yet. Empty when none stand.</summary>
