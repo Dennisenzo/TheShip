@@ -274,7 +274,7 @@ public static class Scenario
         {
             Number = 4, Year = 41, Title = "Signal from Earth",
             Report = "A signal from Earth is in the log: the colony programme has ended and nobody is coming after you. "
-                     + "Nothing needs repair. The entry stays in the log for anyone to find.",
+                     + "The entry stays in the log for anyone to find.",
         },
         new Alert
         {

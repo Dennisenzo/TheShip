@@ -152,7 +152,7 @@ public class SideFaultTests
         var sag = v.Current.Faults.Single(f => f.Kind == "powersag");
         Assert.Equal(Tuning.ThawHours + Tuning.PowerSagHours, v.EarliestDoneHours(sag));
         Assert.Equal(Tuning.ThawHours + Tuning.PowerSagHours / Tuning.PatchRate, v.EarliestDoneHours(sag, patch: true));
-        Assert.StartsWith("Earliest done if started now: 20 hours", v.EarliestDoneText(sag));
+        Assert.Equal("Done in 20 h", v.EarliestDoneText(sag));
         var mara = v.Find("mara")!;
         v.Wake(mara);
         v.Go();
@@ -312,7 +312,7 @@ public class SideFaultTests
         var blight = v.Current.Faults.Single(f => f.Kind == "blight");
         // 40 h of repair do not fit 20 h of clock, 6 + 20 h of patch do not either; give 30 h: only the patch fits.
         blight.Deadline = v.Clock + 30;
-        Assert.Contains("only a patch could make it (26 hours)", v.EarliestDoneText(blight));
+        Assert.Equal("Done in 46 h - patch only: 26 h", v.EarliestDoneText(blight));
         blight.Deadline = v.Clock + 60;
         Assert.DoesNotContain("patch", v.EarliestDoneText(blight));
     }
@@ -354,9 +354,14 @@ public class SideFaultTests
         v.Drift();
         Assert.Equal(4, v.Current.Number);
         Assert.Equal(4, v.Current.Faults.Count);
-        Assert.Single(patched);          // one is left outstanding, not lost
+        // The three Critical patches come first; of the two pod patches the shorter clock (the returning one) takes the last place and the
+        // first pod patch is left outstanding, not lost.
+        Assert.Equal(new[] { "pod" }, patched);
         Assert.Contains(v.Current.Faults, f => f.Id == "nav-again");
-        Assert.DoesNotContain(v.Current.Faults, f => !f.Critical && f.Id.StartsWith("pod", StringComparison.Ordinal) && patched.Count == 0);
+        Assert.Contains(v.Current.Faults, f => f.Id == "coolant-again-again");
+        Assert.Contains(v.Current.Faults, f => f.Id == "illness-again-again");
+        Assert.Contains(v.Current.Faults, f => f.Id == "pod-again-again");
+        Assert.Equal(3, v.Current.Faults.Count(f => f.Critical));
         Assert.StartsWith("pod", patched[0]);   // the non-critical patch waits
     }
 

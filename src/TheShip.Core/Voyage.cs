@@ -304,6 +304,15 @@ public sealed partial class Voyage
         }
         if (alert.Number == 4)
             _facts["earth"].Truth = "programme ended";
+        // An alert with no faults of its own (the signal) says what it holds: nothing, or the old patches giving way inside it.
+        var returned = alert.Faults.Where(f => f.Name != f.PlainName).Select(f => f.PlainName).ToList();
+        if (returned.Count == alert.Faults.Count)
+            report += returned.Count switch
+            {
+                0 => " Nothing needs repair.",
+                1 => " Nothing new needs repair, but an old patch gives way: " + returned[0] + ".",
+                _ => " Nothing new needs repair, but old patches give way: " + string.Join(", ", returned.Take(returned.Count - 1)) + " and " + returned[^1] + ".",
+            };
 
         foreach (var f in alert.Faults)
             f.Deadline = Clock + f.ClockHours;

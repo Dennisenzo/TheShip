@@ -40,7 +40,7 @@ public sealed partial class ShipGame
         if (v.Current.Faults.Count == 0)
             y = _p.Paragraph(v.Phase == Phase.Ended ? "The voyage is over." : "Nothing needs repair.", x, y, width, Painter.Ink);
 
-        // One fault gets a full card; two or more get fixed-height compact cards that always fit the column (IssueCardLayout).
+        // One fault gets a full card; two or more get compact cards, sized by how many there are, that always fit the column (IssueCardLayout).
         var compact = v.Current.Faults.Count >= 2;
         var shown = v.Current.Faults.Count;
         var number = 0;
@@ -67,7 +67,7 @@ public sealed partial class ShipGame
             if (!f.Resolved)
                 _p.TextRight(_p.Head, Voyage.Hours(Math.Max(0, f.Deadline - v.Clock)), x + width - 14, y - 4, Painter.Bright);
             y += 24;
-            _p.Text(_p.Head, f.Name, ix, y, f.Resolved ? Painter.Dim : Painter.Bright);
+            _p.Text(_p.Head, IssueCardLayout.CardName(f), ix, y, f.Resolved ? Painter.Dim : Painter.Bright);
             y += 32;
 
             if (!f.Resolved)
@@ -76,7 +76,8 @@ public sealed partial class ShipGame
                 var needs = Sentence(where) + ". " + Patient(v, f) + "Needs " + f.Skill.ToString().ToLowerInvariant() + " " + f.Level
                             + (f.People > 1 ? ", " + f.People + " people" : "") + ", " + N(f.Hours) + " hours. If the clock runs out: " + f.IfIgnored + ".";
                 y = _p.Paragraph(needs, ix, y, inner, Painter.Dim);
-                y = _p.Paragraph(v.EarliestDoneText(f), ix, y, inner, Painter.Ink) + 6;
+                var verdict = v.EarliestDoneText(f);
+                y = _p.Paragraph("If started now: " + char.ToLowerInvariant(verdict[0]) + verdict[1..], ix, y, inner, Painter.Ink) + 6;
 
                 var workers = v.Awake.Where(c => c.WorkingOn == f.Id).Select(c => c.Name).ToList();
                 if (f.State == FaultState.InRepair)
@@ -158,7 +159,8 @@ public sealed partial class ShipGame
     }
 
     /// <summary>
-    /// A fixed-height issue card for an alert with two or more faults (<see cref="IssueCardLayout"/> holds the heights, so four always fit).
+    /// A compact issue card for an alert with two or more faults (<see cref="IssueCardLayout"/> holds the heights and splits the lines, so
+    /// four always fit and the verdict always shows whole).
     /// Returns the y below the card.
     /// </summary>
     private int DrawCompactIssue(Voyage v, Fault f, int number, int shown, int x, int y, int width)
@@ -170,7 +172,7 @@ public sealed partial class ShipGame
         if (f.Resolved)
         {
             var done = f.State switch { FaultState.Repaired => "REPAIRED", FaultState.Patched => "PATCHED", _ => "LOST" };
-            _p.Text(_p.Small, Clip(tag + " - " + done + " - " + f.Name, inner, _p.SmallWidth), ix, y + 6, Painter.Dim);
+            _p.Text(_p.Small, Clip(tag + " - " + done + " - " + IssueCardLayout.CardName(f), inner, _p.SmallWidth), ix, y + 6, Painter.Dim);
             _p.Frame(new Rectangle(x, cardTop, width, IssueCardLayout.ResolvedRow), Painter.Edge);
             return cardTop + IssueCardLayout.ResolvedRow + IssueCardLayout.Gap;
         }
@@ -180,28 +182,25 @@ public sealed partial class ShipGame
         _p.Text(_p.Small, tag + " - " + state + (f.Critical ? " - CRITICAL" : ""), ix, y, Painter.Accent);
         _p.TextRight(_p.Body, Voyage.Hours(Math.Max(0, f.Deadline - v.Clock)), x + width - 14, y - 2, Painter.Bright);
         y += 20;
-        _p.Text(_p.Body, Clip(f.Name, inner, _p.BodyWidth), ix, y, Painter.Bright);
+        _p.Text(_p.Body, Clip(IssueCardLayout.CardName(f), inner, _p.BodyWidth), ix, y, Painter.Bright);
         y += 22;
+        // The lines below the name: the needs, the verdict (always whole, on its own line), who is on it, and the danger or exposure line.
         var where = v.GetSection(f.Section)?.Name ?? "";
-        var needs = Sentence(where) + ". " + Patient(v, f) + f.Skill + " " + f.Level + (f.People > 1 ? ", " + f.People + " people" : "") + ", " + N(f.Hours) + " h. "
-                    + v.EarliestDoneText(f).Replace("Earliest done if started now: ", "Earliest done: ");
-        _p.Paragraph(FitLines(needs, inner, 2), ix, y, inner, Painter.Dim);
-        y += 38;
-        if (height == IssueCardLayout.RoomyCard)
-        {
-            var extra = f.DangerFact is { } danger ? "Known: " + v.GetFact(danger).Say(v.GetFact(danger).Truth) + "."
-                : f.ExposureFact is { } seen ? "Whoever works here learns " + v.GetFact(seen).Label + "." : "";
-            _p.Paragraph(FitLines(extra, inner, 1), ix, y, inner, Painter.Dim);
-            y += 19;
-        }
+        var needs = Sentence(where) + ". " + Patient(v, f) + f.Skill + " " + f.Level + (f.People > 1 ? ", " + f.People + " people" : "") + ", " + N(f.Hours) + " h.";
+        var extra = f.DangerFact is { } danger ? "Known: " + v.GetFact(danger).Say(v.GetFact(danger).Truth) + "."
+            : f.ExposureFact is { } seen ? "Whoever works here learns " + v.GetFact(seen).Label + "." : "";
         var workers = v.Awake.Where(c => c.WorkingOn == f.Id).Select(c => c.Name).ToList();
-        if (workers.Count > 0)
+        var split = IssueCardLayout.Split(shown, _p.Lines(needs, inner), extra.Length == 0 ? 0 : _p.Lines(extra, inner), workers.Count > 0);
+        y = _p.Paragraph(FitLines(needs, inner, split.Needs), ix, y, inner, Painter.Dim);
+        y = _p.Paragraph(v.EarliestDoneText(f), ix, y, inner, Painter.Ink);
+        if (split.Workers)
         {
             var line = string.Join(" and ", workers) + (workers.Count == 1 ? " is" : " are") + " on it"
                        + (workers.Count < f.People ? " (" + workers.Count + " of " + f.People + ")" : "") + ".";
-            _p.Paragraph(FitLines(line, inner, 1), ix, y, inner, Painter.Ink);
+            y = _p.Paragraph(FitLines(line, inner, 1), ix, y, inner, Painter.Ink);
         }
-        y += 19;
+        if (split.Extra > 0)
+            _p.Paragraph(FitLines(extra, inner, split.Extra), ix, y, inner, Painter.Dim);
         var who = _target is { State: CrewState.Awake } ? _target : null;
         var half = (inner - 8) / 2;
         var fault = f;

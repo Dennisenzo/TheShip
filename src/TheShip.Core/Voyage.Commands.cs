@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace TheShip.Core;
 
 /// <summary>The player's direct controls and the clock (DESIGN.md, "Direct control" and "The eight steps").</summary>
@@ -99,21 +101,32 @@ public sealed partial class Voyage
     }
 
     /// <summary>
-    /// The issue card's line: when the fault could be done at the rate it is being worked at (a repair, or a patch while it is being patched),
-    /// and whether the clock allows it; a fault only a patch can still save says so.
+    /// The issue card's verdict, short enough for one line of a card (<see cref="IssueCardLayout.FitsOneLine"/>): when the fault could be
+    /// done if started now, at the rate it is being worked at (a repair, or a patch while it is being patched), and whether the clock allows
+    /// it. "Done in 9 h", "Done in 18 h - patch only: 12 h", "Done in 20 h - too late", "Patch done in 6 h"; with no spare parts left a
+    /// repair is impossible and the patch time is quoted: "Patch only (no parts): 12 h".
     /// </summary>
     public string EarliestDoneText(Fault f)
     {
         var patching = f.State == FaultState.InRepair && f.Patching;
-        var hours = EarliestDoneHours(f, patching);
+        var noParts = !patching && Parts <= 0;
+        var hours = EarliestDoneHours(f, patching || noParts);
         var left = f.Deadline - Clock + 0.001;
-        var text = "Earliest done if started now: " + Hours(Math.Ceiling(hours));
+        var text = (patching ? "Patch done in " : noParts ? "Patch only (no parts): " : "Done in ") + ShortHours(hours);
         if (hours <= left)
             return text;
-        var patchHours = EarliestDoneHours(f, true);
-        return !patching && patchHours <= left
-            ? text + " - only a patch could make it (" + Hours(Math.Ceiling(patchHours)) + ")"
-            : text + " - too late for the clock";
+        if (!patching && !noParts && EarliestDoneHours(f, true) is var patchHours && patchHours <= left)
+            return text + " - patch only: " + ShortHours(patchHours);
+        return text + " - too late";
+    }
+
+    /// <summary>"18 h", or "3 d" from two days on; rounded up.</summary>
+    private static string ShortHours(double hours)
+    {
+        var h = Math.Ceiling(hours);
+        return h >= 48
+            ? Math.Ceiling(h / 24).ToString("0", CultureInfo.InvariantCulture) + " d"
+            : h.ToString("0", CultureInfo.InvariantCulture) + " h";
     }
 
     private void GoAlert()
