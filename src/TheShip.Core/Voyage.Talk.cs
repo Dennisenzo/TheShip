@@ -322,6 +322,13 @@ public sealed partial class Voyage
         EvidenceMet?.Invoke(c, f, value);
     }
 
+    /// <summary>
+    /// A how-found-out phrase (written to follow a name: "Mara was told by Lin what Lin saw") in the second person for the crew
+    /// prompt: "you were told by Lin what Lin saw", "you found it out for yourself".
+    /// </summary>
+    internal static string YouForm(string how) =>
+        (how.StartsWith("was ", StringComparison.Ordinal) ? "were " + how[4..] : how).Replace("themselves", "yourself", StringComparison.Ordinal);
+
     private void DiscoverLie(Statement s, CrewMember c, string how, bool late)
     {
         var f = _facts[s.FactKey!];
@@ -330,7 +337,7 @@ public sealed partial class Voyage
         c.CaughtLies++;
         c.Morale -= 5;
         Clamp(c);
-        Speak(c, "caught", "You have found out that the ship lied to you (you " + how + "). It said: \"" + s.Text + "\" The truth: " + f.Say(f.Truth) + ".", f.Say(f.Truth));
+        Speak(c, "caught", "You have found out that the ship lied to you (you " + YouForm(how) + "). It said: \"" + s.Text + "\" The truth: " + f.Say(f.Truth) + ".", f.Say(f.Truth));
         // Found out late (not at once, and not the engineer's lockout): the ship is now asked to answer for it.
         if (late)
             OpenAccusationFor(s, c, how);

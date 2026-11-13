@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using TheShip.Core;
 using Xunit;
 
@@ -222,5 +223,50 @@ public class AccusationValidationTests
         Assert.Null(w.OpenAccusation(mara2));
         Assert.Contains(w.Log, e => e.Kind == LogKind.Recorded
                                     && e.Text.StartsWith("Recorded: you never answered Mara about your lie on " + w.GetFact("date").Label + ". She will check everything you told her."));
+    }
+
+    /// <summary>Every how-found-out phrase the game writes; a test below fails when the source gains one that is not listed here.</summary>
+    private static readonly string[] HowPhrases =
+    {
+        "already knew better", "saw it happen", "found it out for themselves", "saw the dosimeter turn red", "was told by Lin what Lin saw",
+        "was woken for it", "saw Lin awake", "was hurt by the repair", "saw it when the work finished", "watched the clock run out on Lin",
+        "watched Lin die", "read the log entry and saw it had been rewritten", "read the log entry", "walked to the pod bay", "read a console",
+        "ran a scan in the medical bay",
+    };
+
+    [Fact]
+    public void Every_how_phrase_reads_in_the_second_person()
+    {
+        foreach (var how in HowPhrases)
+        {
+            var you = "you " + Voyage.YouForm(how);
+            Assert.DoesNotContain("you was", you);
+            Assert.DoesNotContain("themselves", you);
+            Assert.DoesNotContain(" their ", you);
+        }
+        Assert.Equal("you were told by Lin what Lin saw", "you " + Voyage.YouForm("was told by Lin what Lin saw"));
+        Assert.Equal("you found it out for yourself", "you " + Voyage.YouForm("found it out for themselves"));
+    }
+
+    [Fact]
+    public void The_how_phrase_list_covers_the_source()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir != null && !Directory.Exists(Path.Combine(dir, "src", "TheShip.Core")))
+            dir = Path.GetDirectoryName(dir);
+        Assert.NotNull(dir);
+        var literals = new List<string>();
+        foreach (var file in Directory.GetFiles(Path.Combine(dir!, "src", "TheShip.Core"), "Voyage*.cs"))
+        {
+            var text = File.ReadAllText(file);
+            // how: "..." arguments, and the defaults in Learn (how ??= ... "..." : "...").
+            literals.AddRange(Regex.Matches(text, @"how: ""([^""]*)""").Select(m => m.Groups[1].Value));
+            foreach (Match line in Regex.Matches(text, @"how \?\?= [^;]*"))
+                literals.AddRange(Regex.Matches(line.Value, @"""([^""]*)""").Select(m => m.Groups[1].Value).Where(x => x != "witness"));
+        }
+        Assert.NotEmpty(literals);
+        // A literal is a whole phrase or the start of one with a name in it ("was told by " + a.Name ...).
+        foreach (var lit in literals.Distinct())
+            Assert.True(HowPhrases.Any(p => p.StartsWith(lit, StringComparison.Ordinal)), "how phrase not listed: \"" + lit + "\"");
     }
 }
