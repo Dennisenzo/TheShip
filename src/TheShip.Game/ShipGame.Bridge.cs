@@ -30,9 +30,15 @@ public sealed partial class ShipGame
             Do(Exit);
         if (_p.Button(new Rectangle(right - 288, 8, 200, 40), "RECORD AND LOGS"))
             Do(() => _screen = Screen.Record);
+        if (_p.Button(new Rectangle(right - 400, 8, 104, 40), "BRIEFING", tip: "What this voyage is, what you can do and what it costs."))
+            Do(() =>
+            {
+                _briefing = true;
+                _session?.Line("click", "briefing reopened");
+            });
         var numbers = "STORES " + N(v.Stores) + " d   PARTS " + v.Parts + "   POD WEAR " + v.PodWear
                       + "   POWER " + (v.PowerLow ? "LOW" : "normal") + "   COURSE " + (v.NavLost ? "LOST" : "held");
-        _p.TextRight(_p.Small, numbers, right - (v.Phase == Phase.Ended ? 430 : 312), 21, v.PowerLow || v.NavLost ? Painter.Accent : Painter.Dim);
+        _p.TextRight(_p.Small, numbers, right - (v.Phase == Phase.Ended ? 532 : 412), 21, v.PowerLow || v.NavLost ? Painter.Accent : Painter.Dim);
 
         DrawIssues(v, 16, 72, 330, Painter.ScreenHeight - 16);
         DrawPlan(v, new Rectangle(358, 72, 864, 456));

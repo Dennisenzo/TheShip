@@ -91,6 +91,11 @@ public sealed partial class ShipGame
     {
         var v = _voyage!;
         foreach (var w in Settle()) yield return w;
+        // The briefing does not open by itself in a tour: show it once for its screenshot.
+        _briefing = true;
+        Shoot(dir, "briefing");
+        _briefing = false;
+        _briefingSeen = true;
         var shownDossier = false;
         for (var round = 0; round < 8 && v.Phase != Phase.Ended; round++)
         {

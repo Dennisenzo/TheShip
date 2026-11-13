@@ -172,7 +172,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         if (_session.FilePath is { } file)
             Note("This run is recorded in " + file + ".");
         _session.Snapshot(_voyage);
-        Note("Wake someone from the crew list, then advance the clock. Type to speak to whoever is awake; select a person to speak to them alone.");
+        // The briefing explains the scenario; the tour opens it itself for its screenshot.
+        _briefingSeen = false;
+        _briefing = _options.TourDir is null;
     }
 
     private void Note(string text) => _voyage?.Log.Add(new LogEntry(LogKind.Help, "", text));
@@ -248,17 +250,6 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         var height = GraphicsDevice.Viewport.Height;
         var scale = Math.Max(0.1f, Math.Min(width / (float)Painter.ScreenWidth, height / (float)Painter.ScreenHeight));
         return (scale, (width - Painter.ScreenWidth * scale) / 2f, (height - Painter.ScreenHeight * scale) / 2f);
-    }
-
-    /// <summary>A popup or a transition is up: the screen below gets no clicks, no hover and no typing.</summary>
-    private bool OverlayUp => false;
-
-    /// <summary>Enter or Esc while an overlay is up; returns true when it was used.</summary>
-    private bool OverlayKey(bool enter) => false;
-
-    /// <summary>Draws whatever overlay is up, on top of the dimmed screen.</summary>
-    private void DrawOverlay(Voyage v)
-    {
     }
 
     protected override void Update(GameTime gameTime)
@@ -515,7 +506,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             // The ending screen can always be opened again.
             var edge = Painter.ScreenWidth - 16;
-            if (_p.Button(new Rectangle(title == "THE SHIP" ? edge - 410 : edge - 110, 8, 110, 40), "ENDING"))
+            if (_p.Button(new Rectangle(title == "THE SHIP" ? edge - 520 : edge - 110, 8, 110, 40), "ENDING"))
                 Do(() => _screen = Screen.Ending);
         }
         var chip = new Rectangle(x + 124, 14, (int)(phase.Length * _p.SmallWidth) + 20, 28);
