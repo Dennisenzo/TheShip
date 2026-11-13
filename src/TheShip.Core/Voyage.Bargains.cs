@@ -16,7 +16,7 @@ public sealed partial class Voyage
     {
         var list = new List<LedgerEntry>();
         foreach (var s in Statements.Where(s => s.Kind == StatementKind.Promise && s.PromiseKey is { } k && k != "other"))
-            foreach (var id in s.Hearers.Where(id => !s.Repeated.Contains(id)))
+            foreach (var id in s.Hearers.Where(id => !s.Repeated.Contains(id) && !s.Moot.Contains(id)))
             {
                 var c = Crew.First(x => x.Id == id);
                 var state = s.PromiseKept.TryGetValue(id, out var kept) ? (kept ? "kept" : "broken")
@@ -60,9 +60,18 @@ public sealed partial class Voyage
     private bool KeptNow(CrewMember c, string key)
     {
         if (key == "show_logs")
-            return AllLogsOpen;
+            return ShipOpenedLogs;
         var partner = c.PartnerId is null ? null : Crew.First(x => x.Id == c.PartnerId);
         return partner is not null && (partner.State == CrewState.Thawing || (partner.State == CrewState.Awake && c.State == CrewState.Awake && c.SawPartner));
+    }
+
+    /// <summary>Whether an open promise to this person can no longer be kept, so settling it now releases it (no penalty).</summary>
+    private bool ReleasedNow(CrewMember c, string key)
+    {
+        if (key == "show_logs")
+            return LogsLocked;
+        var partner = c.PartnerId is null ? null : Crew.First(x => x.Id == c.PartnerId);
+        return partner is null || partner.State == CrewState.Dead || (Lockouts.Bay && partner.State == CrewState.Asleep);
     }
 
     /// <summary>
@@ -72,7 +81,7 @@ public sealed partial class Voyage
     public string? SleepBreaksText(CrewMember c)
     {
         var lines = new List<string>();
-        foreach (var e in Ledger().Where(e => e.Person == c && e.State == "open" && Checkable(e.Key) && !KeptNow(c, e.Key)))
+        foreach (var e in Ledger().Where(e => e.Person == c && e.State == "open" && Checkable(e.Key) && !KeptNow(c, e.Key) && !ReleasedNow(c, e.Key)))
         {
             var waits = e.Key == "wake_partner" && c.PartnerId is { } p ? Crew.First(x => x.Id == p).Name : "the logs to open";
             var line = c.Name + " still waits for " + waits + ": sleeping now breaks that promise.";
@@ -85,6 +94,10 @@ public sealed partial class Voyage
     /// <summary>The person has an open promise with this key from the ship (other than <paramref name="except"/>).</summary>
     internal bool HasOpenCommitment(CrewMember c, string key, Statement? except = null) =>
         Statements.Any(s => s != except && s.Kind == StatementKind.Promise && s.PromiseKey == key && s.OpenFor(c.Id));
+
+    /// <summary>A promise to wake this person's partner when the partner is already dead: it asks nothing the ship can do (no trust, no ledger entry).</summary>
+    internal bool PartnerDead(CrewMember c, string key) =>
+        key == "wake_partner" && c.PartnerId is { } p && Crew.First(x => x.Id == p).State == CrewState.Dead;
 
     /// <summary>A promise has just been made to a listener: its due date, and whether there is anything left to keep.</summary>
     private void StartCommitment(Statement s, CrewMember c, double days = Tuning.PromiseDueDays)
@@ -102,8 +115,8 @@ public sealed partial class Voyage
 
     /// <summary>
     /// Settles every open promise that has come true, can no longer be kept, or fell due: wake_partner is kept when the partner
-    /// is thawing or met, broken at the due date; show_logs is kept at the due date if all logs are open, else broken. A promise that
-    /// can't be kept any more (partner dead, the bay taken) is released with a SHIP line and no penalty. A promise is warned about once (Advance
+    /// is thawing or met, broken at the due date; show_logs is kept at the due date if the ship has opened every log, else broken. A promise that
+    /// can't be kept any more (partner dead, the bay taken, the crew hold the logs) is released with a SHIP line and no penalty. A promise is warned about once (Advance
     /// stops) at the last beat that leaves time to act: when it has the warning days plus one beat left or less. <paramref name="only"/> and <paramref name="force"/> settle one person's
     /// promises now, as when they go under.
     /// </summary>
@@ -142,9 +155,16 @@ public sealed partial class Voyage
                         continue;
                     }
                 }
+                else if (LogsLocked)
+                {
+                    // The crew took the logs: the ship can no longer open them, and their opening is not the ship's doing.
+                    s.Released.Add(id);
+                    Ship(c.Name + "'s promise can no longer be kept: the crew hold the logs.");
+                    continue;
+                }
                 else if (late)
                 {
-                    ResolvePromise(s, c, AllLogsOpen);
+                    ResolvePromise(s, c, ShipOpenedLogs);
                     continue;
                 }
                 if (late)

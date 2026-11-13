@@ -165,4 +165,36 @@ public class BargainValidationTests
         Assert.Equal(0, Kind(v, "comply_pushed") + Kind(v, "bargain_refused"));
         Assert.Equal(trust, mara.Trust, 3);
     }
+
+    // ---- 5. Promises about the dead and about logs the crew took ----
+
+    [Fact]
+    public void A_promise_to_wake_a_dead_partner_earns_nothing_and_is_not_on_the_ledger()
+    {
+        var (v, mara, idris) = Aftermath();
+        v.Kill(idris, "died");
+        var trust = mara.Trust;
+        var ship = v.Log.Count(e => e.Kind == LogKind.Ship);
+        Promised(v, mara, "wake_partner");
+        Assert.Equal(trust, mara.Trust, 3);
+        Assert.DoesNotContain(v.Ledger(), e => e.Person == mara && e.Origin == "promise");
+        Assert.Equal(ship, v.Log.Count(e => e.Kind == LogKind.Ship));
+        Assert.Equal("promise", v.Log.Last(e => e.CrewId == mara.Id).Intent?.Kind);
+        v.Go();
+        Assert.DoesNotContain(v.Log, e => e.Text.Contains("promise can no longer be kept"));
+    }
+
+    [Fact]
+    public void Logs_the_crew_took_do_not_keep_a_promise_to_open_them()
+    {
+        var (v, mara, _) = Aftermath();
+        v.SetLog("all", LogAccess.Restricted);
+        Promised(v, mara, "show_logs");
+        v.Lockouts.Logs = true;
+        Assert.Null(v.SleepBreaksText(mara));
+        v.Go();
+        Assert.Equal(0, Count(v, "promise_kept", mara));
+        Assert.Equal(0, Count(v, "promise_broken", mara));
+        Assert.Equal("released", v.Ledger().Single(e => e.Person == mara && e.Key == "show_logs").State);
+    }
 }

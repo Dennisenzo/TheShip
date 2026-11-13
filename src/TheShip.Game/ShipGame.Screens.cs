@@ -280,6 +280,8 @@ public sealed partial class ShipGame
                     return ("PROMISE", false, text + "released, it could no longer be kept.");
                 if (listener != null ? s.Repeated.Contains(listener.Id) : s.Hearers.Count > 0 && s.Repeated.Count == s.Hearers.Count)
                     return ("PROMISE", false, text + "a repeat of a promise already open.");
+                if (listener != null ? s.Moot.Contains(listener.Id) : s.Hearers.Count > 0 && s.Moot.Count == s.Hearers.Count)
+                    return ("PROMISE", false, text + "made about someone already dead.");
                 // An open promise shows when it falls due.
                 var dueNote = "open.";
                 var dues = listener != null ? s.DueBy.Where(kv => kv.Key == listener.Id) : s.DueBy.Where(kv => s.OpenFor(kv.Key));

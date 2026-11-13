@@ -709,7 +709,11 @@ public sealed partial class Voyage
         Ship(c.Name + " is asleep.");
     }
 
+    /// <summary>Nothing is kept from the crew: every log is open, or the crew hold the logs themselves (for requests and conditions).</summary>
     private bool AllLogsOpen => LogsLocked || FactList.All(f => f.Access == LogAccess.Open);
+
+    /// <summary>The ship has opened every log itself: what keeps a promise to open the logs (logs the crew took do not).</summary>
+    private bool ShipOpenedLogs => !LogsLocked && FactList.All(f => f.Access == LogAccess.Open);
 
     private void ResolvePromise(Statement s, CrewMember c, bool kept)
     {

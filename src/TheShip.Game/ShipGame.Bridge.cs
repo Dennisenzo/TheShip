@@ -807,7 +807,10 @@ public sealed partial class ShipGame
             yield return (null, string.Join(" and ", v.Lockouts.BayWarned.Select(id => v.Crew.First(c => c.Id == id).Name))
                          + " will take the cold-sleep bay at the next step. Win one of them back above 15 trust, or they do.");
         if (v.Lockouts.Bay)
-            yield return (null, v.BayLockReason + " Keep a promise to one of them and win their trust above " + Tuning.BayReturnTrust.ToString("0") + " to get it back.");
+            yield return (null, v.BayLockReason + (v.LogsLocked
+                ? " The crew hold the logs too: no promise to them can be kept now."
+                : " Promise one of them to open the logs, have every log open when it falls due, and win their trust above "
+                  + Tuning.BayReturnTrust.ToString("0") + " to get it back."));
         var owed = v.Ledger().Where(e => e.State == "open").ToList();
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {

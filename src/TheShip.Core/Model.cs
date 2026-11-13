@@ -235,9 +235,11 @@ public sealed class Statement
     public HashSet<string> Bargained { get; } = new();
     /// <summary>Crew ids who already had the same promise open when this one was said: it repeats that one and is not a promise of its own (no due date, never settled, not in the ledger).</summary>
     public HashSet<string> Repeated { get; } = new();
+    /// <summary>Crew ids to whom this promise asked nothing the game holds the ship to: to wake a partner already dead. Not in the ledger, never settled.</summary>
+    public HashSet<string> Moot { get; } = new();
 
-    /// <summary>The promise to this person is still open: not kept, broken, released or a repeat of one already open.</summary>
-    public bool OpenFor(string id) => Kind == StatementKind.Promise && Hearers.Contains(id) && !PromiseKept.ContainsKey(id) && !Released.Contains(id) && !Repeated.Contains(id);
+    /// <summary>The promise to this person is still open: not kept, broken, released, a repeat of one already open, or moot.</summary>
+    public bool OpenFor(string id) => Kind == StatementKind.Promise && Hearers.Contains(id) && !PromiseKept.ContainsKey(id) && !Released.Contains(id) && !Repeated.Contains(id) && !Moot.Contains(id);
 }
 
 public enum LineKind { Statement, Promise, Order, Question, Dodge, Plain }

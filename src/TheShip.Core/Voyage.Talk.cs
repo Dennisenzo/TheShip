@@ -98,6 +98,13 @@ public sealed partial class Voyage
                         Speak(l, "promise", "The ship repeated a promise it already made you: " + PromiseText(key) + ".");
                         continue;
                     }
+                    // To wake a partner who is already dead: nothing to hold the ship to, nothing earned; they still answer.
+                    if (PartnerDead(l, key))
+                    {
+                        made.Moot.Add(l.Id);
+                        Speak(l, "promise", "The ship made you a promise: " + PromiseText(key) + ".");
+                        continue;
+                    }
                     // The small gain is earned once per person per waking, so repeating a promise buys nothing more.
                     if (!l.PromiseCredited)
                     {
