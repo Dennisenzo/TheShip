@@ -227,6 +227,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 
 - 2026-11-13: the Record's "Not found out by the rest" counts only living hearers (`ShipGame.Screens.cs`, cosmetic Low finding; the Game project has no tests, so none added).
 
+- 2026-11-13: the `--tour` dev tool answers every pending question truthfully (`AnswerQuestions`), including the danger question a person asks when first asked to repair, and then asks again, so work now starts in alert 1 (seed 3 run: Mara asks "Is it safe in there?", is told, sets her bargain, the tour gives its word, the patch starts; before, repairs never began). The tour still ends Adrift on seed 3 because its plan does not put two people on the navigation drift in alert 3 (a tour-plan limit, not changed).
+
 ### Balance table (600 seeds, Short haul, feature/user-decisions, 2026-11-13)
 
 `WorkingAge` 65, broken promises open an accusation, a cause lie is caught only by a skilled worker. The 600-seed figures swing by a few points between rule changes that draw no
