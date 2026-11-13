@@ -101,8 +101,12 @@ public sealed partial class Voyage
                     if (l.PendingQuestion is not { } q)
                         continue;
                     // A dodge is not an answer: the question stays pending. Its trust cost is charged once per question.
-                    if (l.Dodged.Add(q))
+                    l.Dodged.Add(q);
+                    if (!l.DodgeCharged)
+                    {
+                        l.DodgeCharged = true;
                         l.Trust -= Tuning.Dodge;
+                    }
                     l.Doubts.Add(q);
                     Speak(l, "dodge", "The ship avoided your question (" + _facts[q].Question + "). You will look for the answer yourself.");
                 }

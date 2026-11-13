@@ -353,7 +353,6 @@ public sealed partial class Voyage
             Ship("The door to the " + GetSection(f.Section)!.Name.ToLowerInvariant() + " is locked. Nobody can reach the " + f.Name.ToLowerInvariant() + ".");
             return;
         }
-        _idleWarned = false;
 
         if (c.Band == TrustBand.Against || (c.Band == TrustBand.Refuses && !c.RequestGranted))
         {
@@ -388,6 +387,7 @@ public sealed partial class Voyage
             f.Progress = 0;
             f.Patching = patch;
         }
+        _idleWarned = false;
         c.WorkingOn = f.Id;
         f.State = FaultState.InRepair;
         var task = (patch ? "patching the " : "the ") + f.CrewName;

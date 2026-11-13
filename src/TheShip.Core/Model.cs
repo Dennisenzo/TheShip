@@ -76,13 +76,18 @@ public sealed class CrewMember
         set
         {
             if (value != _pendingQuestion)
+            {
                 QuestionRepeats = 0;
+                DodgeCharged = false;
+            }
             _pendingQuestion = value;
         }
     }
     private string? _pendingQuestion;
     /// <summary>How many times they asked the same pending question again (a new question, or none, resets it).</summary>
     public int QuestionRepeats { get; set; }
+    /// <summary>The pending question has already been dodged once and charged; a new asking charges its first dodge again.</summary>
+    public bool DodgeCharged { get; set; }
     /// <summary>The fault they are working on.</summary>
     public string? WorkingOn { get; set; }
     public bool RefusesSleep { get; set; }

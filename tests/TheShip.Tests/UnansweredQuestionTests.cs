@@ -104,4 +104,55 @@ public class UnansweredQuestionTests
         Assert.Contains("something to say", r.Reason);
         Assert.Contains(v.Log, e => e.Intent?.Kind == "ask_again");
     }
+
+    [Fact]
+    public void A_dodge_of_a_question_asked_again_at_a_later_waking_costs_again()
+    {
+        var (v, mara) = AftermathWithPendingQuestion();
+        v.Say("Not now.", new Reading(LineKind.Dodge), new[] { mara });
+        mara.PendingQuestion = null; // asleep and woken again
+        mara.PendingQuestion = "date";
+        var before = mara.Trust;
+        v.Say("Not now.", new Reading(LineKind.Dodge), new[] { mara });
+        Assert.Equal(before - Tuning.Dodge, mara.Trust, 3);
+    }
+
+    [Fact]
+    public void A_new_question_resets_the_repeat_count()
+    {
+        var (_, mara) = AftermathWithPendingQuestion();
+        mara.QuestionRepeats = 2;
+        mara.PendingQuestion = "date"; // same question: kept
+        Assert.Equal(2, mara.QuestionRepeats);
+        mara.PendingQuestion = "earth";
+        Assert.Equal(0, mara.QuestionRepeats);
+    }
+
+    [Fact]
+    public void Finding_the_answer_out_for_themselves_ends_the_question()
+    {
+        var (v, mara) = AftermathWithPendingQuestion();
+        var f = v.GetFact("date");
+        v.Learn(mara, "date", f.Truth, "evidence");
+        Assert.Null(mara.PendingQuestion);
+    }
+
+    [Fact]
+    public void A_refused_repair_does_not_re_arm_the_idle_warning()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        VoyageTests.Say(v, mara, "Idris is alive and asleep.");
+        var fault = v.FindFault("")!;
+        mara.Trust = 45;
+        v.Assign(mara, fault, patch: false); // she asks first, nobody works
+        v.Go(); // warns that nobody works
+        var year = v.Clock;
+        v.Assign(mara, fault, patch: false); // refused: still unanswered
+        Assert.NotEqual(fault.Id, mara.WorkingOn);
+        v.Go();
+        Assert.True(v.Clock > year, "a refused repair must not make Advance warn instead of moving the clock");
+    }
 }
