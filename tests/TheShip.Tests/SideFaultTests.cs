@@ -262,7 +262,7 @@ public class SideFaultTests
     }
 
     [Fact]
-    public void Every_alert_has_at_most_one_critical_fault()
+    public void Every_alert_draws_at_most_one_critical_fault()
     {
         for (var seed = 1; seed <= 200; seed++)
             foreach (var alert in Scenario.Alerts(Variation.Draw(seed)))
@@ -272,7 +272,7 @@ public class SideFaultTests
     }
 
     [Fact]
-    public void A_returning_patch_beside_a_critical_fault_comes_back_non_critical()
+    public void A_returning_patch_keeps_its_critical_flag_beside_a_drawn_critical_fault()
     {
         var v = new Voyage(1, With(Variation.PowerSag));
         var patched = (List<string>)typeof(Voyage).GetField("_patched", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(v)!;
@@ -288,9 +288,9 @@ public class SideFaultTests
             }
             v.Drift();
         }
-        Assert.Equal(1, v.Current.Faults.Count(f => f.Critical));
+        Assert.True(v.Current.Faults.Single(f => f.Kind == "nav").Critical);
         var again = v.Current.Faults.Single(f => f.Id == "coolant-again");
-        Assert.False(again.Critical);
+        Assert.True(again.Critical);
         Assert.Equal("coolant", again.Kind);
     }
 }

@@ -254,8 +254,8 @@ public sealed partial class Voyage
             foreach (var id in _patched)
             {
                 var old = Alerts.SelectMany(a => a.Faults).First(f => f.Id == id);
-                // At most one Critical fault per alert: a patch that returns beside one comes back non-critical (it keeps its consequence).
-                alert.Faults.Add(old.Again(id + "-again", old.Name, Variation.SlackHours[alert.Number - 1], allowCritical: !alert.Faults.Any(f => f.Critical)));
+                // A returning patch keeps its Critical flag, even beside a drawn Critical fault: it is the player's own shortcut coming due.
+                alert.Faults.Add(old.Again(id + "-again", old.Name, Variation.SlackHours[alert.Number - 1]));
             }
             _patched.Clear();
         }

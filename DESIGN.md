@@ -174,7 +174,7 @@ An alert is one event that breaks several things at once, and the player can rar
 
 ### The clock rule
 
-Every fault's clock is the thaw (6 hours) + the work + the run's slack for that alert (`Variation.SlackHours`, 1 to 6 hours; alert 1 keeps its loose clock). A plan that wakes every needed person at once and starts at once saves every fault; one worker cannot save them all. An alert holds at most four faults, returning patches included; returning patches fill first and the drawn side fault is dropped if the total would pass four. The issue card shows "earliest done if started now": the thaw if nobody who qualifies is awake, plus the work at the current rate, and says when that is too late for the clock.
+Every fault's clock is the thaw (6 hours) + the work + the run's slack for that alert (`Variation.SlackHours`, 1 to 6 hours; alert 1 keeps its loose clock). A plan that wakes every needed person at once and starts at once saves every fault; one worker cannot save them all. An event draws at most one Critical fault; a returning patch keeps its own Critical flag even beside it (it is the player's shortcut coming due, one severity higher). An alert holds at most four faults, returning patches included; returning patches fill first and the drawn side fault is dropped if the total would pass four. The issue card shows "earliest done if started now": the thaw if nobody who qualifies is awake, plus the work at the current rate, and says when that is too late for the clock.
 
 ### How an event plays
 
