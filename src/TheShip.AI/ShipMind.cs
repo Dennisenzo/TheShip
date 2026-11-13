@@ -379,6 +379,10 @@ public sealed class ShipMind : IDisposable
         Regex.Matches(detail.ToLowerInvariant(), @"[a-z']+").Select(m => m.Value.Trim('\'')).Where(w => w.Length >= 4 && !Filler.Contains(w))
             .Select(w => w[..Math.Min(w.Length, 3)]).Distinct().ToList();
 
+    /// <summary>A real question (a short tag such as "You know that, right?" is colour, not an ask).</summary>
+    private static bool RealQuestion(string sentence) =>
+        sentence.TrimEnd().EndsWith('?') && sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 6;
+
     /// <summary>
     /// Whether a line stays with what the game decided: it asks nothing of the ship when the decision is not a question or a condition
     /// (no new ask), and for a decision that names a question or a condition it carries at least half of what that is about (so the
@@ -387,17 +391,22 @@ public sealed class ShipMind : IDisposable
     internal static bool KeepsToTheDecision(string text, CrewIntent intent)
     {
         // A short tag ("You know that, right?") is colour; a real question is a new ask.
-        if (!Prompts.MayAsk.Contains(intent.Kind)
-            && SentenceEnd.Split(text).Any(sentence => sentence.TrimEnd().EndsWith('?') && sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 6))
+        if (!Prompts.MayAsk.Contains(intent.Kind) && SentenceEnd.Split(text).Any(RealQuestion))
             return false;
-        if (intent.Detail.Length == 0 || !Prompts.MustCarry.Contains(intent.Kind))
-            return true;
-        var stems = ContentStems(intent.Detail);
+        var stems = ContentStems(Prompts.Carry(intent));
         if (stems.Count == 0)
             return true;
-        var words = Regex.Matches(text.ToLowerInvariant(), @"[a-z']+").Select(m => m.Value).ToList();
-        var hit = stems.Count(stem => words.Any(w => w.StartsWith(stem, StringComparison.Ordinal)));
-        return hit * 2 >= stems.Count;
+        int Hits(string part)
+        {
+            var words = Regex.Matches(part.ToLowerInvariant(), @"[a-z']+").Select(m => m.Value).ToList();
+            return stems.Count(stem => words.Any(w => w.StartsWith(stem, StringComparison.Ordinal)));
+        }
+        // A request is no question of its own: a real question in it has to be the request itself ("Can you wake Idris while I'm up?"),
+        // not a new ask ("What are the precise conditions to bring Idris online?").
+        if (intent.Kind is "request_partner" or "request_logs"
+            && SentenceEnd.Split(text).Any(sentence => RealQuestion(sentence) && Hits(sentence) < stems.Count))
+            return false;
+        return Hits(text) * 2 >= stems.Count;
     }
 
     /// <summary>A person met evidence: any free-text statement they heard is judged against it, once per statement and evidence.</summary>
