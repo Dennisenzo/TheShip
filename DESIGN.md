@@ -672,3 +672,22 @@ Thaws per run (Honest) 13.12 before, 13.13 now. Run with `SHIP_SEEDS=600 dotnet 
 ### Work terms and the balance bots (2026-11-13, 600 seeds, bots unchanged)
 
 Step 1 (the risk axis) moves nothing the bots can see: every bot figure equals the table above. Step 2 (cause facts) takes Honest from 41.3% to 31.8% (Careless 21.3 to 19.0, Liar 12.8 to 8.3, Thrifty 38.2 to 38.3, Silent 22.3 to 17.8, Breaker 43.8 to 31.8): Honest is below the 35% floor and 9.5 points under its baseline, so `ShortHaulHonestLandfallRate` fails at 200 seeds (33.0%) until step 4. Measured parts: the workers learning a hard cause at completion costs about 3-4 points (without that learning Honest is 35.2%), a smaller hardness (3) gave 35.7%; the rest comes with the new facts in the log-reading draw (`unread[_rng.Next(unread.Count)]`), which shifts every seed's path. The bots tell neither the cause nor, in step 2, anything new, so none of them gets the +0.08 repair odds yet; step 4 has Honest, Thrifty and Breaker brief the cause truthfully, which turns the morale cost of the hard cause into a price paid at briefing and returns the odds. Retune the bots, not the cause numbers, if step 4 lands outside the targets.
+
+### The lie comes due and the balance bots (2026-11-13, 600 seeds)
+
+Accusations and self-correction draw no new random numbers, so every bot that never lies is unchanged: the Honest, Thrifty, Careless, Silent and Breaker reports are
+identical to the work-terms ones but for the new rows. The Liar now admits each accusation (`BalanceBot.LiarAdmits`; `SHIP_LIAR_IGNORES=1` measures ignoring them: 2.0% Landfall,
+81.7% Adrift). The Corrector (new) lies like the Liar and tells each person the truth after the work and before the drift.
+
+| Bot (600 seeds) | Landfall before | Landfall now | Survivors now | Adrift now |
+| --- | --- | --- | --- | --- |
+| Honest | 43.2% | 43.2% | 3.49 | 20.0% |
+| Breaker | 39.8% | 39.8% | 3.42 | 21.0% |
+| Thrifty | 38.5% | 38.5% | 3.47 | 20.5% |
+| Corrector (new) | | 37.7% | 3.22 | 18.2% |
+| Careless | 27.3% | 27.3% | 3.17 | 14.0% |
+| Silent | 25.2% | 25.2% | 3.18 | 18.8% |
+| Liar | 4.2% | 10.7% | 1.58 | 66.5% |
+
+Per run: Liar 7.77 lies told, 7.14 caught, 6.79 accusations opened and admitted, end trust 25.0; Corrector 8.29 lies told, 3.84 caught, 3.81 corrections, 3.32 accusations
+opened and admitted, end trust 43.3. The guard `Correcting_a_lie_is_not_a_winning_strategy` fails if the Corrector beats Honest by more than 6 points.
