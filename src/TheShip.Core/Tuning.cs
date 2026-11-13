@@ -113,6 +113,8 @@ public static class Tuning
     public const int BayEngineering = 2;
     /// <summary>A kept promise to a taker whose trust is at least this hands the bay back.</summary>
     public const double BayReturnTrust = 30;
+    /// <summary>The trust a pod refuser needs before the ship's word on the pods lifts the refusal.</summary>
+    public const double PodRefuserListensTrust = 30;
 
     // Ending (Short haul: 6 crew)
     public const int LandfallAlive = 4;

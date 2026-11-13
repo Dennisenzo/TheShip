@@ -157,7 +157,7 @@ public sealed partial class Voyage
         c.Beliefs[f.Key] = new Belief(value, "ship", Year);
         if (doubts)
             c.Doubts.Add(f.Key);
-        if (c.RefusesSleep && f.Key == "pods" && c.Trust >= 30)
+        if (c.RefusesSleep && f.Key == PodRefusalFact && c.Trust >= Tuning.PodRefuserListensTrust)
         {
             c.RefusesSleep = false;
             c.AskedToSleep = false;

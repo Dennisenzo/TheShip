@@ -76,14 +76,28 @@ public sealed partial class Voyage
     /// <summary>
     /// The crew's own rule for sleeping: whoever has been awake three months (or can't be fed) goes back under, except someone who
     /// refuses the pod until the ship answers them (<see cref="CrewMember.RefusesSleep"/>): they refuse the crew as they refuse the ship.
+    /// Such a refuser has been asked, as when the ship asks outside the bay: the drift goes without them, and the ship says how far
+    /// the stores go for whoever stays up.
     /// </summary>
     private void CrewSleepRule()
     {
-        foreach (var c in Awake.Where(c => CanSleepNow(c) && !c.RefusesSleep).ToList())
+        var refused = false;
+        foreach (var c in Awake.Where(c => CanSleepNow(c)).ToList())
         {
+            if (c.RefusesSleep)
+            {
+                if (c.AskedToSleep)
+                    continue;
+                c.AskedToSleep = true;
+                refused = true;
+                Ship(c.Name + " will not go back into the pod for the crew either; they leave " + c.Name + " awake.");
+                continue;
+            }
             c.AskedToSleep = true;
             Sleep(c);
         }
+        if (refused)
+            WarnStaysAwake();
     }
 
     /// <summary>
