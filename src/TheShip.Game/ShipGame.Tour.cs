@@ -199,6 +199,17 @@ public sealed partial class ShipGame
                 Shoot(dir, "record");
                 _screen = Screen.Bridge;
             }
+            // From alert 3 on the log holds more entries than fit (the cause facts of each alert): the record's top and its bottom.
+            if (v.Current.Number >= 3)
+            {
+                _screen = Screen.Record;
+                _logFirst = 0;
+                Shoot(dir, tag + "-record");
+                _logFirst = int.MaxValue / 2; // clamped to the last full page when drawn
+                Shoot(dir, tag + "-record-scrolled");
+                _logFirst = 0;
+                _screen = Screen.Bridge;
+            }
 
             if (v.Phase != Phase.Aftermath)
                 break;

@@ -315,8 +315,10 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _prevLeft = mouse.LeftButton;
         if (_p != null)
             _p.Down = mouse.LeftButton == ButtonState.Pressed && IsActive;
-        _scroll += (mouse.ScrollWheelValue - _prevWheel) / 40;
+        var wheel = mouse.ScrollWheelValue - _prevWheel;
+        _scroll += wheel / 40;
         _prevWheel = mouse.ScrollWheelValue;
+        RecordWheel(wheel);
 
         var keys = Keyboard.GetState();
         bool Pressed(Keys k) => keys.IsKeyDown(k) && !_prevKeys.IsKeyDown(k);

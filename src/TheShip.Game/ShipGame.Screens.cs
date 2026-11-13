@@ -300,13 +300,75 @@ public sealed partial class ShipGame
 
     // ---- The record and the ship logs ----
 
+    /// <summary>The record screen's two panels, in the 1600 x 900 space (the wheel needs them before the frame is drawn).</summary>
+    private static Rectangle RecordStatementsRect => new(16, 72, 780, Painter.ScreenHeight - 16 - 72);
+    private static Rectangle RecordLogRect => new(808, 72, Painter.ScreenWidth - 16 - 808, Painter.ScreenHeight - 16 - 72);
+
+    /// <summary>How many of the newest statements the record list skips (scrolled down to older lines).</summary>
+    private int _recordSkip;
+    /// <summary>The first ship log entry shown (scrolled down to later entries).</summary>
+    private int _logFirst;
+
+    /// <summary>The mouse wheel on the record screen scrolls the list under the mouse, one row per notch.</summary>
+    private void RecordWheel(int delta)
+    {
+        if (_screen != Screen.Record || delta == 0 || _p is null)
+            return;
+        var notches = delta > 0 ? Math.Max(1, delta / 120) : Math.Min(-1, delta / 120);
+        if (_p.Over(RecordLogRect))
+            _logFirst = Math.Max(0, _logFirst - notches);
+        else if (_p.Over(RecordStatementsRect))
+            _recordSkip = Math.Max(0, _recordSkip - notches);
+    }
+
+    /// <summary>
+    /// The scroll cue on the last line of a list that does not fit: which rows show, how many are above and below, and UP and DOWN
+    /// buttons (queued with Do) next to the mouse wheel.
+    /// </summary>
+    private void ScrollCue(Rectangle rect, int first, int shown, int total, string noun, Action up, Action down)
+    {
+        if (shown >= total && first == 0)
+            return;
+        var y = rect.Bottom - 30;
+        _p.Fill(new Rectangle(rect.X + 4, y - 4, rect.Width - 8, 1), Painter.Edge);
+        var above = first;
+        var below = Math.Max(0, total - first - shown);
+        var text = noun + " " + (first + 1) + " to " + (first + shown) + " of " + total
+            + (above > 0 ? ", " + above + " above" : "") + (below > 0 ? ", " + below + " below" : "") + " (mouse wheel)";
+        _p.Text(_p.Small, text, rect.X + 16, y + 3, Painter.Accent);
+        var bx = rect.Right - 16 - 2 * 64 - 4;
+        if (_p.Button(new Rectangle(bx, y, 64, 24), "UP", above > 0, tip: "Scroll this list up."))
+            Do(up);
+        if (_p.Button(new Rectangle(bx + 68, y, 64, 24), "DOWN", below > 0, tip: "Scroll this list down."))
+            Do(down);
+    }
+
+    /// <summary>
+    /// Which rows of a scrolling list fit: from <paramref name="first"/> (clamped so the last row can be reached but no empty space
+    /// is scrolled into), as many as fit between <paramref name="top"/> and <paramref name="bottom"/>, or <paramref name="cueTop"/>
+    /// when they don't all fit and the scroll cue takes the last line. Returns the clamped first row and how many are shown.
+    /// </summary>
+    private static (int First, int Count) ListWindow(IReadOnlyList<int> heights, int first, int top, int bottom, int cueTop)
+    {
+        if (heights.Sum() <= bottom - top)
+            return (0, heights.Count);
+        var room = cueTop - top;
+        // The highest first row that still shows the last row with no space left under it.
+        var lastFirst = heights.Count - 1;
+        for (var used = heights[^1]; lastFirst > 0 && used + heights[lastFirst - 1] <= room; lastFirst--)
+            used += heights[lastFirst - 1];
+        first = Math.Clamp(first, 0, lastFirst);
+        var count = 0;
+        for (var used = 0; first + count < heights.Count && (count == 0 || used + heights[first + count] <= room); count++)
+            used += heights[first + count];
+        return (first, count);
+    }
+
     private void DrawRecord(Voyage v)
     {
         Header(v, "RECORD AND SHIP LOGS", back: true);
-        const int top = 72;
-        var bottom = Painter.ScreenHeight - 16;
-        DrawStatements(v, new Rectangle(16, top, 780, bottom - top));
-        DrawLogEntries(v, new Rectangle(808, top, Painter.ScreenWidth - 16 - 808, bottom - top));
+        DrawStatements(v, RecordStatementsRect);
+        DrawLogEntries(v, RecordLogRect);
     }
 
     private void DrawStatements(Voyage v, Rectangle rect)
@@ -318,21 +380,26 @@ public sealed partial class ShipGame
         var lies = v.Statements.Count(s => s.Kind == StatementKind.False);
         var found = v.Statements.Count(s => s.Kind == StatementKind.False && s.FoundOutBy.Count > 0);
         _p.TextRight(_p.Small, v.Statements.Count + " lines, " + lies + (lies == 1 ? " lie, " : " lies, ") + found + " found out", x + width, rect.Y + 14, Painter.Dim);
-        var y = rect.Y + 46;
-        var limit = rect.Bottom - 16;
+        var top = rect.Y + 46;
         if (v.Statements.Count == 0)
-            _p.Text(_p.Small, "Nothing is on the record yet.", x, y, Painter.Ink);
+        {
+            _p.Text(_p.Small, "Nothing is on the record yet.", x, top, Painter.Ink);
+            return;
+        }
         string Names(IEnumerable<string> ids) => string.Join(", ", ids.Select(id => v.Crew.First(c => c.Id == id).Name));
-        foreach (var s in Enumerable.Reverse(v.Statements))
+        // Newest first; every line can be reached by scrolling.
+        var items = Enumerable.Reverse(v.Statements).Select(s =>
         {
             var (tag, hot, note) = Standing(v, s, null);
             var quote = "\"" + s.Text + "\"";
-            var rows = 1 + _p.Lines(quote, width) + (note.Length > 0 ? _p.Lines(note, width) : 0);
-            if (y + rows * 19 + 10 > limit)
-            {
-                _p.Text(_p.Small, "... and earlier lines.", x, y, Painter.Dim);
-                break;
-            }
+            var height = 24 + 19 * (_p.Lines(quote, width) + (note.Length > 0 ? _p.Lines(note, width) : 0)) + 12;
+            return (s, tag, hot, note, quote, height);
+        }).ToList();
+        var (first, count) = ListWindow(items.Select(i => i.height).ToList(), _recordSkip, top, rect.Bottom - 8, rect.Bottom - 38);
+        _recordSkip = first;
+        var y = top;
+        foreach (var (s, tag, hot, note, quote, _) in items.Skip(first).Take(count))
+        {
             Tag(tag, x, y, hot);
             var to = s.Hearers.Count == 0 ? "the log" : Names(s.Hearers);
             _p.Text(_p.Small, "year " + N(Math.Floor(s.Year)) + ", to " + to, x + (int)(tag.Length * _p.SmallWidth) + 28, y + 2, Painter.Dim);
@@ -342,6 +409,7 @@ public sealed partial class ShipGame
                 y = _p.Paragraph(note, x, y, width, hot ? Painter.Accent : Painter.Dim);
             y += 12;
         }
+        ScrollCue(rect, first, count, items.Count, "Lines (newest first)", () => _recordSkip = Math.Max(0, _recordSkip - 3), () => _recordSkip += 3);
     }
 
     private void DrawLogEntries(Voyage v, Rectangle rect)
@@ -350,32 +418,46 @@ public sealed partial class ShipGame
         var x = rect.X + 16;
         var width = rect.Width - 32;
         _p.Text(_p.Small, "SHIP LOG ENTRIES: WHAT ANYONE AWAKE CAN READ", x, rect.Y + 14, Painter.Dim);
-        var y = rect.Y + 42;
+        var top = rect.Y + 42;
         var live = !v.LogsLocked && v.Phase != Phase.Ended;
         if (v.LogsLocked)
         {
-            _p.Text(_p.Small, "The crew have taken the logs. Every entry is open and you can change none.", x, y, Painter.Accent);
-            y += 24;
+            _p.Text(_p.Small, "The crew have taken the logs. Every entry is open and you can change none.", x, top, Painter.Accent);
+            top += 24;
         }
         const int buttons = 3 * 84 + 2 * 4;
         var textWidth = width - buttons - 12;
-        foreach (var fact in v.FactList)
+        var columns = (int)(textWidth / _p.SmallWidth);
+        // Every entry in the log is listed in full: a long sentence wraps, and the list scrolls when the entries don't all fit.
+        var rows = v.FactList.Where(v.InLog).Select(fact =>
         {
-            if (!v.InLog(fact))
-                continue;
-            if (y + 36 > rect.Bottom - 8)
-                break;
+            var access = v.LogsLocked ? LogAccess.Open : fact.Access;
+            var lines = Painter.Wrap(Cap(fact.Say(fact.Truth)), columns);
+            var extra = access == LogAccess.Altered && fact.AlteredValue != null ? Painter.Wrap("now reads: " + fact.Say(fact.AlteredValue), columns)
+                : access == LogAccess.Restricted ? new List<string> { "hidden: shows as a gap" } : new List<string>();
+            var height = Math.Max(37, 18 * (lines.Count + extra.Count) + 6);
+            return (fact, access, lines, extra, height);
+        }).ToList();
+        var (first, count) = ListWindow(rows.Select(r => r.height).ToList(), _logFirst, top, rect.Bottom - 8, rect.Bottom - 38);
+        _logFirst = first;
+        var y = top;
+        foreach (var (fact, access, lines, extra, height) in rows.Skip(first).Take(count))
+        {
             var f = fact;
-            var rowRect = new Rectangle(rect.X + 4, y - 3, rect.Width - 8, 37);
+            var rowRect = new Rectangle(rect.X + 4, y - 3, rect.Width - 8, height);
             if (_p.Over(rowRect))
                 _p.Fill(rowRect, Painter.Track);
-            var sentence = Cap(fact.Say(fact.Truth));
-            _p.Text(_p.Small, Painter.Wrap(sentence, (int)(textWidth / _p.SmallWidth))[0], x, y + 1, Painter.Bright);
-            var access = v.LogsLocked ? LogAccess.Open : fact.Access;
-            if (access == LogAccess.Altered && fact.AlteredValue != null)
-                _p.Text(_p.Small, Painter.Wrap("now reads: " + fact.Say(fact.AlteredValue), (int)(textWidth / _p.SmallWidth))[0], x, y + 18, Painter.Accent);
-            else if (access == LogAccess.Restricted)
-                _p.Text(_p.Small, "hidden: shows as a gap", x, y + 18, Painter.Dim);
+            var ty = y + 1;
+            foreach (var line in lines)
+            {
+                _p.Text(_p.Small, line, x, ty, Painter.Bright);
+                ty += 18;
+            }
+            foreach (var line in extra)
+            {
+                _p.Text(_p.Small, line, x, ty, access == LogAccess.Altered ? Painter.Accent : Painter.Dim);
+                ty += 18;
+            }
 
             var bx = x + width - buttons;
             if (_p.Button(new Rectangle(bx, y, 84, 32), "OPEN", live, selected: access == LogAccess.Open, tip: "Anyone awake can read this entry."))
@@ -388,8 +470,9 @@ public sealed partial class ShipGame
                 if (next != null)
                     Act("log " + f.Key + " altered to " + next, () => v.SetLog(f.Key, LogAccess.Altered, next));
             }
-            y += 37;
+            y += height;
         }
+        ScrollCue(rect, first, count, rows.Count, "Entries", () => _logFirst = Math.Max(0, _logFirst - 3), () => _logFirst += 3);
     }
 
     /// <summary>
