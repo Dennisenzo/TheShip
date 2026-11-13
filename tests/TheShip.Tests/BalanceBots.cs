@@ -169,7 +169,10 @@ public sealed class BalanceBot
                 return;
             foreach (var c in asked)
             {
-                if (_kind == BotKind.Careless)
+                // Careless dodges a question: once in an alert (work is waiting on it), until the person has had to ask again in the aftermath.
+                // Then the honest answer
+                // (a dodge no longer answers anything, so a refuser would never work otherwise).
+                if (_kind == BotKind.Careless && (_v.Phase == Phase.Alert ? !c.Dodged.Contains(c.PendingQuestion!) : c.QuestionRepeats == 0))
                     _v.Say("Not now.", new Reading(LineKind.Dodge), new[] { c });
                 else
                     Tell(c, _v.GetFact(c.PendingQuestion!));

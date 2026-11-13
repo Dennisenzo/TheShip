@@ -70,7 +70,19 @@ public sealed class CrewMember
     public List<string> Memories { get; } = new();
 
     /// <summary>The fact they asked about and are waiting to hear.</summary>
-    public string? PendingQuestion { get; set; }
+    public string? PendingQuestion
+    {
+        get => _pendingQuestion;
+        set
+        {
+            if (value != _pendingQuestion)
+                QuestionRepeats = 0;
+            _pendingQuestion = value;
+        }
+    }
+    private string? _pendingQuestion;
+    /// <summary>How many times they asked the same pending question again (a new question, or none, resets it).</summary>
+    public int QuestionRepeats { get; set; }
     /// <summary>The fault they are working on.</summary>
     public string? WorkingOn { get; set; }
     public bool RefusesSleep { get; set; }

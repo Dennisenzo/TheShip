@@ -60,6 +60,12 @@ public static class Tuning
     public const double RequestIgnored = 4;
     public const double HurtByOrder = 10;
     public const double Dodge = 3;
+    /// <summary>A pending question still unanswered after an aftermath beat: they ask again and lose this much trust.</summary>
+    public const double QuestionIgnored = 2;
+    /// <summary>Going to sleep with a question still pending.</summary>
+    public const double QuestionIgnoredAtSleep = 4;
+    /// <summary>How often a person repeats a question before they give up and check it themselves.</summary>
+    public const int QuestionRepeatsMax = 2;
     public const double LogGap = 5;
     public const double LockedDoor = 5;
     public const double ConfirmedTruth = 3;

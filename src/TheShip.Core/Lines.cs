@@ -16,6 +16,7 @@ public static class Lines
             "wake_question" => Pick(rng,
                 anxious ? "My hands are shaking. " + detail : "I'm up. " + detail,
                 "Cold. Give me a minute. " + detail),
+            "ask_again" => Pick(rng, "You didn't answer me. " + detail, "I asked you. " + detail),
             "ask_danger" => Pick(rng, "Before I go in: " + detail, "One thing first. " + detail),
             "comply" => Pick(rng, "On it. " + Cap(detail) + ".", "All right. I'll take " + detail + "."),
             "refuse_answer" => Pick(rng,

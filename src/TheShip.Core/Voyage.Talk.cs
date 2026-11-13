@@ -100,10 +100,10 @@ public sealed partial class Voyage
                 {
                     if (l.PendingQuestion is not { } q)
                         continue;
-                    l.Trust -= Tuning.Dodge;
-                    l.Dodged.Add(q);
+                    // A dodge is not an answer: the question stays pending. Its trust cost is charged once per question.
+                    if (l.Dodged.Add(q))
+                        l.Trust -= Tuning.Dodge;
                     l.Doubts.Add(q);
-                    l.PendingQuestion = null;
                     Speak(l, "dodge", "The ship avoided your question (" + _facts[q].Question + "). You will look for the answer yourself.");
                 }
                 break;
@@ -185,6 +185,8 @@ public sealed partial class Voyage
         c.Beliefs.TryGetValue(key, out var old);
         var news = old is null || !f.Same(old.Value, value);
         var doubted = c.Doubts.Remove(key);
+        if (c.PendingQuestion == key)
+            c.PendingQuestion = null;
         c.Beliefs[key] = new Belief(value, source, Year);
         if (source is not ("evidence" or "witness"))
             return;

@@ -635,6 +635,8 @@ public sealed partial class Voyage
         }
         if (c.RequestMade && !c.RequestGranted)
             c.Trust -= Tuning.RequestIgnored;
+        if (c.PendingQuestion != null)
+            c.Trust -= Tuning.QuestionIgnoredAtSleep;
         c.Memories.Add($"Year {Math.Floor(Year):0}: woken for {Current.Title.ToLowerInvariant()}; went back to sleep with trust in the ship {CrewMember.BandText(c.Band)}.");
         c.State = CrewState.Asleep;
         c.WorkingOn = null;
