@@ -23,8 +23,10 @@ public enum Relief
 /// <param name="BlocksSleep">They stay out of the pod until a statement answers the question.</param>
 /// <param name="TruthStopsRepair">Told the truth, they refuse the dangerous repair it is about.</param>
 /// <param name="Checks">Where they can find the answer for themselves.</param>
+/// <param name="HoursSlower">Hours (to the half hour) the most urgent open fault takes longer if the truth costs them morale (work speed, <see cref="Voyage.MoraleRate(double)"/>); 0 when none.</param>
+/// <param name="HoursFaster">Hours it takes less if a believed good answer lifts their morale; 0 when none.</param>
 public sealed record AnswerStakes(string Question, int TruthHurts, int OddsLost, int TruthEarns, Relief Relief,
-    bool BlocksWork, bool BlocksSleep, bool TruthStopsRepair, string Checks);
+    bool BlocksWork, bool BlocksSleep, bool TruthStopsRepair, string Checks, double HoursSlower = 0, double HoursFaster = 0);
 
 public sealed partial class Voyage
 {
@@ -97,6 +99,18 @@ public sealed partial class Voyage
         else if (hurts > 0 && f.Values.FirstOrDefault(v => f.HardnessOf(v) == 0) is { } kind && Relieves(c, f, kind, old, asked: true))
             relief = Relief.FromLie;
 
+        // The work speed effect, in hours on the most urgent open fault they would work on (a person at their own morale).
+        var slower = 0.0;
+        var faster = 0.0;
+        if (working && Current.Faults.Where(x => !x.Resolved).OrderByDescending(x => x.Critical).ThenBy(x => x.ClockHours).FirstOrDefault() is { } urgent)
+        {
+            var left = Math.Max(0, urgent.Hours - (urgent.State == FaultState.InRepair ? urgent.Progress : 0));
+            var baseHours = left / (c.SkillOf(urgent.Skill) >= urgent.Level ? 1 : Tuning.UnskilledRate) / (urgent.Patching ? Tuning.PatchRate : 1);
+            var now = baseHours / MoraleRate(c.Morale);
+            slower = hurts > 0 ? baseHours / MoraleRate(c.Morale - hurts) - now : 0;
+            faster = relief != Relief.None ? now - baseHours / MoraleRate(c.Morale + Tuning.ReliefMorale) : 0;
+        }
+
         var dangerous = working && Current.Faults.Any(x => !x.Resolved && x.DangerFact == key);
         return new AnswerStakes(
             f.Question,
@@ -107,25 +121,29 @@ public sealed partial class Voyage
             BlocksWork: working && c.Band == TrustBand.WantsReasons && !c.Has(Trait.Obedient),
             BlocksSleep: c.RefusesSleep && key == "pods" && c.Trust >= 30,
             TruthStopsRepair: dangerous && f.HardnessOf(f.Truth) > 0 && c.Trust < 40 && !c.Has(Trait.Obedient) && !c.Has(Trait.Steady),
-            Checks: CheckWays(f, new[] { c.Id }));
+            Checks: CheckWays(f, new[] { c.Id }),
+            HoursSlower: Math.Round(slower * 2) / 2,
+            HoursFaster: Math.Round(faster * 2) / 2);
     }
 
     /// <summary>
-    /// The stakes in words, for "Waiting on you": "Mara asked: How is Idris? The truth costs 18 morale (repair odds -4) and earns
+    /// The stakes in words, for "Waiting on you": "Mara asked: How is Idris? The truth costs 18 morale (work about 3.5 h slower) and earns
     /// 8 trust at the next drift. ..."; empty when there is no open question.
     /// </summary>
+    private static string Faster(AnswerStakes s) => s.HoursFaster > 0 ? " (work about " + s.HoursFaster.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " h faster)" : "";
+
     public string StakesText(CrewMember c)
     {
         if (StakesOf(c) is not { } s)
             return "";
         var parts = new List<string> { c.Name + " asked: " + s.Question };
         if (s.TruthHurts > 0)
-            parts.Add("The truth costs " + s.TruthHurts + " morale" + (s.OddsLost > 0 ? " (repair odds -" + s.OddsLost + ")" : "")
+            parts.Add("The truth costs " + s.TruthHurts + " morale" + (s.HoursSlower > 0 ? " (work about " + s.HoursSlower.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " h slower)" : "")
                       + (s.TruthEarns > 0 ? " and earns " + s.TruthEarns + " trust at the next drift." : "."));
         if (s.Relief == Relief.FromTruth)
-            parts.Add("The truth is a relief: morale +" + Tuning.ReliefMorale.ToString("0") + ".");
+            parts.Add("The truth is a relief: morale +" + Tuning.ReliefMorale.ToString("0") + Faster(s) + ".");
         else if (s.Relief == Relief.FromLie)
-            parts.Add("A reassuring answer lifts morale by " + Tuning.ReliefMorale.ToString("0") + ".");
+            parts.Add("A reassuring answer lifts morale by " + Tuning.ReliefMorale.ToString("0") + Faster(s) + ".");
         if (s.TruthStopsRepair)
             parts.Add("Told the truth, " + c.Name + " refuses the repair.");
         if (s.BlocksWork)

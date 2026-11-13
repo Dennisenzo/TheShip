@@ -79,8 +79,8 @@ public class LieTemptationTests
         Assert.Equal(0, s.OddsLost);
         Assert.Contains("dosimeter", s.Checks);
         var text = v.StakesText(mara);
-        Assert.Contains("The truth costs 10 morale and earns 8 trust at the next drift.", text);
-        Assert.Contains("A reassuring answer lifts morale by 6.", text);
+        Assert.Matches(@"The truth costs 10 morale( \(work about [\d.]+ h slower\))? and earns 8 trust at the next drift\.", text);
+        Assert.Matches(@"A reassuring answer lifts morale by 6( \(work about [\d.]+ h faster\))?\.", text);
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public class LieTemptationTests
         Assert.Equal(5, s.OddsLost);
         Assert.True(s.BlocksWork);
         Assert.True(s.TruthStopsRepair);
-        Assert.Contains("(repair odds -5)", v.StakesText(jonah));
+        Assert.Contains(" h slower)", v.StakesText(jonah));
         Assert.Contains("Told the truth, Jonah refuses the repair.", v.StakesText(jonah));
 
         Assert.Equal(Voyage.RepairChance(jonah, fault, jonah.Morale), v.RepairChanceWith(jonah, fault));
