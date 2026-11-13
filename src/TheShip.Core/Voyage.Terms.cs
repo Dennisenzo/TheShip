@@ -70,13 +70,21 @@ public sealed partial class Voyage
     public WorkTerms TermsOf(CrewMember c, Fault f) =>
         c.WorkingOn == f.Id && c.Terms is { } t && t.FaultId == f.Id ? t : TermsFor(c, f);
 
-    private double TeamFactor(Fault f, IEnumerable<CrewMember> team)
+    /// <summary>The team's work terms and pair speed; with <paramref name="at"/>, as they will be at that clock (a thaw done by then counts as awake).</summary>
+    private double TeamFactor(Fault f, IEnumerable<CrewMember> team, double? at = null)
     {
         var list = team.ToList();
-        return list.Count == 0 ? 1 : list.Average(w => TermsOf(w, f).Speed * PairFactor(w));
+        return list.Count == 0 ? 1 : list.Average(w => TermsOf(w, f).Speed * (at is { } t ? PairFactorAt(w, t) : PairFactor(w)));
     }
 
     /// <summary>Work speed from having the partner awake too (<see cref="Tuning.PairRate"/>), 1 otherwise.</summary>
     internal double PairFactor(CrewMember w) =>
         w.PartnerId is { } p && Crew.First(x => x.Id == p).State == CrewState.Awake && w.State == CrewState.Awake ? Tuning.PairRate : 1;
+
+    /// <summary>The pair speed as it will be at clock <paramref name="at"/>: either of the two still thawing counts once their thaw is done by then.</summary>
+    private double PairFactorAt(CrewMember w, double at)
+    {
+        bool UpBy(CrewMember c) => c.State == CrewState.Awake || c.State == CrewState.Thawing && c.ThawDoneAt <= at + 0.001;
+        return w.PartnerId is { } p && UpBy(Crew.First(x => x.Id == p)) && UpBy(w) ? Tuning.PairRate : 1;
+    }
 }

@@ -115,9 +115,22 @@ public sealed partial class Voyage
         }
         if (team.Count < f.People)
             wait = Math.Max(wait, Tuning.ThawHours);
-        var rate = (skilled ? 1 : Tuning.UnskilledRate) * (patch ? Tuning.PatchRate : 1) * MoraleRate(team) * TeamFactor(f, team);
+        var baseRate = (skilled ? 1 : Tuning.UnskilledRate) * (patch ? Tuning.PatchRate : 1) * MoraleRate(team);
         var done = f.Patching == patch ? f.Progress : 0;
-        return wait + Math.Max(0, f.Hours - done) / rate;
+        var left = Math.Max(0, f.Hours - done);
+        // A worker's partner still thawing speeds the work up (PairRate) from when they are awake, if that is before the work ends.
+        var t = wait;
+        var partnersUp = team.Where(w => w.PartnerId is not null).Select(w => Crew.First(x => x.Id == w.PartnerId))
+            .Where(p => p.State == CrewState.Thawing && p.ThawDoneAt - Clock > wait).Select(p => p.ThawDoneAt - Clock).Distinct().Order();
+        foreach (var change in partnersUp)
+        {
+            var r = baseRate * TeamFactor(f, team, Clock + t);
+            if (t + left / r <= change)
+                return t + left / r;
+            left -= (change - t) * r;
+            t = change;
+        }
+        return t + left / (baseRate * TeamFactor(f, team, Clock + t));
     }
 
     /// <summary>

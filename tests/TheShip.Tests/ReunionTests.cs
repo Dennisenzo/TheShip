@@ -157,4 +157,44 @@ public class ReunionTests
         // Before: each re-thaw cleared ReunionPodCare (2) against the thaw's 1, so wear fell by one a cycle.
         Assert.Equal(wear + 1, v.PodWear);
     }
+
+    [Fact]
+    public void The_card_estimate_counts_a_thawing_partner_who_is_up_before_the_work_ends()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        VoyageTests.Say(v, mara, "Idris is alive and asleep.");
+        var fault = v.FindFault("")!;
+        v.AssignDeal(mara, fault, patch: false);
+        VoyageTests.Say(v, mara, "It is dangerous. You will take a radiation dose.");
+        v.AssignDeal(mara, fault, patch: false);
+        Assert.Equal(fault.Id, mara.WorkingOn);
+
+        var alone = v.EarliestDoneHours(fault);
+        var rate = (fault.Hours - fault.Progress) / alone;
+        Assert.True(alone > Tuning.ThawHours, $"alone {alone}");
+        var morale = mara.Morale;
+        v.Wake(v.Find("idris")!);
+        // Waking him lifts her (her want); keep her morale so only the pair speed moves the estimate.
+        mara.Morale = morale;
+        // Six hours at Mara's rate, the rest at the pair's.
+        var expected = Tuning.ThawHours + (fault.Hours - fault.Progress - Tuning.ThawHours * rate) / (rate * Tuning.PairRate);
+        Assert.Equal(expected, v.EarliestDoneHours(fault), 6);
+    }
+
+    [Fact]
+    public void The_card_estimate_counts_partners_thawing_together_as_a_pair()
+    {
+        var one = new Voyage(1);
+        one.Wake(one.Find("mara")!);
+        var alone = one.EarliestDoneHours(one.FindFault("")!);
+
+        var both = new Voyage(1);
+        both.Wake(both.Find("mara")!);
+        both.Wake(both.Find("idris")!);
+        var pair = both.EarliestDoneHours(both.FindFault("")!);
+        Assert.Equal((alone - Tuning.ThawHours) / Tuning.PairRate, pair - Tuning.ThawHours, 6);
+    }
 }
