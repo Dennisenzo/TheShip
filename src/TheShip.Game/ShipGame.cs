@@ -339,6 +339,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             _session?.Ending(ending);
             _session?.Snapshot(_voyage);
         }
+        StepTour();
         base.Update(gameTime);
     }
 
@@ -411,6 +412,14 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
 
     protected override void Draw(GameTime gameTime)
     {
+        DrawScene();
+        _click = false;
+        base.Draw(gameTime);
+    }
+
+    /// <summary>One frame of the current screen into whatever render target (or the back buffer) is set.</summary>
+    private void DrawScene()
+    {
         GraphicsDevice.Clear(Painter.Ground);
         var view = View();
         _p.Click = _click;
@@ -434,8 +443,6 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             DrawBridge(_voyage);
         }
         _batch.End();
-        _click = false;
-        base.Draw(gameTime);
     }
 
     /// <summary>The bar on top of every screen: where you are, the year, and the phase of the voyage.</summary>
