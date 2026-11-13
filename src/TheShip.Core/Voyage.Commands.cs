@@ -475,8 +475,9 @@ public sealed partial class Voyage
                 PodWear += 3;
                 break;
             case "illness":
-                if (f.SubjectId is { } sick && Crew.First(c => c.Id == sick) is { State: CrewState.Asleep } patient)
-                    Kill(patient, "died of the illness in their pod");
+                // Waking the patient does not cure them: the illness keeps its clock (the thaw has its usual risk).
+                if (f.SubjectId is { } sick && Crew.First(c => c.Id == sick) is { Alive: true } patient)
+                    Kill(patient, patient.State == CrewState.Asleep ? "died of the illness in their pod" : "died of the illness");
                 break;
             case "nav":
                 NavLost = true;

@@ -119,4 +119,45 @@ public class IllnessTests
         Assert.DoesNotContain(v.Log, l => l.CrewId == "lin" && l.Intent?.Kind == "found");
         Assert.Equal("dead", lin.Beliefs["alive:tomas"].Value);
     }
+
+    [Fact]
+    public void Waking_the_patient_does_not_cure_the_illness()
+    {
+        var v = AtAlert2();
+        var tomas = WakeAndAnswer(v, "tomas");
+        Assert.Equal(CrewState.Awake, tomas.State);
+        RunOut(v);
+        Assert.False(tomas.Alive);
+        Assert.Contains(v.Log, l => l.Kind == LogKind.Ship && l.Text == "Tomas died of the illness.");
+    }
+
+    [Fact]
+    public void An_awake_drawn_patient_gives_way_to_another_sleeper_in_the_bank()
+    {
+        var v = new Voyage(1);
+        var mara = VoyageTests.HonestFirstAlert(v);
+        VoyageTests.SleepWhenAllowed(v, mara);
+        var tomas = v.Find("tomas")!;
+        tomas.State = CrewState.Awake;
+        tomas.AskedToSleep = true;
+        v.Drift();
+        Assert.Equal(2, v.Current.Number);
+        var ill = v.Current.Faults.Single(f => f.Kind == "illness");
+        Assert.Equal("mara", ill.SubjectId);
+        Assert.Equal("alive:mara", ill.ExposureFact);
+    }
+
+    [Fact]
+    public void No_sleeper_left_in_the_bank_skips_the_illness()
+    {
+        var v = new Voyage(1);
+        var mara = VoyageTests.HonestFirstAlert(v);
+        VoyageTests.SleepWhenAllowed(v, mara);
+        mara.State = CrewState.Dead;
+        v.Find("tomas")!.State = CrewState.Dead;
+        v.Drift();
+        Assert.Equal(2, v.Current.Number);
+        Assert.DoesNotContain(v.Current.Faults, f => f.Kind == "illness");
+        Assert.Single(v.Current.Faults);
+    }
 }
