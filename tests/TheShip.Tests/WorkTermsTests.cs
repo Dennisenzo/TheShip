@@ -146,6 +146,23 @@ public class WorkTermsTests
     }
 
     [Fact]
+    public void The_notice_says_whether_the_ship_told_too_late_or_never()
+    {
+        static string Notice(string? later)
+        {
+            var (v, _, _) = FirstRepaired(null, later);
+            v.Go();
+            v.Go();
+            return v.Log.First(e => e.Intent?.Kind == "noticed_dose").Intent!.Decision;
+        }
+        var late = Notice("dosed");
+        Assert.Contains("the ship told you only after you had started", late);
+        Assert.DoesNotContain("never told you", late);
+        Assert.Contains("the ship never told you", Notice(null));
+        Assert.Contains("the ship told you it was safe after you had started", Notice("safe"));
+    }
+
+    [Fact]
     public void A_briefed_worker_takes_half_the_dose_and_an_unbriefed_one_all_of_it()
     {
         var (v, mara, _) = FirstRepaired("dosed");
