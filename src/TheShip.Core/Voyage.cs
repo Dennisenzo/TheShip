@@ -73,6 +73,13 @@ public sealed partial class Voyage
 
     public Fact GetFact(string key) => _facts[key];
     public bool HasFact(string key) => _facts.ContainsKey(key);
+
+    /// <summary>
+    /// The "Waiting on you" line for a doubt. A doubt about something the ship has no record of yet (an alert still to come, the
+    /// cause of a fault that has not appeared) is checked only once it shows up (<see cref="InLog"/>), so the line says it waits.
+    /// </summary>
+    public string DoubtText(CrewMember c, string key) =>
+        c.Name + " doubts you on " + _facts[key].Label + (InLog(_facts[key]) ? " and will check." : " and will check once it comes up.");
     public Section? GetSection(string id) => Sections.FirstOrDefault(s => s.Id == id);
 
     /// <summary>Where a person is on the plan: their pod bank, the section of the fault they work on, or the corridor.</summary>

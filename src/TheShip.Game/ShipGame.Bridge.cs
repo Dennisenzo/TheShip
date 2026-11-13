@@ -845,7 +845,7 @@ public sealed partial class ShipGame
                 yield return (c, v.LedgerLine(e));
             foreach (var doubt in c.Doubts)
                 if (v.HasFact(doubt))
-                    yield return (c, c.Name + " doubts you on " + v.GetFact(doubt).Label + " and will check.");
+                    yield return (c, v.DoubtText(c, doubt));
             if (v.PodRefusalText(c) is { } refusal)
                 yield return (c, refusal);
         }
