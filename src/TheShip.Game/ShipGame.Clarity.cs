@@ -17,6 +17,10 @@ public sealed partial class ShipGame
     {
         if (v.Phase == Phase.Ended)
             return "The voyage is over.";
+        var accused = v.Awake.FirstOrDefault(c => v.OpenAccusation(c) != null);
+        if (accused != null)
+            return accused.Name + " caught a lie. Answer " + (accused.Pronoun == "she" ? "her" : accused.Pronoun == "he" ? "him" : "them")
+                   + ": admit it, or " + (accused.Pronoun == "she" ? "she" : accused.Pronoun == "he" ? "he" : "they") + " will check everything.";
         var asker = v.Awake.FirstOrDefault(c => c.PendingQuestion != null && v.HasFact(c.PendingQuestion));
         if (asker != null)
             return asker.Name + " is waiting for an answer.";

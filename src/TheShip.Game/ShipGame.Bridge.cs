@@ -790,8 +790,18 @@ public sealed partial class ShipGame
             }
             if (terms is { } t && who == _target && item == t.Short)
                 _p.Tip(row, t.Full);
+            else if (who != null && v.AccusationText(who) is { } accusation && item == AccusationShort(v, who))
+                _p.Tip(row, accusation);
             wy = _p.Paragraph(item, x + 12, wy, width - 24, Painter.Ink) + 4;
         }
+    }
+
+    /// <summary>The accusation item in two or three rows; <see cref="Voyage.AccusationText"/> is its tooltip.</summary>
+    private static string AccusationShort(Voyage v, CrewMember c)
+    {
+        var a = v.OpenAccusation(c)!;
+        var label = v.HasFact(a.FactKey) ? v.GetFact(a.FactKey).Label : "something you said";
+        return c.Name + " caught you lying about " + label + " (" + a.How + "). Tell them what is true (" + a.BeatsLeft * 2 + " weeks).";
     }
 
     /// <summary>Questions nobody has answered, conditions, things people asked for, doubts, and promises still open; each with the person it is about, if one.</summary>
@@ -821,6 +831,9 @@ public sealed partial class ShipGame
                 ? " Select " + string.Join(" or ", others) + " to see " + (others.Count == 1 ? "theirs." : "each of theirs.")
                 : ""));
         }
+        // A lie they caught: short form here (two rows), the full text is the tooltip. Selected person first.
+        foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).Where(a => v.OpenAccusation(a) != null))
+            yield return (c, AccusationShort(v, c));
         if (v.Lockouts.BayWarned.Count > 0)
             yield return (null, string.Join(" and ", v.Lockouts.BayWarned.Select(id => v.Crew.First(c => c.Id == id).Name))
                          + " will take the cold-sleep bay at the next step. Win one of them back above 15 trust, or they do.");

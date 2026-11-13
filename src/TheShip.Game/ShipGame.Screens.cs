@@ -255,6 +255,24 @@ public sealed partial class ShipGame
         _p.Text(_p.Small, tag, x + 8, y + 2, hot ? Painter.Accent : Painter.Dim);
     }
 
+    /// <summary>"Found out in year 31 (read the log entry)." plus what became of the accusation: still open, admitted, ignored or denied.</summary>
+    private static string FoundOutNote(Voyage v, Statement s, CrewMember listener, double year)
+    {
+        var note = "Found out in year " + N(Math.Floor(year))
+                   + (s.FoundOutHow.TryGetValue(listener.Id, out var how) && how.Length > 0 ? " (" + how + ")" : "") + ".";
+        if (v.OpenAccusation(listener) is { } open && open.StatementId == s.Id)
+            return note + " " + listener.Name + " is waiting for you to answer.";
+        return s.Accused.TryGetValue(listener.Id, out var outcome) ? note + " You " + AccusedWord(outcome) + "." : note;
+    }
+
+    private static string AccusedWord(string outcome) => outcome switch
+    {
+        "admitted" => "admitted it",
+        "ignored" => "did not answer",
+        "denied" => "denied it",
+        _ => outcome,
+    };
+
     /// <summary>Where a statement stands: its label, whether it needs attention, and a note. For one listener, or for everyone when null.</summary>
     private static (string Tag, bool Hot, string Note) Standing(Voyage v, Statement s, CrewMember? listener)
     {
@@ -265,7 +283,7 @@ public sealed partial class ShipGame
                 return ("TRUE", false, "");
             case StatementKind.False:
                 if (listener != null && s.FoundOutBy.TryGetValue(listener.Id, out var year))
-                    return ("LIE", true, "Found out in year " + N(Math.Floor(year)) + ".");
+                    return ("LIE", true, FoundOutNote(v, s, listener, year));
                 if (listener is null && s.FoundOutBy.Count > 0)
                     return ("LIE", true, "Found out by " + Names(s.FoundOutBy.Keys) + ".");
                 return ("LIE", true, "Not found out. Could be: " + v.Exposure(s) + ".");
