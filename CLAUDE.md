@@ -186,6 +186,7 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-13: work terms, step 3 (feature/work-terms-ui): the terms are shown before the player commits. `Voyage.TermsText(c, f)` (`Voyage.TermsText.cs`; belief and fault only, numbers from Tuning, no truth wording) in the Repair/Patch tooltip, as a "Waiting on you" item for the selected idle person whose likely job has a risk or cause (`Voyage.TermsItem`, after the stakes, bargain and bay items, dropped if it does not fit), and "Cause: ..." on the issue cards (`Voyage.CauseKnown`, only once the alert has started). Tests: `TermsTextTests`.
 
 - 2026-11-13: ambient music and the alert alarm (feature/space-music). `Music.cs` is plain DSP (no MonoGame, also compiled into the test project): `MusicEngine` renders an endless woozy drone (four notes, each two oscillators detuned a few cents, slow pitch and filter LFOs), hull hiss, sparse pentatonic bells and a reverb + ping-pong echo, soft-clipped, with no allocation while rendering. `MusicPlayer.cs` streams it through a `DynamicSoundEffectInstance` from its own thread; no audio device means silence. `ShipGame.Music.cs` maps state to mood (read-only): Aftermath = calm, Alert = tense (`MusicTension.Of`: critical faults, more open faults and little clock time raise it), a drift = deep and dark, the ending = Landfall (warm) or bleak; moods crossfade over `MusicParams.MoodFadeSeconds`. The old alert chime in `Sounds.cs` is replaced by a three-whoop alarm in the engine, once per alert (when the drift report's CONTINUE brings the alert in, and when the first briefing is closed); it ducks the music and the music then settles into the alert mood. A MUSIC ON/OFF button on the plan panel header (the alarm still sounds with the music off). Silent under `--tour`. The sound numbers are in `MusicParams` (Music.cs), not Tuning.cs: sound, not game tuning. `--render-music <dir>` writes a WAV of each mood, the alarm and a 100 s journey. Tests: `MusicTests`.
+- 2026-11-13: balance back to one in two (feature/balance-50, the user's decision). The partner reunion had lifted Honest to 63.7% (600 seeds); `Tuning.SleepDeathPerWearYear` 0.0001 -> 0.00025 brings it to 50.0% (2400 seeds: 50.5%) with the reunion values untouched and thaws unchanged (13.16). Landfall % at 600 seeds, before -> after: Honest 63.7 -> 50.0, Breaker 64.7 -> 48.7 (strict 64.7 -> 46.2), Thrifty 60.2 -> 48.5, Corrector 55.8 -> 43.7, Careless 34.8 -> 20.5, Silent 31.8 -> 19.2, Liar 14.0 -> 9.5. `WorkingAge` stays 65. Sweep of the other levers in DESIGN.md "Balance". The strict Breaker (`SHIP_BREAKER_STRICT=1`) does change behaviour (thaws 12.1 vs 13.2); its 64.7% equal to the default in the last runs was a coincidence of the count (388 of 600 both).
 - 2026-11-13: `--tour <dir>` dev tool: unattended screenshot tour (render-target PNGs of the bridge, dossier, record and ending). No in-game control.
 - 2026-11-13: a found-out lie says how (feature/lie-comes-due, step 1): `Statement.FoundOutHow` (crew id to a past-tense phrase: "read the log entry", "read a console", "walked to the pod bay", "ran a scan in the medical bay", "saw it when the work finished", "was told by Lin what Lin saw", "watched Name die", "already knew better" for a lie caught at once); `Learn(..., how:)` carries it from every call site, the `caught` line's decision text says "(you read the log entry)", the ending record says "Found out by Mara in year 31 (read the log entry)". Hypothesis verified by test: a lie corrected by telling the truth before it is found out is still charged in full (`LieTrust`) at the later finding-out (`AccusationTests`); self-correction came in step 3 (below), which flipped that test. Tests: `AccusationTests`.
 - 2026-11-13: the accusation agenda (feature/lie-comes-due, step 2). A keyed lie found out late (not at once, not the engineer's log lockout, not a free-text one) opens `CrewMember.Accusations` (oldest open, the rest queued; `Voyage.Accusations.cs`). Admit = the true value of that fact said to them: `AccusationAdmitTrust` 6 back, once per person and fact, `accusation_admitted`. Deny = a false statement on that fact while open is caught at once whatever the year (fixes the "fresh within a year" quirk for this case), closes as denied. Dodge = `Dodge` once, stays open. Ignore = after `AccusationBeats` 2 beats, at sleep, or at a drift they stay up through: `accusation_closed`, `AccusationIgnoredTrust` 4, doubts on every fact they hold from the ship (the doubt check audits one per beat); death closes silently. `Voyage.AccusationText(c)` for the UI, session-log `state` line `accused: <name> <fact> beats <n>`, `Statement.Accused` (admitted/ignored/denied) in the ending record. No new rng draws, so Honest, Careless, Silent, Thrifty and Breaker reports are byte-identical at 600 seeds (checked against main; only the new report row differs). Liar bot (`BalanceBot.LiarAdmits`, env `SHIP_LIAR_IGNORES=1` for the other policy), 600 seeds, before -> after (Landfall / Adrift / survivors / end trust): admits when accused 4.2% / 66.8% / 1.18 / 17.5 -> 10.7% / 66.5% / 1.58 / 25.0 (6.79 accusations per run, all admitted); ignores 4.2% / 66.8% / 1.18 / 17.5 -> 2.0% / 81.7% / 1.08 / 14.2 (6.85 opened, 6.39 ignored per run). Honest 43.2% beats Careless 27.3, Silent 25.2 and Liar by well over 10 points. The Bridge Waiting item and dossier note (step 2b) and self-correction (step 3) follow below. Tests: `AccusationAgendaTests`.
@@ -230,20 +231,19 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 
 - 2026-11-13: the `--tour` dev tool answers every pending question truthfully (`AnswerQuestions`), including the danger question a person asks when first asked to repair, and then asks again, so work now starts in alert 1 (seed 3 run: Mara asks "Is it safe in there?", is told, sets her bargain, the tour gives its word, the patch starts; before, repairs never began). The tour still ends Adrift on seed 3 because its plan does not put two people on the navigation drift in alert 3 (a tour-plan limit, not changed).
 
-### Balance table (600 seeds, Short haul, feature/user-decisions, 2026-11-13)
+### Balance table (600 seeds, Short haul, feature/balance-50, 2026-11-13)
 
-`WorkingAge` 65, broken promises open an accusation, a cause lie is caught only by a skilled worker. The 600-seed figures swing by a few points between rule changes that draw no
-new random numbers (DESIGN.md, "Balance"); a 2400-seed run of the last step moved Honest 47.8 -> 46.3 and Corrector 44.1 -> 46.8. Copied from DESIGN.md:
+`WorkingAge` 65, partner reunion in, `SleepDeathPerWearYear` 0.00025 (was 0.0001). A 2400-seed run: Honest 50.5%, Breaker 48.2% (strict 46.2%), Thrifty 44.0%, Corrector 44.4%, Careless 18.4%, Silent 18.7%, Liar 10.4%. 600-seed figures (DESIGN.md, "Balance"):
 
-| Bot | Landfall | Survivors | Adrift |
-| --- | --- | --- | --- |
-| Honest | 43.3% | 3.35 | 20.7% |
-| Breaker | 44.2% | 3.47 | 20.2% |
-| Thrifty | 43.0% | 3.45 | 21.2% |
-| Corrector | 49.0% | 3.49 | 18.7% |
-| Careless | 34.8% | 3.22 | 15.3% |
-| Silent | 31.8% | 3.17 | 21.0% |
-| Liar | 9.7% | 1.60 | 67.5% |
+| Bot | Landfall | Survivors | Adrift | Thaws |
+| --- | --- | --- | --- | --- |
+| Honest | 50.0% | 3.66 | 18.8% | 13.16 |
+| Breaker (strict 46.2%) | 48.7% | 3.64 | 17.8% | 13.15 |
+| Thrifty | 48.5% | 3.67 | 15.7% | 10.03 |
+| Corrector | 43.7% | 3.42 | 19.3% | 13.11 |
+| Careless | 20.5% | 2.83 | 18.0% | 12.15 |
+| Silent | 19.2% | 2.79 | 23.5% | 12.14 |
+| Liar | 9.5% | 1.69 | 66.2% | 12.16 |
 
 The balance test (`ShortHaulHonestLandfallRate`) holds Honest in 35-65% at 200 seeds; `SHIP_SEEDS=600 dotnet test --filter Category=Balance` for the 600-seed run.
 The scripted pod death (1.0 per run) is in every run.
