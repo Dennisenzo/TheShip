@@ -55,4 +55,35 @@ public class DoubtSettleTests
             v.Go();
         Assert.DoesNotContain("date", mara.Doubts);
     }
+
+    /// <summary>An accused engineer reading a rewrite on the fact they caught the ship on still rolls to spot it; unspotted, the entry counts as read.</summary>
+    [Fact]
+    public void An_accused_engineer_can_still_spot_a_rewrite_and_otherwise_has_read_it()
+    {
+        var spotted = 0;
+        var unspotted = 0;
+        for (var seed = 1; seed <= 40; seed++)
+        {
+            var v = new Voyage(seed);
+            var mara = VoyageTests.HonestFirstAlert(v);
+            v.ReleaseOwed(mara);
+            mara.Trust = 70;
+            var date = v.GetFact("date");
+            SayValue(v, mara, "date", WrongDate(v));
+            v.ReadLog(mara, date);
+            Assert.NotNull(v.OpenAccusation(mara));
+            v.SetLog("date", LogAccess.Altered, WrongDate(v));
+            Assert.True(v.Unread(mara, date));
+            v.ReadLog(mara, date);
+            Assert.True(date.Same(mara.Beliefs["date"].Value, date.Truth));
+            if (v.LogsLocked)
+                spotted++;
+            else
+            {
+                unspotted++;
+                Assert.False(v.Unread(mara, date));
+            }
+        }
+        Assert.True(spotted > 0 && unspotted > 0, $"spotted {spotted}, unspotted {unspotted}");
+    }
 }

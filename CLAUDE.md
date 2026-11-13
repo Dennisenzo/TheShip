@@ -223,6 +223,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 
 - 2026-11-13: a doubt on something the person saw themselves is settled (feature/partner-reunion, Low finding). `Hear` adds no doubt when the person keeps what they saw (`keepSeen`), and `ReadLog` drops the doubt (and its audit flag) when the reader already holds the truth firsthand, so Waiting no longer shows it forever and the person stops browsing the log. The Careless bot's `pods` doubt in 200 of 200 runs is not this: it is the pod refuser of alert 5 (the bot dodges the pod question), who starves with the question pending and the dodge's doubt; correct, left as is. 600 seeds, Landfall: Honest 64.0 -> 63.7, Thrifty 60.0 -> 60.2, Corrector 56.2 -> 55.8, Liar 14.8 -> 14.0, others unchanged. Tests: `DoubtSettleTests`.
 
+- 2026-11-13: an accused reader can still spot a rewrite (feature/partner-reunion, Low finding). `ReadLog` returned early for someone who caught the ship lying on a fact and holds the truth firsthand, before the engineer's spot roll: an accused engineer could not trigger the lockout and the entry stayed Unread. Now the roll runs first for them (the lockout path if it hits; the draw order for everyone else is unchanged), and an unspotted rewrite is recorded in `CrewMember.ReadRewrites` (fact = shown value), so `Unread` is false while their belief stays. 600 seeds: unchanged (Honest 64.0, Liar 14.0, Corrector 55.8; no bot has an accused engineer reading a rewrite). Test: `DoubtSettleTests`.
+
 ### Balance table (600 seeds, Short haul, feature/user-decisions, 2026-11-13)
 
 `WorkingAge` 65, broken promises open an accusation, a cause lie is caught only by a skilled worker. The 600-seed figures swing by a few points between rule changes that draw no
