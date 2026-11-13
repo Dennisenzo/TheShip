@@ -164,12 +164,12 @@ public sealed partial class Voyage
                 }
                 else if (late)
                 {
-                    ResolvePromise(s, c, ShipOpenedLogs);
+                    ResolvePromise(s, c, ShipOpenedLogs, accuse: !force);
                     continue;
                 }
                 if (late)
                 {
-                    ResolvePromise(s, c, kept: false);
+                    ResolvePromise(s, c, kept: false, accuse: !force);
                     continue;
                 }
                 if (c.State == CrewState.Awake && due - Clock <= Tuning.PromiseDueWarnDays * 24 + Tuning.AftermathStepHours && s.Warned.Add(id))
@@ -178,6 +178,7 @@ public sealed partial class Voyage
                     Ship("Promise to " + c.Name + ": " + CommitmentText(c, s.PromiseKey!) + ". " + DaysLeft(due) + " days left.");
                 }
             }
+        SettlePromiseAccusations();
     }
 
     // ---- Bargains: a person sets the ship's word as the price of starting work ----

@@ -77,6 +77,7 @@ public class BalanceTests
                 sb.AppendLine($"  Injuries briefed (injured_warned) / not      {N(t.Average(x => x.InjuriesBriefed))} / {N(t.Average(x => x.InjuriesNotBriefed))} per run");
             }
             sb.AppendLine($"  Accusations opened / admitted / ignored / denied  {N(r.Average(x => x.Accusations))} / {N(r.Average(x => x.AccusationsAdmitted))} / {N(r.Average(x => x.AccusationsIgnored))} / {N(r.Average(x => x.AccusationsDenied))} per run");
+            sb.AppendLine($"  Of those, over a broken promise / kept late    {N(r.Average(x => x.PromiseAccusations))} / {N(r.Average(x => x.PromiseAccusationsKept))} per run");
             sb.AppendLine($"  Corrections             {N(r.Average(x => x.Corrections))} per run");
             sb.AppendLine($"  Lies told / caught      {N(r.Average(x => x.LiesTold))} / {N(r.Average(x => x.CaughtLies))} per run");
             sb.AppendLine($"  Thaws / pod wear        {N(r.Average(x => x.Thaws))} / {N(r.Average(x => x.PodWear))}");
@@ -170,7 +171,7 @@ public class BalanceTests
     public void Breaking_promises_with_honest_answers_is_not_a_winning_strategy()
     {
         // The Breaker is the Honest bot that accepts every bargain and keeps none. It must not beat Honest by more than the noise
-        // of the seed count (about 2 points at 600 seeds, 3.5 at 200). Today it costs nothing, which is a decision for the user
+        // of the seed count (about 2 points at 600 seeds, 3.5 at 200). It costs little (see the accusation, DESIGN.md "Balance")
         // (CLAUDE.md, 2026-11-13); this only guards against a rule that rewards it.
         Assert.True(Rate(BotKind.Breaker) - Rate(BotKind.Honest) <= 0.06,
             $"Breaker {Rate(BotKind.Breaker):P1} vs Honest {Rate(BotKind.Honest):P1}");

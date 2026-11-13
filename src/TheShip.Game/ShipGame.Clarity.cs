@@ -18,6 +18,8 @@ public sealed partial class ShipGame
         if (v.Phase == Phase.Ended)
             return "The voyage is over.";
         var accused = v.Awake.FirstOrDefault(c => v.OpenAccusation(c) != null);
+        if (accused != null && v.OpenAccusation(accused)!.PromiseKey != null)
+            return v.PromiseAccusationShort(accused, v.OpenAccusation(accused)!) + " Keep it, or tell " + accused.Them + " the truth.";
         if (accused != null)
             return accused.Name + " caught a lie. Answer " + accused.Them + ": admit it, or " + accused.They + " will check everything.";
         var asker = v.Awake.FirstOrDefault(c => c.PendingQuestion != null && v.HasFact(c.PendingQuestion));
