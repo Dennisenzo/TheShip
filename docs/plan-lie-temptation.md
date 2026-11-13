@@ -1,6 +1,6 @@
 # Plan: make the lie tempting and the truth legible
 
-Branch `feature/lie-temptation`. Not merged; written in a cloud session with no .NET SDK, so nothing here has been compiled or run.
+Branch `feature/lie-temptation`. Written in a cloud session with no .NET SDK; built, tested and validated on 2026-11-13 (see "Status").
 
 ## Why
 
@@ -38,15 +38,24 @@ All five steps are done on the branch, one commit each. Found while doing step 1
 chance's 0.97 cap for a skilled lead (Mara, Engineering 3, on the level 2 coolant leak loses no odds at all), so the stakes text names
 repair odds only where they really drop.
 
+Built and validated on 2026-11-13: 0 warnings, the suite passes, and the balance report is unchanged (relief only moves morale, and
+morale only moves the repair chance, which is capped at 0.97). Fixes after validation, one commit each:
+
+- The drift no longer names the hard-truth credit (step 3 withdrawn): the trust arrives silently.
+- Relief needs the earlier belief to be absent or hard: switching between two good answers ("no word" and "good news" from Earth) gave
+  +6 morale each time.
+- A hard truth earns trust once per person and fact (`CrewMember.HardTruthsCredited`) until the truth changes: a lie and the truth told in
+  turn stacked 8, 16, 24 pending trust.
+- The facts are synced where pod wear changes (a thaw's end, a lost pod or controller), not only at the end of a clock move.
+- The Repair button reads "REPAIR: NO PARTS" (no odds) when no spare parts are left.
+
 ## Left out on purpose
 
 - No new penalty on the truth (a "shaken" delay was considered): alert clocks have 1 to 6 hours of slack, and it could not be measured here.
 - No change to `LieTrust`, `HardTruthTrust` or the doubt score.
 - Nothing shown says whether a statement was true; the stakes are about the question, before the line is said.
 
-## To do on a machine with the SDK
+## Still open
 
-1. `dotnet build TheShip.slnx`, then `dotnet test`.
-2. `dotnet test --filter Category=Balance`: relief raises morale a little for every bot, so the table moves. Check Honest stays in 35 to 65% and
-   still beats Liar by 10 points; if not, lower `ReliefMorale`.
-3. Look at the bridge with two and three people asking: the stakes text must fit the "Waiting on you" box.
+- Relief has no effect on any bot outcome yet (see above); a later step gives it a real one.
+- Look at the bridge with two and three people asking in play: by measurement the stakes text is at most 6 of the 8 lines that fit.
