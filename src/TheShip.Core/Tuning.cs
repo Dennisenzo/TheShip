@@ -16,7 +16,7 @@ public static class Tuning
     public const int ThawAgeMax = 5;
     /// <summary>One year of ageing per ten years asleep.</summary>
     public const double SleepAgeing = 0.1;
-    public const double WorkingAge = 64;
+    public const double WorkingAge = 65;
 
     public const double StartStores = 1500;     // person-days
     public const int StartParts = 2;

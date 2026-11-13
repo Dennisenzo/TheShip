@@ -411,7 +411,7 @@ Arrival is graded on four things: who is alive and how old they are, what they b
 
 | Ending | Condition |
 | --- | --- |
-| Landfall | At least 12 alive, enough of working age, and you still have a voice (Short haul with 6 crew: at least 4 alive and 3 under age 64) |
+| Landfall | At least 12 alive, enough of working age, and you still have a voice (Short haul with 6 crew: at least 4 alive and 3 under age 65) |
 | Landfall without you | They arrive after muting you or taking the bay. Short haul: the Landfall condition is met while the crew hold the cold-sleep bay at arrival (they land, and decide what to do with you) |
 | The quiet ship | The ship arrives with nobody able to land it |
 | Turned back | The Return faction took the helm |
@@ -555,7 +555,9 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 | How often should an honest run reach Landfall? | One run in two |
 | How much of the years between alerts does the player see? | A short report, limited to working sensors |
 | Should altering a log be allowed? | Yes; it counts as a lie and an engineer can detect it |
-| When does Short haul reach Landfall? | At least 4 of 6 alive and 3 under age 64 (user chose 50 on 2026-11-12, an estimate from about 6 thaws a run; the code had 65; set to 64 on 2026-11-13 because the honest bot thaws 13.2 times a run and 3 to 5 years a thaw makes "under 50" nearly unreachable (Honest 0%, Thrifty 8.5%); 63 gives Honest 38.5%; review) |
+| When does Short haul reach Landfall? | At least 4 of 6 alive and 3 under age 65 (decided by the user, 2026-11-13; his earlier 50 of 2026-11-12 was an estimate from about 6 thaws a run, and the honest bot thaws 13 times a run at 3 to 5 years each, so under 50 is unreachable; 64 at B1; 65 is the highest value at which Honest still beats Careless and Silent by 10 points) |
+| Should work speed follow morale less steeply? | No; leave as it is (decided by the user, 2026-11-13) |
+| Is `LieTrust` 22 right? | Yes; it stays 22 (decided by the user, 2026-11-13) |
 | How many spare parts does Short haul start with? | 2; a failed repair spends a part too (2026-11-12) |
 | How was Short haul balanced? | See "Balance" below |
 | What does a navigation fault still patched at arrival cost? | Arrival slips by years; Adrift only when a navigation fault's clock runs out unrepaired, including a returned patch (2026-11-13) |
@@ -612,9 +614,18 @@ Decided by the main session while the user was away, 2026-11-13 (the lie comes d
 Measured with the harness (`dotnet test --filter Category=Balance`, 200 seeds, five bots). Fixed by the user and the pillars: 3 to 5 years of ageing a thaw,
 2 starting parts, a failed repair spends a part, Landfall = at least 4 alive and 3 of working age. The one bent parameter is the working age:
 
-- **Working age 64 (user's design value 50; the code had 65).** The honest bot thaws 13.2 times a run (Thrifty 9.8) at 3 to 5 years each, so under 50 is nearly
-  unreachable (Landfall at 50: Honest 0%, Careless 0%, Silent 0.5%, Liar 1%, Thrifty 8.5%). Landfall for the honest bot by working age: 50 = 0%, 60 = 20.5%, 63 = 38.5%,
-  64 = 48.5%, 65 = 53.5%, 66 = 59.5%. 64 is the lowest value in the 45-55% band. The full table by bot is in CLAUDE.md, "Decisions for the user to review". (Measured at B1. Since morale sets the work speed, the honest bot at 64 lands in 43.5% of runs: CLAUDE.md, "Balance table".)
+- **Working age 65 (decided by the user, 2026-11-13; B1 had 64).** The honest bot thaws about 13 times a run (Thrifty 10) at 3 to 5 years each, so under 50 is
+  unreachable (at B1, Landfall at 50: Honest 0%, Thrifty 8.5%). Landfall by working age, re-measured on 2026-11-13 (600 seeds, after the morale-speed, cause-fact and accusation steps; the B1 table was stale):
+
+  | WorkingAge | Honest | Thrifty | Careless | Silent | Liar | Breaker | Corrector |
+  | --- | --- | --- | --- | --- | --- | --- | --- |
+  | 63 | 36.7% | 33.5% | 22.8% | 18.7% | 11.5% | 32.0% | 34.5% |
+  | 64 | 43.2% | 38.5% | 27.3% | 25.2% | 11.7% | 39.8% | 40.2% |
+  | 65 (chosen) | 46.7% | 42.8% | 34.8% | 31.7% | 12.0% | 44.5% | 43.0% |
+  | 66 | 49.2% | 45.8% | 40.7% | 36.5% | 12.2% | 45.7% | 46.3% |
+
+  The honest rate moves 3 to 6 points a year here. At 66 Honest leads Careless by 8.5 points, below the 10 the balance test asks, so 65 is the top; it puts Honest
+  in the 45-55% band again.
 - **Power-low sleeper death 10% to 5%, patch-failure sleeper death 15% to 10%, thaw risk per pod wear 0.012 to 0.008.** Fewer sleepers lost to the
   chain of faults: the 4-alive condition is the other wall (3.6 survivors before).
 - **A lost or still-patched failed pod adds 6 pod wear (was 3), a pod controller 8 (was 4).** Measured: most of these faults end patched and give way at the last drift, so this
