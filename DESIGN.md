@@ -545,7 +545,7 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 - [ ] How often does a small model misread a lie as plain talk? Count, from the session log (`said`, `read` and the `recorded` lines), the readings that turned out wrong in each prototype playthrough, including unusable ones; a first target is under one in ten.
 - [ ] Are paper notes fun, or only frustrating? The prototype has no notes, so this waits for the first build that has them.
 - [ ] Do 8 to 10 alerts fill 60 to 90 minutes? The first prototype run (5 alerts, one fault each) took 8 minutes against Short haul's 30.
-- [ ] What should low trust do before the ending (recruiting, the logs, an ending gate, a voice lockout)? Decided once the balance harness has measured the other balance changes.
+- [ ] Do players ever reach the cold-sleep bay takeover, and does it feel earned? It needs two Against people awake together in an aftermath beat; the balance bots trigger it in 1 of their 1000 runs (one Liar run in 200, never the other four bots). If players never see it, low trust needs a consequence that comes earlier (recruiting, an ending gate, a voice lockout).
 - [ ] Does the clock cost of talking make players too terse? Watch whether briefings shrink to one line once an exchange costs 5 minutes.
 - [ ] Is a hidden test fair? Ask players whether a caught test felt earned or like a trap.
 
