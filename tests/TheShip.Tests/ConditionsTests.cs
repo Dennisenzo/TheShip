@@ -119,4 +119,43 @@ public class ConditionsTests
         Assert.Contains("Ask Mara to sleep", line);
         Assert.Contains("SLEEP", line);
     }
+
+    /// <summary>An obedient person short of trusting, woken for the coolant leak, asked to repair: Asha at trust 45.</summary>
+    private static (Voyage v, CrewMember asha, Fault f) ObedientWary()
+    {
+        var v = new Voyage(1);
+        var asha = v.Find("asha")!;
+        v.Wake(asha);
+        v.Go();
+        asha.Trust = 45;
+        asha.PendingQuestion = null;
+        return (v, asha, v.FindFault("")!);
+    }
+
+    [Fact]
+    public void An_obedient_person_waits_on_the_danger_question_until_it_is_answered()
+    {
+        var (v, asha, f) = ObedientWary();
+        v.Assign(asha, f, patch: false);
+        Assert.Equal(f.DangerFact, asha.PendingQuestion);
+        Assert.NotEqual(f.Id, asha.WorkingOn);
+        Assert.Equal(new[] { false }, v.JobChecklist(asha).Select(i => i.Done));
+        // Repair again does not slip past the question: they ask it again.
+        var from = v.Log.Count;
+        v.Assign(asha, f, patch: false);
+        Assert.NotEqual(f.Id, asha.WorkingOn);
+        Assert.Equal("refuse_answer", v.Log.Skip(from).Last(e => e.Intent != null).Intent!.Kind);
+        Tell(v, asha, f.DangerFact!);
+        Assert.Equal(f.Id, asha.WorkingOn);
+    }
+
+    [Fact]
+    public void An_obedient_person_starts_after_a_dodge_of_the_danger_question()
+    {
+        var (v, asha, f) = ObedientWary();
+        v.Assign(asha, f, patch: false);
+        v.Say("Let's not get into that.", new Reading(LineKind.Dodge), new[] { asha });
+        v.Assign(asha, f, patch: false);
+        Assert.Equal(f.Id, asha.WorkingOn);
+    }
 }

@@ -17,7 +17,8 @@ public sealed partial class Voyage
         // is also asked of anyone short of trusting who has heard nothing about it.
         if (c.PendingQuestion is { } pq && _facts.TryGetValue(pq, out var asked) && c.Band == TrustBand.WantsReasons && !c.Has(Trait.Obedient))
             list.Add(new JobCondition(pq == danger ? "danger" : "answer", pq, asked.Question));
-        if (danger != null && c.PendingQuestion != danger && !c.Beliefs.ContainsKey(danger) && !c.Dodged.ContainsKey(danger) && c.Band != TrustBand.Follows)
+        // Asked already (the pending question) or not, it stands until it is answered or dodged; listed once.
+        if (danger != null && !list.Any(l => l.Key == danger) && !c.Beliefs.ContainsKey(danger) && !c.Dodged.ContainsKey(danger) && c.Band != TrustBand.Follows)
             list.Add(new JobCondition("danger", danger, _facts[danger].Question));
         if (BargainOf(c) is { } b)
             list.Add(new JobCondition("bargain", b.Key, CommitmentText(c, b.Key)));
