@@ -190,7 +190,7 @@ The game picks one agenda for each conversation from the person's sheet and the 
 | Agenda | What the person does | Picked when | What it leaves behind |
 | --- | --- | --- | --- |
 | Question | Asks for a fact | They lack a fact that matters to them; the default (built) | A statement or a dodge |
-| Bargain | Sets a condition before they work, sleep or keep quiet | Trust 30 to 59, or the request touches their want | A promise with a due date, or a refusal |
+| Bargain | Sets a condition before they work, sleep or keep quiet | Trust 30 to 59, or the request touches their want (built for work: wake the partner, open the logs) | A promise with a due date, or a refusal |
 | Test | Asks something they already know | Sceptical temperament, or they hold a note or another person's account | A lie caught at once, or a small rise in trust |
 | Accusation | Puts evidence against one of your statements in front of you | They have met that evidence | A true statement that corrects it, or a second false one |
 | Confidence | Tells you something and asks you to keep it from a named person | Trust 60 and up, and a bond under strain | A promise of silence that a later question from that person will strain |
@@ -199,6 +199,7 @@ The game picks one agenda for each conversation from the person's sheet and the 
 How the hard ones resolve:
 
 - **Bargain.** The condition comes from the person's want and bonds: wake someone, show a log, stay awake longer. Accepting records a promise. Refusing leaves the compliance roll to trust alone, with a penalty.
+  *Built for work (step 2 of the bargains plan).* When the player asks a wary person to repair or patch (trust 30 to 59, not Obedient; asked after the trust-band refusals, the pending question and the danger question) and the ship can grant their want, they set one condition per waking instead of starting: Mara-like (wants her partner) asks the ship's word to wake the partner if he is asleep and alive and a slot is free; Lin-like (wants the logs) asks the word to open the logs if any log is restricted (all logs are open until the player restricts one, so this is rare). The line is a `bargain` crew line; the work does not start. The player accepts by saying the matching promise to them (a promise reading with the same key): the work starts, the ledger gets the commitment with origin "bargain" and a due date `BargainDueDays` (40) away, and there is no `PromiseMade` trust. A promise with another key is an ordinary promise and the bargain stays open. Pressing Repair or Patch again is a push (the click is "without your word"): one roll, they start with chance trust / 100 + `BargainPushBase` (0.10), and it costs `BargainPushedTrust` (3) either way. A failed push declines: they refuse until the matching promise. The condition lapses silently when its fault is resolved, the alert changes, the person goes to sleep, or the ship meets the condition another way; they set no second condition that waking. The player-facing text (`Voyage.BargainText`) states the price, the stakes and the odds of a push, and never whether a statement is true. A bargain costs no clock yet (that comes with work terms).
 - **Test.** The player is never told a question is a test. A truthful answer raises trust more than an ordinary truth does.
 - **Accusation.** Telling the truth now stops the fall in trust at the discovered-lie cost. A denial is a new false statement, caught as it is said. This is a new statement, not a take-back: the first one stays in the record.
 - **Confidence.** If the named person later asks about it, the player must break the promise, dodge, or lie to them.
@@ -228,6 +229,8 @@ Every conversation closes with at least one outcome, shown in the log like the "
 | Independent action | After a dodge, Mara walks to the pod bay | They check for themselves (built: a dodge or a twice-repeated question makes them doubt the fact and check it) |
 | Spread | "Mara will tell Idris." | Knowers of the fact, at the next shared shift or in a note |
 | Stance | "Mara now doubts the pods." | One step towards or away from a faction's stance |
+
+**The promise ledger (built).** Every promise the game can check goes on a ledger (`Voyage.Ledger()`) with a due date, shown in "Waiting on you" ("Promise to Mara: wake Idris, 12 days left"), on the dossier's PROMISE note and in the ending record (due year). Today a promise to wake a partner or open the logs is due `Tuning.PromiseDueDays` (45) days after it is said (a bargain's will be `BargainDueDays`, 40). How one ends: wake the partner is kept at once when the partner is thawing or met, and broken at the due date; open the logs is kept at the due date (or when the person goes to sleep) if every log is open then, otherwise broken, never at once, so opening and closing logs earns nothing; going to sleep settles what is still open. A promise that can no longer be kept (the partner died, the crew hold the bay) is released with a ship line and no penalty, and so is one that was already true when it was said (no partner, partner already up). With 14 days left a ship line warns once and Advance stops. A kept promise gives `PromiseKept` trust and `PromiseKeptMorale`, a broken one `PromiseBroken` trust and `PromiseBrokenMorale` (morale moves work speed). Saying a promise gives `PromiseMade` trust once per person per waking. "Never thaw them again" has no date (kept at arrival, broken by a thaw); a promise the game can't check stays out of the ledger. A person is not asked for something the ship has already promised them.
 
 Work terms tie the briefing to the repair. Each fault lists what a repairer can be told before starting, and each item changes how the work goes:
 
@@ -263,7 +266,7 @@ Work terms tie the briefing to the repair. Each fault lists what a repairer can 
 
 Two of these come first, because they reuse the statement record and the compliance roll the prototype already has:
 
-1. Bargains that create promises with a due date.
+1. Bargains that create promises with a due date (built, 2026-11-13: the ledger; the offer, acceptance and push; the "WITHOUT YOUR WORD" button with a 0.6 s double-click guard; the Waiting item with the price and the risk of pushing; the NEXT line; the balance bots). Accepting is still a spoken promise through the voice line: no new control.
 2. Work terms set by the briefing.
 
 ## Alerts
@@ -546,6 +549,18 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 | What does a navigation fault still patched at arrival cost? | Arrival slips by years; Adrift only when a navigation fault's clock runs out unrepaired, including a returned patch (2026-11-13) |
 | What is the consequence of low trust? | A bay takeover: two awake people under 15 trust with Engineering 2 between them warn for one beat, then take the cold-sleep bay; the ending can be "Landfall without you" (2026-11-13) |
 
+Decided by the main session while the user was away, 2026-11-13 (first build of "Conversations", step 1: the promise ledger):
+
+| Question | Decision |
+| --- | --- |
+| When is "open the logs" kept? | At its due date, or when the person goes to sleep, if every log is open then; not at once (no open and restrict farming) |
+| Does a promise earn trust every time it is said? | No: `PromiseMade` once per person per waking (it was farmable) |
+| A promise that can no longer be kept? | Released with a ship line, no penalty (the partner died, the bay is taken, nothing to keep) |
+| Do promises move morale? | Yes: kept +3, broken -8, and morale moves work speed |
+| How long does a promise last? | 45 days (`PromiseDueDays`); a warning at 14 days left stops Advance |
+| What does pushing past a bargain look like? | The Repair/Patch button of a person with an open bargain reads "WITHOUT YOUR WORD" (tooltip: the price and the odds); a repeat click within 0.6 s real time is ignored, so a double click cannot push |
+| Is breaking a promise a winning strategy? | No, but it is not costly enough either: see "Balance", the Breaker bot (decision for the user) |
+
 ### Questions for playtest
 
 - [ ] How often does a small model misread a lie as plain talk? Count, from the session log (`said`, `read` and the `recorded` lines), the readings that turned out wrong in each prototype playthrough, including unusable ones; a first target is under one in ten.
@@ -572,3 +587,29 @@ Measured with the harness (`dotnet test --filter Category=Balance`, 200 seeds, f
   Landfall was 12%; lying should be tempting and costly, not hopeless.
 
 Result: Honest 48.5%, Thrifty 36% (a valid second strategy, within reach), Silent 25%, Liar 20%, Careless 18.5%.
+
+### Bargains and the balance bots (2026-11-13, 600 seeds)
+
+The Liar bot lies about hard truths; a first version also broke every promise. Landfall went from 17.5% (200 seeds; 20.3% at 600) before bargains to 33.0% (33.8% at 600). Cause, traced
+on seeds 7-11: breaking Mara's bargain on top of a caught lie drops her to Refuses, the bot then never wakes her again, and so never lies to her a second time ("How is Idris?" asked at every waking,
+after Idris died). The baseline Liar death spiral was exactly that: an awake, mourning, repeatedly lied-to Mara who refuses the pod and starves (starved 2.72 per run). A burned person who stays asleep is free,
+so the break "paid". It is a property of the bot's lies, not of promises: a Liar that keeps its word gets 12.8% (600 seeds), a Liar that pushes instead of promising 27.5%, and every
+small trust change anywhere else moves the Liar between 9% and 41% (it sits on the 30 and 60 trust bands; a flat 0.05 trust cost to the other crew sent it to 9%, a broken-promise cost of 5 to 40%).
+The first-pass fix is therefore in the bot, not in a number: the Liar differs from Honest only in what it says (it accepts and keeps its word like Honest), and a new **Breaker** bot (honest answers,
+accepts every bargain, keeps none) measures promise-breaking on its own.
+
+Open finding for the user: the Breaker lands at 43.8% against Honest's 41.3% (600 seeds), so breaking a promise **costs nothing measurable** when you also answer honestly: one person's -15 trust and -8 morale
+rarely matters in a voyage where each person is woken a few times. Raising `PromiseBroken` to 20, 25, 30 gave the Breaker 43.5%, 40.5%, 40.5%. A cost that bites (a grudge: the person whose word was broken
+refuses the pod until the ship does what it promised, so they stay awake and starve) was tried and wipes out Careless and Silent (0%), so it is not in. Candidates: a trust cost that reaches the person's partner
+and friends, or a skill/availability cost for a person who refuses; the harness test only guards against a rule that rewards breaking (Breaker at most 6 points above Honest).
+
+| Bot | 600 seeds before bargains (main) | 600 seeds now | 200 seeds now |
+| --- | --- | --- | --- |
+| Honest | 42.7% | 41.3% | 44.5% |
+| Thrifty | 40.7% | 38.2% | 36.5% |
+| Careless | 23.7% | 21.3% | 18.5% |
+| Silent | 24.3% | 22.3% | 16.0% |
+| Liar | 20.3% | 12.8% | 13.5% |
+| Breaker (new) | | 43.8% | 44.5% |
+
+Thaws per run (Honest) 13.12 before, 13.13 now. Run with `SHIP_SEEDS=600 dotnet test --filter Category=Balance`.

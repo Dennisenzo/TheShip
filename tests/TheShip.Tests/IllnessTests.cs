@@ -68,7 +68,7 @@ public class IllnessTests
         var v = AtAlert2();
         var lin = WakeAndAnswer(v, "lin");
         var ill = v.Current.Faults.Single(f => f.Kind == "illness");
-        v.Assign(lin, ill, patch: false);
+        v.AssignDeal(lin, ill, patch: false);
         VoyageTests.FinishAlert(v);
         Assert.Equal(FaultState.Repaired, ill.State);
         Assert.True(v.Find("tomas")!.Alive);
@@ -84,7 +84,7 @@ public class IllnessTests
         v.SetDoor("podA", DoorState.Locked);
         foreach (var f in v.Current.Faults)
         {
-            v.Assign(lin, f, patch: false);
+            v.AssignDeal(lin, f, patch: false);
             Assert.NotEqual(f.Id, lin.WorkingOn);
         }
     }

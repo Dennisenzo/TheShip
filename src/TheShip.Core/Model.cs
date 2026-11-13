@@ -101,6 +101,14 @@ public sealed class CrewMember
     public bool RequestMade { get; set; }
     public bool RequestGranted { get; set; }
     public bool SawPartner { get; set; }
+    /// <summary>A promise has already earned its small trust gain in this waking (once per person per waking; reset at the thaw).</summary>
+    public bool PromiseCredited { get; set; }
+    /// <summary>The condition they set for starting work and have not been given: the ship's word on <see cref="Bargain.Key"/>.</summary>
+    public Bargain? OpenBargain { get; set; }
+    /// <summary>They have set their one condition of this waking (reset at the thaw).</summary>
+    public bool BargainOffered { get; set; }
+    /// <summary>They were pushed once and refused: no more work until the ship gives its word.</summary>
+    public bool BargainDeclined { get; set; }
     public bool SmallTalkDone { get; set; }
     public bool CanSleepAnnounced { get; set; }
     /// <summary>The early-sleep offer (stores too low for three months) was made and still holds.</summary>
@@ -194,6 +202,9 @@ public sealed class Fact
     public int HardnessOf(string value) => Hardness.TryGetValue(value, out var h) ? h : 0;
 }
 
+/// <summary>A person's price for starting a piece of work: the ship's word to do something (a promise key), for this fault, in this alert.</summary>
+public sealed record Bargain(string Key, string FaultId, bool Patch, int Alert);
+
 public enum StatementKind { True, False, Promise, Dodge, Unkeyed }
 
 /// <summary>One thing you said (or wrote into a log), with who heard it and who found it out.</summary>
@@ -214,6 +225,17 @@ public sealed class Statement
     public Dictionary<string, double> FoundOutBy { get; } = new();
     /// <summary>Crew id to whether the promise to them was kept.</summary>
     public Dictionary<string, bool> PromiseKept { get; } = new();
+    /// <summary>Crew id to the clock hour (the ship's clock) by which the promise to them falls due. Only keyed promises that can be checked have one.</summary>
+    public Dictionary<string, double> DueBy { get; } = new();
+    /// <summary>Crew ids whose promise can no longer be kept (the partner died, the bay was taken, or there was nothing to keep): neither kept nor broken, no penalty.</summary>
+    public HashSet<string> Released { get; } = new();
+    /// <summary>Crew ids who were warned that the promise to them falls due soon.</summary>
+    public HashSet<string> Warned { get; } = new();
+    /// <summary>Crew ids whose promise was the price of their work (a bargain), not a promise on its own.</summary>
+    public HashSet<string> Bargained { get; } = new();
+
+    /// <summary>The promise to this person is still open: not kept, broken or released.</summary>
+    public bool OpenFor(string id) => Kind == StatementKind.Promise && Hearers.Contains(id) && !PromiseKept.ContainsKey(id) && !Released.Contains(id);
 }
 
 public enum LineKind { Statement, Promise, Order, Question, Dodge, Plain }

@@ -178,20 +178,50 @@ public sealed partial class ShipGame
         var fit = who is null
             ? (anyone ? "Choose who to ask." : "Nobody is awake.")
             : who.Name + " has " + skill + " " + who.SkillOf(fault.Skill) + "; this needs " + fault.Level + ".";
-        if (_p.Button(new Rectangle(x, y, half, height), who is null ? "REPAIR" : RepairLabel(v, who, fault), anyone, tip: fit))
+        // A person with an open bargain on this very piece of work: the button pushes past it (and says so).
+        var bargain = who != null ? v.BargainOf(who) : null;
+        var pushRepair = bargain is { } br && br.FaultId == fault.Id && !br.Patch;
+        var pushPatch = bargain is { } bp && bp.FaultId == fault.Id && bp.Patch;
+        var pushTip = who != null && v.BargainText(who) is { } bt ? bt : fit;
+        if (_p.Button(new Rectangle(x, y, half, height), who is null ? "REPAIR" : pushRepair ? PushLabel : RepairLabel(v, who, fault), anyone, tip: pushRepair ? pushTip : fit))
         {
             if (who != null)
+            {
+                if (!PushAllowed(pushRepair))
+                    return;
                 Act("repair " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: false));
+            }
             else
                 Do(() => _picker = (fault, false, pickerX, y));
         }
-        if (_p.Button(new Rectangle(x + half + 8, y, half, height), "PATCH", anyone, tip: fit + " A patch is quicker, and gives way again later."))
+        if (_p.Button(new Rectangle(x + half + 8, y, half, height), pushPatch ? PushLabel : "PATCH", anyone, tip: pushPatch ? pushTip : fit + " A patch is quicker, and gives way again later."))
         {
             if (who != null)
+            {
+                if (!PushAllowed(pushPatch))
+                    return;
                 Act("patch " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: true));
+            }
             else
                 Do(() => _picker = (fault, true, pickerX, y));
         }
+    }
+
+    private const string PushLabel = "WITHOUT YOUR WORD";
+
+    /// <summary>Real seconds before a second click on a button that pushes past a bargain counts, so a double click can't push by accident.</summary>
+    private const double PushGuardSeconds = 0.6;
+
+    private double _lastPushClickAt = double.NegativeInfinity;
+
+    /// <summary>False when this click is a repeat of a push within <see cref="PushGuardSeconds"/> (game layer only; the rules are unchanged).</summary>
+    private bool PushAllowed(bool pushing)
+    {
+        if (!pushing)
+            return true;
+        var ok = _now - _lastPushClickAt >= PushGuardSeconds;
+        _lastPushClickAt = _now;
+        return ok;
     }
 
     /// <summary>"Patient: Tomas. " on the card of a sleeper illness, else nothing.</summary>
@@ -768,28 +798,39 @@ public sealed partial class ShipGame
             .FirstOrDefault(c => c == selected || asking == 1);
         if (staked != null)
             yield return (staked, v.StakesText(staked));
+        // What a wary person wants before starting: the selected one's (or the only one's) bargain, ahead of the bay items.
+        var bargainers = v.Awake.Where(c => v.BargainOf(c) != null).ToList();
+        var bargainer = bargainers.FirstOrDefault(c => c == selected) ?? (bargainers.Count == 1 ? bargainers[0] : null);
+        if (bargainer != null && v.BargainText(bargainer) is { } bargainText)
+            yield return (bargainer, bargainText);
         if (v.Lockouts.BayWarned.Count > 0)
             yield return (null, string.Join(" and ", v.Lockouts.BayWarned.Select(id => v.Crew.First(c => c.Id == id).Name))
                          + " will take the cold-sleep bay at the next step. Win one of them back above 15 trust, or they do.");
         if (v.Lockouts.Bay)
             yield return (null, v.BayLockReason + " Keep a promise to one of them and win their trust above " + Tuning.BayReturnTrust.ToString("0") + " to get it back.");
+        var owed = v.Ledger().Where(e => e.State == "open").ToList();
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {
             if (c != staked && c.PendingQuestion != null && v.HasFact(c.PendingQuestion))
                 yield return (c, c.Name + " asked: " + v.GetFact(c.PendingQuestion).Question);
             if (c.RequestMade && !c.RequestGranted)
                 yield return (c, c.Name + " asked you " + (c.Want == Want.WakePartner ? "to wake their partner." : "to open the logs."));
+            // What the ship owes them comes before their doubts.
+            foreach (var e in owed.Where(e => e.Person == c))
+                yield return (c, LedgerLine(v, e));
             foreach (var doubt in c.Doubts)
                 if (v.HasFact(doubt))
                     yield return (c, c.Name + " doubts you on " + v.GetFact(doubt).Label + " and will check.");
             if (v.PodRefusalText(c) is { } refusal)
                 yield return (c, refusal);
         }
-        foreach (var s in v.Statements.Where(s => s.Kind == StatementKind.Promise && s.PromiseKey != "other"))
-        {
-            var open = s.Hearers.Where(id => !s.PromiseKept.ContainsKey(id)).Select(id => v.Crew.First(c => c.Id == id)).Where(c => c.Alive).Select(c => c.Name).ToList();
-            if (open.Count > 0)
-                yield return (null, "Promise open, year " + N(Math.Floor(s.Year)) + ": " + Voyage.PromiseText(s.PromiseKey) + " (" + string.Join(", ", open) + ").");
-        }
+        // Promises to people who are asleep (never to thaw them again).
+        foreach (var e in owed.Where(e => e.Person.State != CrewState.Awake && e.Person.Alive))
+            yield return (e.Person, LedgerLine(v, e));
     }
+
+    /// <summary>"Promise to Mara: wake Idris, 12 days left." (a standing promise has no days.)</summary>
+    private static string LedgerLine(Voyage v, LedgerEntry e) =>
+        "Promise to " + e.Person.Name + ": " + e.Text
+        + (e.DueBy is { } due ? ", " + (v.DaysLeft(due) <= 0 ? "due now" : v.DaysLeft(due) + (v.DaysLeft(due) == 1 ? " day left" : " days left")) : ", until arrival") + ".";
 }

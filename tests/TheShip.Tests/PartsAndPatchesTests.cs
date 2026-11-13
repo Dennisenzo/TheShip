@@ -31,9 +31,9 @@ public class PartsAndPatchesTests
             v.Go();
             VoyageTests.Say(v, mara, "Idris is alive and asleep.");
             var fault = v.FindFault("")!;
-            v.Assign(mara, fault, patch: false);
+            v.AssignDeal(mara, fault, patch: false);
             VoyageTests.Say(v, mara, "It is dangerous. You will take a radiation dose.");
-            v.Assign(mara, fault, patch: false);
+            v.AssignDeal(mara, fault, patch: false);
             var partsBefore = v.Parts;
             for (var i = 0; i < 50 && v.Phase == Phase.Alert; i++)
                 v.Go();
@@ -56,9 +56,9 @@ public class PartsAndPatchesTests
         v.Go();
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
         var fault = v.FindFault("")!;
-        v.Assign(mara, fault, patch: true);
+        v.AssignDeal(mara, fault, patch: true);
         VoyageTests.Say(v, mara, "It is dangerous. You will take a radiation dose.");
-        v.Assign(mara, fault, patch: true);
+        v.AssignDeal(mara, fault, patch: true);
         VoyageTests.FinishAlert(v);
         Assert.Equal(FaultState.Patched, fault.State);
         VoyageTests.SleepWhenAllowed(v, mara);
@@ -214,9 +214,9 @@ public class PartsAndPatchesTests
         v.Go();
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
         var fault = v.FindFault("")!;
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         VoyageTests.Say(v, mara, "It is dangerous. You will take a radiation dose.");
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         Assert.Equal(FaultState.InRepair, fault.State);
         return (v, mara, fault);
     }
@@ -237,9 +237,9 @@ public class PartsAndPatchesTests
             Assert.Equal(FaultState.Open, fault.State);
             Assert.Null(mara.WorkingOn);
             Assert.Contains(v.Log, e => e.Intent?.Kind == "work_no_parts");
-            v.Assign(mara, fault, patch: false);
+            v.AssignDeal(mara, fault, patch: false);
             Assert.Equal("No spare parts are left. This can only be patched.", v.Log.Last().Text);
-            v.Assign(mara, fault, patch: true);
+            v.AssignDeal(mara, fault, patch: true);
             for (var i = 0; i < 50 && fault.State == FaultState.InRepair; i++)
                 v.Go();
             Assert.Equal(FaultState.Patched, fault.State);
@@ -358,16 +358,17 @@ public class PartsAndPatchesTests
         v.Go();
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
         var fault = v.FindFault("")!;
-        v.Assign(mara, fault, patch: true);
+        v.AssignDeal(mara, fault, patch: true);
         VoyageTests.Say(v, mara, "It is dangerous. You will take a radiation dose.");
-        v.Assign(mara, fault, patch: true);
+        v.AssignDeal(mara, fault, patch: true);
         VoyageTests.FinishAlert(v);
+        v.ReleaseOwed(mara); // her bargain's promise to wake Idris is not under test: unkept it would cost her trust at sleep
         VoyageTests.SleepWhenAllowed(v, mara);
         v.Drift();
         var again = v.Current.Faults.Single(x => x.Id == "coolant-again");
         v.Wake(mara);
         v.Go();
-        v.Assign(mara, again, patch: true);
+        v.AssignDeal(mara, again, patch: true);
         var crew = v.Log.Where(e => e.Kind == LogKind.Crew && e.Intent != null).ToList();
         Assert.Contains(crew, e => e.Intent!.Decision.Contains("coolant leak again"));
         Assert.DoesNotContain(crew, e => e.Intent!.Decision.Contains("gives way", StringComparison.OrdinalIgnoreCase)

@@ -19,12 +19,14 @@ public class AdvanceTests
         v.Go();
         Say(v, mara, "Idris is alive and asleep.");
         var fault = v.FindFault("")!;
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         Say(v, mara, "It is dangerous. You will take a radiation dose.");
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         for (var i = 0; i < 50 && v.Phase == Phase.Alert; i++)
             v.Go();
         Assert.Equal(Phase.Aftermath, v.Phase);
+        v.ReleaseOwed(mara); // the bargain's promise to wake Idris has its own tests
+        mara.RequestMade = mara.RequestGranted = true; // and so has the request it would turn into
         return mara;
     }
 
@@ -135,6 +137,13 @@ public class AdvanceTests
         v.Go();
         Assert.Equal(CrewState.Awake, tomas.State);
         tomas.PendingQuestion = null; // an unanswered wake question would be asked again and stop the advance first
+        tomas.Doubts.Clear();
+        mara.Doubts.Clear();
+        foreach (var f in v.FactList)
+        {
+            tomas.SeenGaps.Add(f.Key); // nothing left for them to read and remark on: this beat must be about the stores
+            mara.SeenGaps.Add(f.Key);
+        }
         Assert.False(v.CanSleepNow(mara));
         Assert.True(v.CanSleepNow(tomas));
 

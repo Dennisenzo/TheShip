@@ -273,8 +273,20 @@ public sealed partial class ShipGame
                 var kept = listener != null
                     ? (s.PromiseKept.TryGetValue(listener.Id, out var k) ? k : (bool?)null)
                     : (s.PromiseKept.Count == 0 ? (bool?)null : s.PromiseKept.Values.All(x => x));
-                var text = Cap(Voyage.PromiseText(s.PromiseKey)) + ": ";
-                return ("PROMISE", kept != true, text + (kept is null ? "open." : kept.Value ? "kept." : "broken."));
+                var priced = listener != null ? s.Bargained.Contains(listener.Id) : s.Bargained.Count > 0;
+                var text = Cap(Voyage.PromiseText(s.PromiseKey)) + (priced ? " (the price of their work)" : "") + ": ";
+                var released = listener != null ? s.Released.Contains(listener.Id) : s.Released.Count > 0 && s.PromiseKept.Count == 0;
+                if (released)
+                    return ("PROMISE", false, text + "released, it could no longer be kept.");
+                // An open promise shows when it falls due.
+                var dueNote = "open.";
+                var dues = listener != null ? s.DueBy.Where(kv => kv.Key == listener.Id) : s.DueBy.Where(kv => s.OpenFor(kv.Key));
+                if (kept is null && dues.Any())
+                {
+                    var left = v.DaysLeft(dues.Min(kv => kv.Value));
+                    dueNote = "open, " + (left <= 0 ? "due now." : left + (left == 1 ? " day left." : " days left."));
+                }
+                return ("PROMISE", kept != true, text + (kept is null ? dueNote : kept.Value ? "kept." : "broken."));
             case StatementKind.Dodge:
                 return ("DODGE", false, "");
             default:

@@ -74,12 +74,12 @@ public class SayAtOnceTimingTests
         v.Go();
         var f = v.Current.Faults[0];
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
-        v.Assign(mara, f, false); // "Is it safe in there?"
+        v.AssignDeal(mara, f, false); // "Is it safe in there?"
         Assert.NotNull(mara.PendingQuestion);
         var main = new MainThreadQueue();
         using var mind = new ShipMind(v, new FakeLlm { Read = Dose }, main);
         mind.SayAtOnce("It is dangerous. You will take a radiation dose.", new List<CrewMember> { mara });
-        mind.AfterReading(() => v.Assign(mara, f, false));
+        mind.AfterReading(() => v.AssignDeal(mara, f, false));
         await Until(main, () => !mind.Holding);
         Assert.Equal(f.Id, mara.WorkingOn);
     }
@@ -154,7 +154,7 @@ public class SayAtOnceTimingTests
         v.Go();
         var f = v.Current.Faults[0];
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
-        v.Assign(mara, f, false);
+        v.AssignDeal(mara, f, false);
         var asked = mara.PendingQuestion;
         Assert.NotNull(asked);
         var llm = new HangingLlm();

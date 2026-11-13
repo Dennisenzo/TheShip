@@ -192,8 +192,10 @@ public static class Prompts
     {
         "dodge" or "gap" or "locked" when band is TrustBand.Follows => "puzzled and a little uneasy",
         "dodge" or "gap" or "locked" when band is TrustBand.WantsReasons => "uneasy, wanting a straight answer",
-        "comply" or "work_done" or "accept" or "confirmed" or "promise_kept" or "request_granted" => "steady, a little relief",
-        "work_patched" or "work_failed" or "work_no_parts" or "injured" or "refuse_danger" or "ask_danger" => "tense and wary",
+        "comply" or "bargain_struck" or "work_done" or "accept" or "confirmed" or "promise_kept" or "request_granted" => "steady, a little relief",
+        "bargain" => "guarded, bargaining",
+        "bargain_refused" => "cold and short",
+        "work_patched" or "comply_pushed" or "work_failed" or "work_no_parts" or "injured" or "refuse_danger" or "ask_danger" => "tense and wary",
         "caught" or "left_behind" or "takeover_warning" or "refuse_trust" or "altered" or "gap" or "locked" or "promise_broken" or "dodge" => "angry, hurt or suspicious",
         "bay_returned" => "guarded, but willing to trust the ship again",
         "hard_truth" or "found" or "noticed_dose" => "shaken",
@@ -280,6 +282,8 @@ public static class Prompts
             sb.Append("Listener: ").Append(h.Name);
             if (h.PendingQuestion != null && voyage.HasFact(h.PendingQuestion))
                 sb.Append(" (asked: \"").Append(voyage.GetFact(h.PendingQuestion).Question).Append("\", fact ").Append(h.PendingQuestion).Append(')');
+            if (voyage.BargainOf(h) is { } bargain)
+                sb.Append(" (wants the ship's word to: ").Append(bargain.Key).Append(')');
             sb.AppendLine();
         }
         sb.Append("Ship says: \"").Append(text.Replace('"', '\'')).Append('"');
