@@ -66,8 +66,10 @@ public sealed partial class Voyage
         AnswerAccusation(c, "ignored");
         AccusationsIgnored++;
         c.Trust -= Tuning.AccusationIgnoredTrust;
+        // An audit, not a fresh chance to earn trust: a doubt it starts pays no ConfirmedTruth when it checks out (Learn).
         foreach (var kv in c.Beliefs.Where(kv => kv.Value.Source == "ship").ToList())
-            c.Doubts.Add(kv.Key);
+            if (c.Doubts.Add(kv.Key))
+                c.AuditDoubts.Add(kv.Key);
         while (dropWaiting && c.Accusations.Count > 0)
             AnswerAccusation(c, "ignored");
         Clamp(c);

@@ -269,6 +269,7 @@ public sealed partial class Voyage
         c.Beliefs.TryGetValue(key, out var old);
         var news = old is null || !f.Same(old.Value, value);
         var doubted = c.Doubts.Remove(key);
+        var audited = c.AuditDoubts.Remove(key);
         if (c.PendingQuestion == key)
             c.PendingQuestion = null;
         c.Beliefs[key] = new Belief(value, source, Year);
@@ -288,7 +289,9 @@ public sealed partial class Voyage
         }
         if (!caught && doubted && old is { Source: "ship" } && !news)
         {
-            c.Trust += Tuning.ConfirmedTruth;
+            // A doubt from the audit after an ignored accusation earns no trust when it checks out: the ship had its chance to answer.
+            if (!audited)
+                c.Trust += Tuning.ConfirmedTruth;
             Speak(c, "confirmed", "You checked something the ship told you (" + f.Say(value) + ") and it was true.");
         }
         var hard = f.HardnessOf(value);

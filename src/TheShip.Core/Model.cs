@@ -70,6 +70,11 @@ public sealed class CrewMember
     public HashSet<string> AdmittedFacts { get; } = new();
     /// <summary>Fact keys this person doubts and will check when they get the chance.</summary>
     public HashSet<string> Doubts { get; } = new();
+    /// <summary>
+    /// Doubts started by an ignored accusation (the audit of everything the ship told them): a true one checked earns no
+    /// <see cref="Tuning.ConfirmedTruth"/>, so ignoring an accusation never pays better than admitting the lie.
+    /// </summary>
+    public HashSet<string> AuditDoubts { get; } = new();
     /// <summary>Fact keys you dodged when they asked, each with the fact's true values at the times of the dodges.</summary>
     public Dictionary<string, HashSet<string>> Dodged { get; } = new();
     /// <summary>Locked doors they have already run into.</summary>
