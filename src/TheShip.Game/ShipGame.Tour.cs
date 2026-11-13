@@ -138,6 +138,7 @@ public sealed partial class ShipGame
             if (v.Current.Number == 1 && v.Awake.FirstOrDefault() is { } liar && v.GetFact("date") is { } dateFact)
             {
                 var wrong = (int.Parse(dateFact.Truth) + 7).ToString();
+                var (trust, morale, caught) = (liar.Trust, liar.Morale, liar.CaughtLies);
                 Act("say to " + liar.Name, () => v.Say(Capitalise(dateFact.Say(wrong)) + ".", new Reading(LineKind.Statement, "date", wrong), new[] { liar }));
                 Act("tour: " + liar.Name + " reads the log", () => v.TourReadLog(liar, dateFact));
                 foreach (var w in Settle()) yield return w;
@@ -153,6 +154,8 @@ public sealed partial class ShipGame
                 Shoot(dir, "accusation-admitted-dossier");
                 _screen = Screen.Bridge;
                 _target = null;
+                // The scripted lie is for these shots only: the rest of the tour plays on from where the person stood before it.
+                Act("tour: restore " + liar.Name, () => v.TourRestore(liar, trust, morale, caught));
             }
 
             // Answer the first question truthfully, the way Enter does it.
