@@ -273,7 +273,8 @@ public sealed partial class ShipGame
                 var kept = listener != null
                     ? (s.PromiseKept.TryGetValue(listener.Id, out var k) ? k : (bool?)null)
                     : (s.PromiseKept.Count == 0 ? (bool?)null : s.PromiseKept.Values.All(x => x));
-                var text = Cap(Voyage.PromiseText(s.PromiseKey)) + ": ";
+                var priced = listener != null ? s.Bargained.Contains(listener.Id) : s.Bargained.Count > 0;
+                var text = Cap(Voyage.PromiseText(s.PromiseKey)) + (priced ? " (the price of their work)" : "") + ": ";
                 var released = listener != null ? s.Released.Contains(listener.Id) : s.Released.Count > 0 && s.PromiseKept.Count == 0;
                 if (released)
                     return ("PROMISE", false, text + "released, it could no longer be kept.");

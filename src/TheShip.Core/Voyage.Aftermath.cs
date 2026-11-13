@@ -219,7 +219,7 @@ public sealed partial class Voyage
                 case StatementKind.Promise:
                     var kept = s.PromiseKept.Count(kv => kv.Value);
                     var broken = s.PromiseKept.Count(kv => !kv.Value);
-                    line += "A promise " + PromiseText(s.PromiseKey)
+                    line += (s.Bargained.Count > 0 ? "A promise, the price of work, " : "A promise ") + PromiseText(s.PromiseKey)
                             + (s.DueBy.Count > 0 ? " (due year " + Math.Floor(s.DueBy.Values.Min() / Tuning.HoursPerYear).ToString("0") + ")" : "") + ": "
                             + (broken > 0 ? "broken." : kept > 0 ? "kept." : s.Released.Count > 0 ? "released, it could no longer be kept." : "never tested.");
                     break;

@@ -287,7 +287,7 @@ public sealed partial class Voyage
         var text = FormattableString.Invariant($"{c.Name} will start {TaskText(f, b.Patch)} if you promise to {cond} within {Tuning.BargainDueDays:0} days. Kept +{Tuning.PromiseKept:0} trust, broken -{Tuning.PromiseBroken:0}. ");
         text += c.BargainDeclined
             ? "They refuse to start without your word. Say it to them."
-            : FormattableString.Invariant($"Without your word: about {PushChance(c) * 100:0}% they start, -{Tuning.BargainPushedTrust:0} trust either way. Say it to them.");
+            : FormattableString.Invariant($"Without it: about {PushChance(c) * 100:0}% they start, -{Tuning.BargainPushedTrust:0} trust. Say it to them.");
         return text;
     }
 

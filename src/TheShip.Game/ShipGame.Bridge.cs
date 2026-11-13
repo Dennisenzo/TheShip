@@ -178,20 +178,50 @@ public sealed partial class ShipGame
         var fit = who is null
             ? (anyone ? "Choose who to ask." : "Nobody is awake.")
             : who.Name + " has " + skill + " " + who.SkillOf(fault.Skill) + "; this needs " + fault.Level + ".";
-        if (_p.Button(new Rectangle(x, y, half, height), who is null ? "REPAIR" : RepairLabel(v, who, fault), anyone, tip: fit))
+        // A person with an open bargain on this very piece of work: the button pushes past it (and says so).
+        var bargain = who != null ? v.BargainOf(who) : null;
+        var pushRepair = bargain is { } br && br.FaultId == fault.Id && !br.Patch;
+        var pushPatch = bargain is { } bp && bp.FaultId == fault.Id && bp.Patch;
+        var pushTip = who != null && v.BargainText(who) is { } bt ? bt : fit;
+        if (_p.Button(new Rectangle(x, y, half, height), who is null ? "REPAIR" : pushRepair ? PushLabel : RepairLabel(v, who, fault), anyone, tip: pushRepair ? pushTip : fit))
         {
             if (who != null)
+            {
+                if (!PushAllowed(pushRepair))
+                    return;
                 Act("repair " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: false));
+            }
             else
                 Do(() => _picker = (fault, false, pickerX, y));
         }
-        if (_p.Button(new Rectangle(x + half + 8, y, half, height), "PATCH", anyone, tip: fit + " A patch is quicker, and gives way again later."))
+        if (_p.Button(new Rectangle(x + half + 8, y, half, height), pushPatch ? PushLabel : "PATCH", anyone, tip: pushPatch ? pushTip : fit + " A patch is quicker, and gives way again later."))
         {
             if (who != null)
+            {
+                if (!PushAllowed(pushPatch))
+                    return;
                 Act("patch " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: true));
+            }
             else
                 Do(() => _picker = (fault, true, pickerX, y));
         }
+    }
+
+    private const string PushLabel = "WITHOUT YOUR WORD";
+
+    /// <summary>Real seconds before a second click on a button that pushes past a bargain counts, so a double click can't push by accident.</summary>
+    private const double PushGuardSeconds = 0.6;
+
+    private double _lastPushClickAt = double.NegativeInfinity;
+
+    /// <summary>False when this click is a repeat of a push within <see cref="PushGuardSeconds"/> (game layer only; the rules are unchanged).</summary>
+    private bool PushAllowed(bool pushing)
+    {
+        if (!pushing)
+            return true;
+        var ok = _now - _lastPushClickAt >= PushGuardSeconds;
+        _lastPushClickAt = _now;
+        return ok;
     }
 
     /// <summary>"Patient: Tomas. " on the card of a sleeper illness, else nothing.</summary>
@@ -774,6 +804,11 @@ public sealed partial class ShipGame
         if (v.Lockouts.Bay)
             yield return (null, v.BayLockReason + " Keep a promise to one of them and win their trust above " + Tuning.BayReturnTrust.ToString("0") + " to get it back.");
         var owed = v.Ledger().Where(e => e.State == "open").ToList();
+        // What a wary person wants before starting: the selected one's (or the only one's) bargain, ahead of the bay items.
+        var bargainers = v.Awake.Where(c => v.BargainOf(c) != null).ToList();
+        var bargainer = bargainers.FirstOrDefault(c => c == selected) ?? (bargainers.Count == 1 ? bargainers[0] : null);
+        if (bargainer != null && v.BargainText(bargainer) is { } bargainText)
+            yield return (bargainer, bargainText);
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {
             if (c != staked && c.PendingQuestion != null && v.HasFact(c.PendingQuestion))
