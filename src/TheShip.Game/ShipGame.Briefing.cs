@@ -21,6 +21,8 @@ public sealed partial class ShipGame
             return;
         _briefing = false;
         _session?.Line("click", _briefingSeen ? "briefing closed" : "briefing begin");
+        if (!_briefingSeen)
+            SoundAlarm(); // alert 1 appears when the briefing is closed for the first time
         _briefingSeen = true;
     }
 

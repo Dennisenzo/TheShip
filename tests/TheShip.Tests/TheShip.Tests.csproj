@@ -22,4 +22,9 @@
     <ProjectReference Include="..\..\src\TheShip.AI\TheShip.AI.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The music DSP is plain C# (no MonoGame): compiled in here so it can be tested without referencing the Game project. -->
+    <Compile Include="..\..\src\TheShip.Game\Music.cs" Link="Music.cs" />
+  </ItemGroup>
+
 </Project>
