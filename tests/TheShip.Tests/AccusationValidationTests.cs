@@ -187,4 +187,40 @@ public class AccusationValidationTests
         Assert.Equal("him", v.Find("idris")!.Them);
         Assert.Equal("they", new CrewMember { Id = "x", Name = "X", Role = "r", Skills = new(), Traits = Array.Empty<Trait>(), Want = Want.StayAwake }.They);
     }
+
+    /// <summary>An accusation left open into a drift closes out loud: the line comes after the drift report, and the record says so.</summary>
+    [Fact]
+    public void A_drift_closes_an_accusation_with_a_line_after_the_report()
+    {
+        var (v, mara, lie) = Lied();
+        v.ReadLog(mara, v.GetFact("date"));
+        Assert.NotNull(v.OpenAccusation(mara));
+        mara.AskedToSleep = true;
+        v.Stores = 100000;
+        v.Drift();
+        Assert.Null(v.OpenAccusation(mara));
+        Assert.Equal("ignored", lie.Accused["mara"]);
+        Assert.True(mara.Alive);
+        var report = v.Log.FindIndex(e => e.Text.StartsWith("DRIFT:"));
+        var line = v.Log.FindIndex(e => e.CrewId == "mara" && e.Intent?.Kind == "accusation_closed");
+        Assert.True(report >= 0 && line > report, "report " + report + ", line " + line);
+        Assert.Contains(v.Log, e => e.Kind == LogKind.Recorded && e.Text.Contains("never answered Mara"));
+    }
+
+    [Fact]
+    public void An_admission_and_an_expiry_are_recorded()
+    {
+        var (v, mara, _) = Lied();
+        v.ReadLog(mara, v.GetFact("date"));
+        SayValue(v, mara, "date", v.GetFact("date").Truth);
+        Assert.Contains(v.Log, e => e.Kind == LogKind.Recorded && e.Text == "Recorded: you admitted to Mara that you lied about " + v.GetFact("date").Label + ".");
+
+        var (w, mara2, _) = Lied();
+        w.ReadLog(mara2, w.GetFact("date"));
+        w.Go();
+        w.Go();
+        Assert.Null(w.OpenAccusation(mara2));
+        Assert.Contains(w.Log, e => e.Kind == LogKind.Recorded
+                                    && e.Text.StartsWith("Recorded: you never answered Mara about your lie on " + w.GetFact("date").Label + ". She will check everything you told her."));
+    }
 }

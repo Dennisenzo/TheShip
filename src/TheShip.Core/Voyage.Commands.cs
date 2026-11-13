@@ -970,8 +970,9 @@ public sealed partial class Voyage
                     // Someone who would not sleep ages, eats and reads everything, for as long as they live.
                     c.Age += hours / Tuning.HoursPerYear;
                     c.HoursAwake += hours;
-                    // An accusation the ship let run through the drift closes unanswered (they read everything anyway).
-                    IgnoreAccusation(c, speak: false);
+                    // An accusation the ship let run through the drift closes unanswered (they read everything anyway). Their line is
+                    // held with the drift's other crew lines and said after its report, if they live through it.
+                    IgnoreAccusation(c, speak: true);
                     foreach (var f in FactList)
                         ReadLog(c, f, quiet: true);
                 }

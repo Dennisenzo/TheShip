@@ -50,6 +50,7 @@ public sealed partial class Voyage
     private void Admit(CrewMember c, Fact f)
     {
         AnswerAccusation(c, "admitted");
+        Recorded("Recorded: you admitted to " + c.Name + " that you lied about " + f.Label + ".");
         if (c.AdmittedFacts.Add(f.Key))
             c.Trust += Tuning.AccusationAdmitTrust;
         Speak(c, "accusation_admitted", "The ship told you the truth about what it lied to you about (" + f.Say(f.Truth) + "). It does not undo the lie.");
@@ -63,8 +64,10 @@ public sealed partial class Voyage
     {
         if (c.Accusations.Count == 0)
             return;
+        var label = HasFact(c.Accusations[0].FactKey) ? GetFact(c.Accusations[0].FactKey).Label : "something you said";
         AnswerAccusation(c, "ignored");
         AccusationsIgnored++;
+        Recorded("Recorded: you never answered " + c.Name + " about your lie on " + label + ". " + Cap(c.They) + " will check everything you told " + c.Them + ".");
         c.Trust -= Tuning.AccusationIgnoredTrust;
         // An audit, not a fresh chance to earn trust: a doubt it starts pays no ConfirmedTruth when it checks out (Learn).
         foreach (var kv in c.Beliefs.Where(kv => kv.Value.Source == "ship").ToList())
