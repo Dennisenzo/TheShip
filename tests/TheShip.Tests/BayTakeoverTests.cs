@@ -167,6 +167,45 @@ public class BayTakeoverTests
     }
 
     [Fact]
+    public void The_bay_goes_back_to_the_ship_when_its_last_taker_dies()
+    {
+        // Validator finding: a bay whose takers were all dead stayed taken, refusing Wake in the names of the dead.
+        var v = Aftermath("jonah");
+        Hostile(v, "mara", "jonah");
+        v.Go();
+        Hostile(v, "mara", "jonah");
+        v.Go();
+        Assert.True(v.Lockouts.Bay);
+        v.Kill(v.Find("jonah")!, "died");
+        Assert.True(v.Lockouts.Bay);
+        Assert.DoesNotContain("Jonah", v.BayLockReason);
+        Assert.Contains("Mara decides", v.BayLockReason);
+        v.Kill(v.Find("mara")!, "died");
+        Assert.False(v.Lockouts.Bay);
+        Assert.Null(v.BayLockReason);
+        Assert.Contains(v.Log, e => e.Kind == LogKind.Ship && e.Text.StartsWith("The cold-sleep bay is back in your hands", StringComparison.Ordinal)
+                                    && e.Text.Contains("Mara and Jonah"));
+        var tomas = v.Find("tomas")!;
+        v.Wake(tomas);
+        Assert.Equal(CrewState.Thawing, tomas.State);
+    }
+
+    [Fact]
+    public void Takers_who_die_in_a_drift_free_the_bay_after_the_drift_report()
+    {
+        var v = TakenAndAsleep(new Voyage(1));
+        // Every sleeper's pod fails in this drift.
+        v.PodWear = 100000;
+        v.Drift();
+        Assert.False(v.Find("mara")!.Alive);
+        Assert.False(v.Find("jonah")!.Alive);
+        Assert.False(v.Lockouts.Bay);
+        var drift = v.Log.FindIndex(e => e.Kind == LogKind.Ship && e.Text.StartsWith("DRIFT:", StringComparison.Ordinal));
+        var freed = v.Log.FindIndex(e => e.Kind == LogKind.Ship && e.Text.StartsWith("The cold-sleep bay is back in your hands", StringComparison.Ordinal));
+        Assert.True(drift >= 0 && freed > drift);
+    }
+
+    [Fact]
     public void Advance_until_attention_does_not_stall_when_everyone_can_sleep_and_the_bay_is_taken()
     {
         var v = Aftermath("jonah");

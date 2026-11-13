@@ -10,7 +10,8 @@ public sealed partial class Voyage
 
     /// <summary>Why Wake and Sleep are refused now, or null.</summary>
     public string? BayLockReason => Lockouts.Bay
-        ? "The crew hold the cold-sleep bay: " + string.Join(" and ", Lockouts.BayTakers.Select(id => Crew.First(c => c.Id == id).Name)) + " decide who wakes and sleeps."
+        ? "The crew hold the cold-sleep bay: " + string.Join(" and ", Crew.Where(c => c.Alive && Lockouts.BayTakers.Contains(c.Id)).Select(c => c.Name))
+          + (Crew.Count(c => c.Alive && Lockouts.BayTakers.Contains(c.Id)) == 1 ? " decides" : " decide") + " who wakes and sleeps."
         : null;
 
     /// <summary>Awake people who would take the bay now: in the Against band, with enough Engineering between them.</summary>
@@ -98,6 +99,27 @@ public sealed partial class Voyage
                 finally { _crewActing = false; }
             }
         }
+    }
+
+    /// <summary>True during a drift: a taker's death is reported after the drift report, so the bay is freed after it too.</summary>
+    private bool _holdBayRelease;
+
+    /// <summary>
+    /// A bay whose takers are all dead has nobody holding it: it goes back to the ship. Called when someone dies, and
+    /// after the drift report (deaths in a drift are reported there first).
+    /// </summary>
+    private void MaybeFreeBay()
+    {
+        if (_holdBayRelease || !Lockouts.Bay || Lockouts.BayTakers.Count == 0)
+            return;
+        var takers = Lockouts.BayTakers.Select(id => Crew.First(c => c.Id == id)).ToList();
+        if (takers.Any(t => t.Alive))
+            return;
+        Lockouts.Bay = false;
+        Lockouts.BayTakers.Clear();
+        Attend("the cold-sleep bay is yours again");
+        Ship("The cold-sleep bay is back in your hands: " + string.Join(" and ", takers.Select(t => t.Name))
+             + (takers.Count == 1 ? ", who held it, is" : ", who held it, are") + " dead.");
     }
 
     /// <summary>A promise kept to one of the takers, who now trusts the ship again, hands the bay back.</summary>

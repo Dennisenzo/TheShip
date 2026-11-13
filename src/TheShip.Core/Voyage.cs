@@ -210,7 +210,7 @@ public sealed partial class Voyage
     /// they learn it as evidence, the way they learn who is up when someone is thawed (<see cref="Meet"/>).
     /// <paramref name="witnessesSilent"/>: the caller has the witnesses say it in its own line (<c>LeftBehind</c>).
     /// </summary>
-    private void Kill(CrewMember c, string how, bool quiet = false, bool witnessesSilent = false)
+    internal void Kill(CrewMember c, string how, bool quiet = false, bool witnessesSilent = false)
     {
         if (!c.Alive)
             return;
@@ -226,6 +226,8 @@ public sealed partial class Voyage
             foreach (var w in Awake.ToList())
                 Learn(w, "alive:" + c.Id, "dead", "evidence", silent: witnessesSilent || quiet, witnessed: c.Name);
         DropIllnessOf(c);
+        if (Lockouts.BayTakers.Contains(c.Id))
+            MaybeFreeBay();
     }
 
     /// <summary>A sick person who has died needs no more treatment: their illness fault (and any patch of it that would return) goes.</summary>

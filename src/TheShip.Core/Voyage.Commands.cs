@@ -824,6 +824,8 @@ public sealed partial class Voyage
         var deaths = new List<string>();
         var events = new List<string>();
         var start = Clock;
+        // The bay's takers dying in the drift free it after the report, not before it.
+        _holdBayRelease = true;
         // A patch still holding at the last drift gives way on the way in (DESIGN.md, "How alerts are scheduled").
         var patchFailed = false;
         if (last && _patched.Count > 0)
@@ -921,7 +923,10 @@ public sealed partial class Voyage
         {
             if (heldSpeech)
                 ReleaseSpeech();
+            _holdBayRelease = false;
         }
+        // Before the ending and the crew's wake rule: a bay with no living taker is the ship's again.
+        MaybeFreeBay();
 
         if (last)
         {
