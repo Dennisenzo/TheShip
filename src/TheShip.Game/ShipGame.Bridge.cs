@@ -187,9 +187,8 @@ public sealed partial class ShipGame
         {
             if (who != null)
             {
-                if (!PushAllowed(pushRepair))
-                    return;
-                Act("repair " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: false));
+                if (PushAllowed(pushRepair))
+                    Act("repair " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: false));
             }
             else
                 Do(() => _picker = (fault, false, pickerX, y));
@@ -198,9 +197,8 @@ public sealed partial class ShipGame
         {
             if (who != null)
             {
-                if (!PushAllowed(pushPatch))
-                    return;
-                Act("patch " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: true));
+                if (PushAllowed(pushPatch))
+                    Act("patch " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: true));
             }
             else
                 Do(() => _picker = (fault, true, pickerX, y));
@@ -214,12 +212,14 @@ public sealed partial class ShipGame
 
     private double _lastPushClickAt = double.NegativeInfinity;
 
-    /// <summary>False when this click is a repeat of a push within <see cref="PushGuardSeconds"/> (game layer only; the rules are unchanged).</summary>
+    /// <summary>
+    /// False when this click would push past a bargain within <see cref="PushGuardSeconds"/> of the last Repair/Patch click for a
+    /// person (game layer only; the rules are unchanged). Every such click is stamped, pushing or not: the first click of a double
+    /// click makes the offer (or re-targets it to another fault) and must not let the second push.
+    /// </summary>
     private bool PushAllowed(bool pushing)
     {
-        if (!pushing)
-            return true;
-        var ok = _now - _lastPushClickAt >= PushGuardSeconds;
+        var ok = !pushing || _now - _lastPushClickAt >= PushGuardSeconds;
         _lastPushClickAt = _now;
         return ok;
     }

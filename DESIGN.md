@@ -266,7 +266,7 @@ Work terms tie the briefing to the repair. Each fault lists what a repairer can 
 
 Two of these come first, because they reuse the statement record and the compliance roll the prototype already has:
 
-1. Bargains that create promises with a due date (built, 2026-11-13: the ledger; the offer, acceptance and push; the "WITHOUT YOUR WORD" button with a 0.6 s double-click guard; the Waiting item with the price and the risk of pushing; the NEXT line; the balance bots). Accepting is still a spoken promise through the voice line: no new control.
+1. Bargains that create promises with a due date (built, 2026-11-13: the ledger; the offer, acceptance and push; the "WITHOUT YOUR WORD" button with a 0.6 s double-click guard counted from any Repair/Patch click for a person, so the click that makes the offer cannot be followed by a push; the Waiting item with the price and the risk of pushing; the NEXT line; the balance bots). Accepting is still a spoken promise through the voice line: no new control.
 2. Work terms set by the briefing.
 
 ## Alerts
@@ -558,7 +558,7 @@ Decided by the main session while the user was away, 2026-11-13 (first build of 
 | A promise that can no longer be kept? | Released with a ship line, no penalty (the partner died, the bay is taken, nothing to keep) |
 | Do promises move morale? | Yes: kept +3, broken -8, and morale moves work speed |
 | How long does a promise last? | 45 days (`PromiseDueDays`); a warning at 14 days left stops Advance |
-| What does pushing past a bargain look like? | The Repair/Patch button of a person with an open bargain reads "WITHOUT YOUR WORD" (tooltip: the price and the odds); a repeat click within 0.6 s real time is ignored, so a double click cannot push |
+| What does pushing past a bargain look like? | The Repair/Patch button of a person with an open bargain reads "WITHOUT YOUR WORD" (tooltip: the price and the odds); a push within 0.6 s real time of any Repair/Patch click for a person is ignored, so a double click (the first makes the offer) cannot push |
 | Is breaking a promise a winning strategy? | No, but it is not costly enough either: see "Balance", the Breaker bot (decision for the user) |
 
 ### Questions for playtest
