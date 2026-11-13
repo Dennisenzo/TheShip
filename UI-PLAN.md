@@ -5,9 +5,11 @@ DESIGN.md stays the leading document for the game's rules. This file only covers
 
 ## Status
 
-All six steps are written on the branch `feature/ui-plan` (2026-11-13), in a cloud session with no .NET SDK:
-**none of it has been compiled or run.** The first job is `dotnet build TheShip.slnx`, fixing what it reports, `dotnet test`,
-then a `--tour` run and a played run to look at every transition. The branch is not validated and not merged.
+All six steps are built on the branch `feature/ui-plan` (2026-11-13). Written first in a cloud session with no .NET SDK, then built
+(0 warnings), tested (442 pass at validation) and run through `--tour`. The validator's findings are fixed on the branch (a crew marker
+wins over a door under it, input during transitions goes through, the ending is logged at the click, transitions play on the bridge
+only, the short WAITING label, no state writes in draw, deselect on sleep, crew cards keep the pre-drift state during the roll).
+The tour runs with every duration at zero, so a played run is still the way to look at the transitions. Not merged yet.
 
 Where the code differs from the plan below:
 
