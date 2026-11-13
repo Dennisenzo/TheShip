@@ -32,6 +32,12 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     private int _prevWheel;
     private ButtonState _prevLeft = ButtonState.Released;
     private bool _click;
+    /// <summary>Seconds since the game started; the clock of everything that moves in the interface (<see cref="Motion"/>).</summary>
+    private double _now;
+    private bool _handCursor;
+    /// <summary>The screen the last frame showed, and when it was switched to (for the fade between screens).</summary>
+    private Screen _shownScreen = Screen.Bridge;
+    private double _screenAt = double.NegativeInfinity;
 
     private SpriteBatch _batch = null!;
     private Texture2D _pixel = null!;
@@ -47,15 +53,21 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     private SessionLog? _session;
     /// <summary>The person selected on the bridge: who you speak to alone, and who repair requests go to.</summary>
     private CrewMember? _target;
+    /// <summary>The selected person was up at the last update: when they are asleep now, they went back to sleep.</summary>
+    private bool _targetWasUp;
     private CrewMember? _dossier;
     private Screen _screen = Screen.Bridge;
     private bool _endingShown;
+    /// <summary>The ending is in the session log (written when the voyage ends, before the ending screen shows).</summary>
+    private bool _endingLogged;
     /// <summary>No model could be loaded: the window only shows why.</summary>
     private bool _fatal;
 
     public ShipGame(Options options)
     {
         _options = options;
+        // The tour's screenshots must not depend on timing: nothing moves while it runs.
+        Motion.Speed = options.TourDir is null ? 1f : 0f;
         _graphics = new GraphicsDeviceManager(this)
         {
             PreferredBackBufferWidth = Painter.ScreenWidth,
@@ -167,7 +179,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         if (_session.FilePath is { } file)
             Note("This run is recorded in " + file + ".");
         _session.Snapshot(_voyage);
-        Note("Wake someone from the crew list, then advance the clock. Type to speak to whoever is awake; select a person to speak to them alone.");
+        // The briefing explains the scenario; the tour opens it itself for its screenshot.
+        _briefingSeen = false;
+        _briefing = _options.TourDir is null;
     }
 
     private void Note(string text) => _voyage?.Log.Add(new LogEntry(LogKind.Help, "", text));
@@ -190,13 +204,22 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     /// While a said line is still being read the click waits for it (<see cref="ShipMind.AfterReading"/>), so the line
     /// counts at the moment it was said: before a Sleep, an Advance or a Repair clicked right after it.
     /// </summary>
-    private void Act(string what, Action action, bool snapshot = false) => Do(() =>
+    private void Act(string what, Action action, bool snapshot = false, SkipKind? skip = null) => Do(() =>
     {
         void Run()
         {
             _held.Remove(what);
             _session?.Line("click", what);
+            // A clock move is shown as a transition from what the screen showed before it (ShipGame.Transitions.cs).
+            Before? before = null;
+            if (skip is not null && _voyage is not null)
+                before = Snapshot(_voyage);
+            if (snapshot && _voyage is not null)
+                _logMark = _voyage.Log.Count; // log lines from here on are new since this clock move
+            _lastAdvance = null;
             action();
+            if (before is not null && skip is { } kind)
+                BeginTransition(kind, before);
             if (snapshot && _voyage is not null)
             {
                 _session?.Follow(_voyage);
@@ -231,7 +254,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     {
         if (_mind is not { Holding: true })
             return;
-        var dots = new string('.', 1 + (int)(DateTime.UtcNow.TimeOfDay.TotalMilliseconds / 400 % 3));
+        var dots = new string('.', 1 + (int)(_now * 1000 / 400 % 3));
         var text = (_held.Count > 0 ? "reading your line, your click waits" : "reading your line") + dots.PadRight(3);
         _p.TextRight(_p.Small, text, inputLine.Right - 14, inputLine.Y + 14, Painter.Dim);
     }
@@ -247,6 +270,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
 
     protected override void Update(GameTime gameTime)
     {
+        _now = gameTime.TotalGameTime.TotalSeconds;
+        if (_p != null)
+            _p.Now = _now;
         if (_loading is { IsCompleted: true } done)
         {
             _loading = null;
@@ -262,9 +288,14 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             }
         }
         _main.Drain();
+        // A person who died, or who went back to sleep, is no longer selected (a sleeper selected on purpose stays).
+        if (_target is { Alive: false } || _target is { State: CrewState.Asleep } && _targetWasUp)
+            _target = null;
+        _targetWasUp = _target is { State: CrewState.Awake or CrewState.Thawing };
 
         if (_actions.Count > 0)
         {
+            _banner = null; // the stop banner stays until the next click
             var actions = _actions.ToList();
             _actions.Clear();
             foreach (var action in actions)
@@ -281,6 +312,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         if (_prevLeft == ButtonState.Pressed && mouse.LeftButton == ButtonState.Released && IsActive)
             _click = true;
         _prevLeft = mouse.LeftButton;
+        if (_p != null)
+            _p.Down = mouse.LeftButton == ButtonState.Pressed && IsActive;
         _scroll += (mouse.ScrollWheelValue - _prevWheel) / 40;
         _prevWheel = mouse.ScrollWheelValue;
 
@@ -307,7 +340,11 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             if (_fatal)
                 Exit();
-            if (_screen == Screen.Record && _voyage is { Phase: Phase.Ended })
+            if (OverlayUp)
+                OverlayKey(enter: false);
+            else if (_transition is not null)
+                EndTransition();
+            else if (_screen == Screen.Record && _voyage is { Phase: Phase.Ended })
                 _screen = Screen.Ending;
             else if (_screen != Screen.Bridge)
                 _screen = Screen.Bridge;
@@ -319,6 +356,15 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         while (_typed.Count > 0)
         {
             var ch = _typed.Dequeue();
+            if (OverlayUp)
+            {
+                // Nothing is typed into the voice line while a popup is up; Enter confirms it.
+                if (ch == '\r' || ch == '\n')
+                    OverlayKey(enter: true);
+                continue;
+            }
+            // A key skips a running transition and still reaches the voice line.
+            EndTransition();
             if (_screen != Screen.Bridge)
                 continue;
             if (ch == '\b')
@@ -332,15 +378,23 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
                 _input.Append(ch);
         }
 
-        if (_voyage is { Phase: Phase.Ended, Ending: { } ending } && !_endingShown)
+        // The session log records the ending when the voyage ends (the click), so closing the window during the last
+        // drift's report does not lose it; the ending screen waits for the report to be closed.
+        if (_voyage is { Phase: Phase.Ended, Ending: { } ended } && !_endingLogged)
+        {
+            _endingLogged = true;
+            _session?.Follow(_voyage);
+            _session?.Ending(ended);
+            _session?.Snapshot(_voyage);
+        }
+        StepTransition();
+        StepOverlays();
+        if (_voyage is { Phase: Phase.Ended, Ending: { } ending } && !_endingShown && _transition is null)
         {
             _endingShown = true;
             _screen = Screen.Ending;
             _scroll = int.MaxValue / 2;
             ShowEnding(ending);
-            _session?.Follow(_voyage);
-            _session?.Ending(ending);
-            _session?.Snapshot(_voyage);
         }
         StepTour();
         base.Update(gameTime);
@@ -358,7 +412,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _scroll = 0;
         if (_voyage.Phase == Phase.Ended)
             return;
-        var hearers = _target is { State: CrewState.Awake } one ? new List<CrewMember> { one } : _voyage.Awake.ToList();
+        var hearers = Hearers(_voyage);
         if (hearers.Count == 0)
         {
             Note("Nobody is awake to hear you.");
@@ -396,8 +450,16 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
 
     protected override void Draw(GameTime gameTime)
     {
+        _p.Delta = (float)gameTime.ElapsedGameTime.TotalSeconds;
         DrawScene();
         _click = false;
+        if (_p.Denied)
+            _sounds.Denied();
+        if (_p.Hand != _handCursor)
+        {
+            _handCursor = _p.Hand;
+            Mouse.SetCursor(_handCursor ? MouseCursor.Hand : MouseCursor.Arrow);
+        }
         base.Draw(gameTime);
     }
 
@@ -407,6 +469,20 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         GraphicsDevice.Clear(Painter.Ground);
         var view = View();
         _p.Click = _click;
+        _p.BeginFrame();
+        // Under an overlay the screen is drawn as if the mouse were elsewhere; the overlay then gets the real mouse and click.
+        // Under a running transition only its own box (the year, the drift report, the alert title) keeps the mouse from the screen.
+        var overlay = _voyage is not null && OverlayUp;
+        // A running transition lets the screen have the mouse, except over its own box.
+        var playing = _voyage is not null && !overlay && _transition is not null && _screen == Screen.Bridge;
+        var mouse = _p.Mouse;
+        var down = _p.Down;
+        if (overlay || playing && TransitionBlock(_voyage!) is { } block && _p.Over(block))
+        {
+            _p.Click = false;
+            _p.Down = false;
+            _p.Mouse = new Vector2(-1000, -1000);
+        }
         _batch.Begin(transformMatrix: Matrix.CreateScale(view.Scale, view.Scale, 1f) * Matrix.CreateTranslation(view.X, view.Y, 0f));
         if (_voyage is null)
         {
@@ -430,6 +506,29 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             DrawBridge(_voyage);
         }
+        if (_voyage is not null)
+        {
+            // A change of screen fades in; the ending takes its time.
+            if (_screen != _shownScreen)
+            {
+                _shownScreen = _screen;
+                _screenAt = _now;
+            }
+            var cover = 1f - Motion.Progress(_now, _screenAt, _screen == Screen.Ending ? Motion.EndingFade : Motion.ScreenFade);
+            if (cover > 0f)
+                _p.Fill(new Rectangle(0, 57, Painter.ScreenWidth, Painter.ScreenHeight - 57), Painter.Fade(Painter.Ground, cover));
+        }
+        if (overlay || playing)
+        {
+            _p.Click = _click;
+            _p.Down = down;
+            _p.Mouse = mouse;
+            if (overlay)
+                DrawOverlay(_voyage!);
+            else
+                DrawTransition(_voyage!);
+        }
+        _p.EndFrame();
         _batch.End();
     }
 
@@ -448,7 +547,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _p.Text(_p.Head, title, x, 16, Painter.Bright);
         x += (int)_p.Head.MeasureString(title).X + 32;
         _p.Text(_p.Small, "YEAR", x, 21, Painter.Dim);
-        _p.Text(_p.Head, Math.Floor(v.Year).ToString("0"), x + 44, 16, Painter.Bright);
+        _p.Text(_p.Head, Math.Floor(ShownClock(v) / Tuning.HoursPerYear).ToString("0"), x + 44, 16, Painter.Bright);
         _p.Text(_p.Small, "/ " + Scenario.ArrivalYear, x + 76, 21, Painter.Dim);
         var phase = v.Phase switch
         {
@@ -456,16 +555,20 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             Phase.Aftermath => "AFTERMATH OF ALERT " + v.Current.Number + ": " + v.Current.Title.ToUpperInvariant(),
             _ => v.Ending?.Title.ToUpperInvariant() ?? "ARRIVED",
         };
-        if (v.Phase == Phase.Ended && _screen != Screen.Ending)
+        // While the years roll and the drift report is up, the header does not give the new alert (or the ending) away.
+        if (Drifting)
+            phase = "DRIFT";
+        if (v.Phase == Phase.Ended && _screen != Screen.Ending && !Drifting)
         {
             // The ending screen can always be opened again.
             var edge = Painter.ScreenWidth - 16;
-            if (_p.Button(new Rectangle(title == "THE SHIP" ? edge - 410 : edge - 110, 8, 110, 40), "ENDING"))
+            if (_p.Button(new Rectangle(title == "THE SHIP" ? edge - 520 : edge - 110, 8, 110, 40), "ENDING"))
                 Do(() => _screen = Screen.Ending);
         }
         var chip = new Rectangle(x + 124, 14, (int)(phase.Length * _p.SmallWidth) + 20, 28);
-        _p.Frame(chip, v.Phase == Phase.Alert ? Painter.Accent : Painter.Wire);
-        _p.Text(_p.Small, phase, chip.X + 10, chip.Y + 6, v.Phase == Phase.Alert ? Painter.Accent : Painter.Ink);
+        var alert = v.Phase == Phase.Alert && !Drifting;
+        _p.Frame(chip, alert ? Painter.Accent : Painter.Wire);
+        _p.Text(_p.Small, phase, chip.X + 10, chip.Y + 6, alert ? Painter.Accent : Painter.Ink);
         // The lockouts the crew hold: a chip each, so the loss of Wake and Sleep is never a mystery.
         var lockText = v.Lockouts.Bay ? "BAY TAKEN BY THE CREW" : v.Lockouts.BayWarned.Count > 0 ? "CREW WILL TAKE THE BAY" : null;
         if (lockText != null)
