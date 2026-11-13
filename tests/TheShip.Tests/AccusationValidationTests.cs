@@ -175,4 +175,16 @@ public class AccusationValidationTests
         Assert.Equal(caught + 1, lin.CaughtLies);
         Assert.Equal(1, v.AccusationsDenied);
     }
+
+    [Fact]
+    public void The_accusation_text_uses_the_persons_pronoun()
+    {
+        var (v, mara, _) = Lied();
+        v.ReadLog(mara, v.GetFact("date"));
+        var text = v.AccusationText(mara)!;
+        Assert.Contains("Tell her what is true, or she will check everything you told her", text);
+        Assert.DoesNotContain("them", text);
+        Assert.Equal("him", v.Find("idris")!.Them);
+        Assert.Equal("they", new CrewMember { Id = "x", Name = "X", Role = "r", Skills = new(), Traits = Array.Empty<Trait>(), Want = Want.StayAwake }.They);
+    }
 }

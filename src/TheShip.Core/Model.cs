@@ -36,6 +36,10 @@ public sealed class CrewMember
     public string? PartnerId { get; init; }
     /// <summary>"he" or "she": who a crew line's pronoun can mean (<see cref="RuleReader.PersonClaims"/>). Null matches either.</summary>
     public string? Pronoun { get; init; }
+    /// <summary>The subject pronoun for lines about them: "she", "he", or "they" when none is set.</summary>
+    public string They => Pronoun ?? "they";
+    /// <summary>The object pronoun: "her", "him" or "them".</summary>
+    public string Them => Pronoun switch { "she" => "her", "he" => "him", _ => "them" };
     /// <summary>How this person talks and who they are; null for a crew member made without one (tests).</summary>
     public CrewSheet? Sheet { get; init; }
 

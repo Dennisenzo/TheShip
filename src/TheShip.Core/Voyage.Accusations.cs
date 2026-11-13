@@ -99,7 +99,7 @@ public sealed partial class Voyage
     {
         if (OpenAccusation(c) is not { } a || Statements.FirstOrDefault(x => x.Id == a.StatementId) is not { } s)
             return null;
-        return c.Name + " caught you: you said \"" + s.Text.Trim() + "\" (" + c.Name + " " + a.How + "). Tell them what is true, or they will check everything you told them ("
+        return c.Name + " caught you: you said \"" + s.Text.Trim() + "\" (" + c.Name + " " + a.How + "). Tell " + c.Them + " what is true, or " + c.They + " will check everything you told " + c.Them + " ("
                + a.BeatsLeft * 2 + " weeks).";
     }
 }
