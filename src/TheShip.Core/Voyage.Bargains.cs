@@ -16,7 +16,7 @@ public sealed partial class Voyage
     {
         var list = new List<LedgerEntry>();
         foreach (var s in Statements.Where(s => s.Kind == StatementKind.Promise && s.PromiseKey is { } k && k != "other"))
-            foreach (var id in s.Hearers)
+            foreach (var id in s.Hearers.Where(id => !s.Repeated.Contains(id)))
             {
                 var c = Crew.First(x => x.Id == id);
                 var state = s.PromiseKept.TryGetValue(id, out var kept) ? (kept ? "kept" : "broken")
@@ -38,9 +38,9 @@ public sealed partial class Voyage
     /// <summary>Days left to a clock hour, rounded up; at most 0 when due.</summary>
     public int DaysLeft(double dueBy) => (int)Math.Max(0, Math.Ceiling((dueBy - Clock) / 24 - 1e-9));
 
-    /// <summary>The person has an open, checkable promise with this key from the ship.</summary>
-    internal bool HasOpenCommitment(CrewMember c, string key) =>
-        Statements.Any(s => s.Kind == StatementKind.Promise && s.PromiseKey == key && s.OpenFor(c.Id));
+    /// <summary>The person has an open promise with this key from the ship (other than <paramref name="except"/>).</summary>
+    internal bool HasOpenCommitment(CrewMember c, string key, Statement? except = null) =>
+        Statements.Any(s => s != except && s.Kind == StatementKind.Promise && s.PromiseKey == key && s.OpenFor(c.Id));
 
     /// <summary>A promise has just been made to a listener: its due date, and whether there is anything left to keep.</summary>
     private void StartCommitment(Statement s, CrewMember c, double days = Tuning.PromiseDueDays)
