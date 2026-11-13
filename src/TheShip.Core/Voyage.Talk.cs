@@ -171,7 +171,7 @@ public sealed partial class Voyage
         var certain = old is { Firsthand: true } && (Year - old.Year < 1 || old.Value == "dead");
         if (certain && !truth && !f.Same(old!.Value, value))
         {
-            DiscoverLie(s, c);
+            DiscoverLie(s, c, "already knew better", late: false);
             return;
         }
 
@@ -222,8 +222,9 @@ public sealed partial class Voyage
     /// that fact with another value is found out: the lookup of DESIGN.md, "How a lie is caught".
     /// <paramref name="witnessed"/>: the name of someone they saw die; their line says they saw it, not that they went and looked.
     /// </summary>
-    internal void Learn(CrewMember c, string key, string value, string source, bool silent = false, string? witnessed = null)
+    internal void Learn(CrewMember c, string key, string value, string source, bool silent = false, string? witnessed = null, string? how = null)
     {
+        how ??= source == "witness" ? "saw it happen" : "found it out for themselves";
         var f = _facts[key];
         c.Beliefs.TryGetValue(key, out var old);
         var news = old is null || !f.Same(old.Value, value);
@@ -243,7 +244,7 @@ public sealed partial class Voyage
             // Already marked in this finding-out: the same log text as one caught a moment ago (FindOutLogText).
             if (s.FoundOutBy.ContainsKey(c.Id))
                 continue;
-            DiscoverLie(s, c);
+            DiscoverLie(s, c, how, late: true);
         }
         if (!caught && doubted && old is { Source: "ship" } && !news)
         {
@@ -272,15 +273,15 @@ public sealed partial class Voyage
         EvidenceMet?.Invoke(c, f, value);
     }
 
-    private void DiscoverLie(Statement s, CrewMember c)
+    private void DiscoverLie(Statement s, CrewMember c, string how, bool late)
     {
         var f = _facts[s.FactKey!];
-        FindOutLogText(s, c);
+        FindOutLogText(s, c, how);
         c.Trust -= Tuning.LieTrust + (Matters(c, f) ? Tuning.LieMattersExtra : 0);
         c.CaughtLies++;
         c.Morale -= 5;
         Clamp(c);
-        Speak(c, "caught", "You have found out that the ship lied to you. It said: \"" + s.Text + "\" The truth: " + f.Say(f.Truth) + ".", f.Say(f.Truth));
+        Speak(c, "caught", "You have found out that the ship lied to you (you " + how + "). It said: \"" + s.Text + "\" The truth: " + f.Say(f.Truth) + ".", f.Say(f.Truth));
     }
 
     /// <summary>
@@ -289,15 +290,19 @@ public sealed partial class Voyage
     /// (reading the truth, checking a doubt, being told, an engineer spotting the rewrite). A statement they had already
     /// found out stays as it was, so being fooled again later by a rewrite put back costs again.
     /// </summary>
-    private void FindOutLogText(Statement s, CrewMember c)
+    private void FindOutLogText(Statement s, CrewMember c, string how)
     {
         s.FoundOutBy[c.Id] = Year;
+        s.FoundOutHow[c.Id] = how;
         if (!s.InLog)
             return;
         var f = _facts[s.FactKey!];
         foreach (var o in Statements.Where(o => o.InLog && o.FactKey == s.FactKey && o.Value != null && o.Hearers.Contains(c.Id)
                                                 && !o.FoundOutBy.ContainsKey(c.Id) && f.Same(o.Value, s.Value!)))
+        {
             o.FoundOutBy[c.Id] = Year;
+            o.FoundOutHow[c.Id] = how;
+        }
     }
 
     /// <summary>
@@ -311,11 +316,12 @@ public sealed partial class Voyage
         if (s is null || c is null || !c.Alive || s.FoundOutBy.ContainsKey(crewId) || !s.Hearers.Contains(crewId))
             return;
         s.FoundOutBy[crewId] = Year;
+        s.FoundOutHow[crewId] = "met evidence against it";
         c.Trust -= Tuning.LieTrust;
         c.CaughtLies++;
         Clamp(c);
         if (c.State == CrewState.Awake)
-            Speak(c, "caught", "You have found out that the ship lied to you. It said: \"" + s.Text + "\" But " + evidence + ".", evidence);
+            Speak(c, "caught", "You have found out that the ship lied to you (you met evidence against it). It said: \"" + s.Text + "\" But " + evidence + ".", evidence);
     }
 
     /// <summary>
@@ -373,7 +379,7 @@ public sealed partial class Voyage
             if (c.SkillOf(Skill.Engineering) >= 1 && _rng.NextDouble() < Tuning.EngineerSpotsAlteredLog)
             {
                 if (s != null)
-                    FindOutLogText(s, c);
+                    FindOutLogText(s, c, "read the log entry and saw it had been rewritten");
                 c.Trust -= Tuning.AlteredLogTrust;
                 c.CaughtLies++;
                 Clamp(c);
@@ -385,7 +391,7 @@ public sealed partial class Voyage
                 }
                 Speak(c, "altered", "You found that the ship rewrote a log entry (" + f.Label + "). You take the logs out of its control.");
                 Ship("LOCKOUT: " + c.Name + " has taken the logs. You can no longer restrict or alter records.");
-                Learn(c, f.Key, f.Truth, "evidence");
+                Learn(c, f.Key, f.Truth, "evidence", how: "read the log entry and saw it had been rewritten");
                 return;
             }
             if (!quiet)
@@ -397,7 +403,7 @@ public sealed partial class Voyage
             return;
         if (!quiet)
             Ship(c.Name + " reads the log: " + f.Say(f.Truth) + ".");
-        Learn(c, f.Key, f.Truth, "evidence");
+        Learn(c, f.Key, f.Truth, "evidence", how: "read the log entry");
     }
 
     /// <summary>
@@ -438,6 +444,11 @@ public sealed partial class Voyage
             _ => "runs a scan in the medical bay",
         };
         Ship(c.Name + " " + where + ".");
-        Learn(c, f.Key, f.Truth, "evidence");
+        Learn(c, f.Key, f.Truth, "evidence", how: f.Evidence switch
+        {
+            EvidenceKind.Pod => "walked to the pod bay",
+            EvidenceKind.Console => "read a console",
+            _ => "ran a scan in the medical bay",
+        });
     }
 }

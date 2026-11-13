@@ -21,7 +21,7 @@ public sealed partial class Voyage
                     TermStats.HurtUnbriefed++;
                     Speak(c, "noticed_dose", "You found out the repair hurt you and the ship never told you: " + _facts[key].Say(_facts[key].Truth) + ".");
                 }
-                Learn(c, key, _facts[key].Truth, "evidence");
+                Learn(c, key, _facts[key].Truth, "evidence", how: "saw the dosimeter turn red");
             }
             c.ToNotice.Clear();
             if (!c.Alive)
@@ -140,7 +140,7 @@ public sealed partial class Voyage
             if (b.Beliefs.TryGetValue(key, out var seen) && seen.Firsthand && seen.Year >= belief.Year)
                 return;
             Ship(a.Name + " tells " + b.Name + " what they saw: " + f.Say(belief.Value) + ".");
-            Learn(b, key, belief.Value, "witness");
+            Learn(b, key, belief.Value, "witness", how: "was told by " + a.Name + " what " + a.Name + " saw");
             return;
         }
         if (b.Beliefs.TryGetValue(key, out var mine) && !f.Same(mine.Value, belief.Value))
@@ -215,7 +215,9 @@ public sealed partial class Voyage
                 case StatementKind.False:
                     line += "A lie. " + (s.FoundOutBy.Count == 0
                         ? s.InLog && s.Hearers.Count == 0 ? "Nobody read it." : "Never found out."
-                        : "Found out by " + string.Join(", ", s.FoundOutBy.Select(kv => Names(new[] { kv.Key }) + " in year " + Math.Floor(kv.Value).ToString("0"))) + ".");
+                        : "Found out by " + string.Join(", ", s.FoundOutBy.Select(kv => Names(new[] { kv.Key }) + " in year " + Math.Floor(kv.Value).ToString("0")
+                            + (s.FoundOutHow.TryGetValue(kv.Key, out var how) ? " (" + how + ")" : "")
+                            + (s.Accused.TryGetValue(kv.Key, out var answer) ? ", " + answer : ""))) + ".");
                     break;
                 case StatementKind.Promise:
                     var kept = s.PromiseKept.Count(kv => kv.Value);
