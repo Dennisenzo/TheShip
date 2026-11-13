@@ -23,7 +23,7 @@ Each step is one commit. Numbers go in `Tuning.cs`.
    whether they refuse work or sleep until answered, whether the truth makes them refuse the repair, and how they could check the answer.
    `Voyage.RepairChance` is taken out of `CompleteRepair` so the odds shown are the odds rolled. `Voyage.CheckWays` is the fact half of `Exposure`.
 2. **Relief (Core, the one rule change).** The good answer to a question a person asked, or that matters to them, lifts morale by `Tuning.ReliefMorale` (6)
-   when it is news and they believe it. A true good answer earns it; a lie borrows it, and pays the hard truth's morale back on discovery (already built).
+   when it is news and they believe it. Morale sets work speed (`Voyage.MoraleRate`: 1 + (average morale - 70) / 150, within 0.8 and 1.15, applied to fault progress and the card's "Done in N h" verdict), so the relief and the truth's cost are hours on the clock; the stakes text says them ("work about 1 h slower"). A true good answer earns it; a lie borrows it, and pays the hard truth's morale back on discovery (already built).
 3. **Honesty credited at the drift (Core).** The drift report is followed by one line per person whose pending hard-truth trust arrived,
    naming what they were told. *Withdrawn after validation (user decision, 2026-11-13):* only a true statement earns that trust, so the line
    told the player which statements were true. The trust still arrives at the drift, but no line names it; "the player never sees whether a
@@ -57,5 +57,5 @@ morale only moves the repair chance, which is capped at 0.97). Fixes after valid
 
 ## Still open
 
-- Relief has no effect on any bot outcome yet (see above); a later step gives it a real one.
+- (Closed) Relief had no effect on any bot outcome: morale now sets work speed. Landfall, before -> after: Honest 48.5% -> 43.5%, Liar 20% -> 17.5%, Careless 18.5% -> 16.5%, Thrifty 36% -> 39%, Silent 25% -> 22.5%.
 - Look at the bridge with two and three people asking in play: by measurement the stakes text is at most 6 of the 8 lines that fit.
