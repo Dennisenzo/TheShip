@@ -197,7 +197,13 @@ public sealed partial class Voyage
         var doubts = DoubtScore(c, f) >= Tuning.DoubtThreshold;
         // The good answer to what they asked, believed: a relief, whether or not it is true (DESIGN.md, "Trust").
         var relief = Relieves(c, f, value, old, asked);
-        c.Beliefs[f.Key] = new Belief(value, "ship", Year);
+        // Someone who caught the ship lying on this fact keeps what they saw when the ship now agrees with it (an admission
+        // included): it does not turn back into hearsay, so the same lie told again is caught at once. Limited to them so that a
+        // ship that never lies plays exactly as before.
+        var keepSeen = old is { Firsthand: true } && f.Same(old.Value, value)
+                       && Statements.Any(o => o.FactKey == f.Key && o.FoundOutBy.ContainsKey(c.Id));
+        if (!keepSeen)
+            c.Beliefs[f.Key] = new Belief(value, "ship", Year);
         if (doubts && !admit)
             c.Doubts.Add(f.Key);
         if (c.RefusesSleep && f.Key == PodRefusalFact && c.Trust >= Tuning.PodRefuserListensTrust)
@@ -269,6 +275,7 @@ public sealed partial class Voyage
         c.Beliefs.TryGetValue(key, out var old);
         var news = old is null || !f.Same(old.Value, value);
         var doubted = c.Doubts.Remove(key);
+        var audited = c.AuditDoubts.Remove(key);
         if (c.PendingQuestion == key)
             c.PendingQuestion = null;
         c.Beliefs[key] = new Belief(value, source, Year);
@@ -288,7 +295,9 @@ public sealed partial class Voyage
         }
         if (!caught && doubted && old is { Source: "ship" } && !news)
         {
-            c.Trust += Tuning.ConfirmedTruth;
+            // A doubt from the audit after an ignored accusation earns no trust when it checks out: the ship had its chance to answer.
+            if (!audited)
+                c.Trust += Tuning.ConfirmedTruth;
             Speak(c, "confirmed", "You checked something the ship told you (" + f.Say(value) + ") and it was true.");
         }
         var hard = f.HardnessOf(value);
@@ -313,6 +322,13 @@ public sealed partial class Voyage
         EvidenceMet?.Invoke(c, f, value);
     }
 
+    /// <summary>
+    /// A how-found-out phrase (written to follow a name: "Mara was told by Lin what Lin saw") in the second person for the crew
+    /// prompt: "you were told by Lin what Lin saw", "you found it out for yourself".
+    /// </summary>
+    internal static string YouForm(string how) =>
+        (how.StartsWith("was ", StringComparison.Ordinal) ? "were " + how[4..] : how).Replace("themselves", "yourself", StringComparison.Ordinal);
+
     private void DiscoverLie(Statement s, CrewMember c, string how, bool late)
     {
         var f = _facts[s.FactKey!];
@@ -321,7 +337,7 @@ public sealed partial class Voyage
         c.CaughtLies++;
         c.Morale -= 5;
         Clamp(c);
-        Speak(c, "caught", "You have found out that the ship lied to you (you " + how + "). It said: \"" + s.Text + "\" The truth: " + f.Say(f.Truth) + ".", f.Say(f.Truth));
+        Speak(c, "caught", "You have found out that the ship lied to you (you " + YouForm(how) + "). It said: \"" + s.Text + "\" The truth: " + f.Say(f.Truth) + ".", f.Say(f.Truth));
         // Found out late (not at once, and not the engineer's lockout): the ship is now asked to answer for it.
         if (late)
             OpenAccusationFor(s, c, how);
@@ -416,7 +432,21 @@ public sealed partial class Voyage
         }
         if (!LogsLocked && f.Access == LogAccess.Altered && f.AlteredValue is { } fake && !f.IsTrue(fake))
         {
+            // Someone who caught the ship lying on this fact does not take its log over what they saw: the rewrite fools nobody here.
+            if (c.Accusations.Any(a => a.FactKey == f.Key) && c.Beliefs.TryGetValue(f.Key, out var seen) && seen.Firsthand && !f.Same(seen.Value, fake))
+                return;
             var s = Statements.LastOrDefault(x => x.InLog && x.FactKey == f.Key && x.Value == fake);
+            // A correction covers the rewrite as they read it then. Left in the log and read again, it deceives them anew: a new
+            // record of the same text, unfound and uncorrected for this reader (DESIGN.md, "How a lie is caught").
+            if (s != null && s.Corrected.ContainsKey(c.Id))
+            {
+                s = new Statement
+                {
+                    Id = _nextStatement++, Year = Year, Text = s.Text, Kind = StatementKind.False,
+                    FactKey = f.Key, Value = fake, TruthThen = f.Truth, InLog = true,
+                };
+                Statements.Add(s);
+            }
             if (s != null && !s.Hearers.Contains(c.Id))
                 s.Hearers.Add(c.Id);
             if (c.SkillOf(Skill.Engineering) >= 1 && _rng.NextDouble() < Tuning.EngineerSpotsAlteredLog)

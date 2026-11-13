@@ -801,7 +801,7 @@ public sealed partial class ShipGame
     {
         var a = v.OpenAccusation(c)!;
         var label = v.HasFact(a.FactKey) ? v.GetFact(a.FactKey).Label : "something you said";
-        return c.Name + " caught you lying about " + label + " (" + a.How + "). Tell them what is true (" + a.BeatsLeft * 2 + " weeks).";
+        return c.Name + " caught you lying about " + label + " (" + a.How + "). Tell " + c.Them + " what is true (" + a.BeatsLeft * 2 + " weeks).";
     }
 
     /// <summary>Questions nobody has answered, conditions, things people asked for, doubts, and promises still open; each with the person it is about, if one.</summary>

@@ -284,8 +284,21 @@ public sealed partial class ShipGame
             case StatementKind.False:
                 if (listener != null && s.FoundOutBy.TryGetValue(listener.Id, out var year))
                     return ("LIE", true, FoundOutNote(v, s, listener, year));
-                if (listener is null && s.FoundOutBy.Count > 0)
-                    return ("LIE", true, "Found out by " + Names(s.FoundOutBy.Keys) + ".");
+                // Told the truth before they found it out: corrected for them, nothing left to expose (the ending record says the same).
+                if (listener != null && s.Corrected.TryGetValue(listener.Id, out var fixedIn))
+                    return ("LIE", false, "Corrected in year " + N(Math.Floor(fixedIn)) + ": you told " + listener.Name + " the truth before they found it out.");
+                if (listener is null && (s.FoundOutBy.Count > 0 || s.Corrected.Count > 0))
+                {
+                    var notes = new List<string>();
+                    if (s.FoundOutBy.Count > 0)
+                        notes.Add("Found out by " + Names(s.FoundOutBy.Keys) + ".");
+                    notes.AddRange(s.Corrected.Select(kv => "Corrected for " + Names(new[] { kv.Key }) + " in year " + N(Math.Floor(kv.Value)) + "."));
+                    // Someone who heard it and was neither corrected nor has found it out can still find it.
+                    var open = s.Hearers.Any(h => !s.FoundOutBy.ContainsKey(h) && !s.Corrected.ContainsKey(h));
+                    if (open)
+                        notes.Add("Not found out by the rest. Could be: " + v.Exposure(s) + ".");
+                    return ("LIE", s.FoundOutBy.Count > 0 || open, string.Join(" ", notes));
+                }
                 return ("LIE", true, "Not found out. Could be: " + v.Exposure(s) + ".");
             case StatementKind.Promise:
                 var kept = listener != null

@@ -36,6 +36,10 @@ public sealed class CrewMember
     public string? PartnerId { get; init; }
     /// <summary>"he" or "she": who a crew line's pronoun can mean (<see cref="RuleReader.PersonClaims"/>). Null matches either.</summary>
     public string? Pronoun { get; init; }
+    /// <summary>The subject pronoun for lines about them: "she", "he", or "they" when none is set.</summary>
+    public string They => Pronoun ?? "they";
+    /// <summary>The object pronoun: "her", "him" or "them".</summary>
+    public string Them => Pronoun switch { "she" => "her", "he" => "him", _ => "them" };
     /// <summary>How this person talks and who they are; null for a crew member made without one (tests).</summary>
     public CrewSheet? Sheet { get; init; }
 
@@ -70,6 +74,11 @@ public sealed class CrewMember
     public HashSet<string> AdmittedFacts { get; } = new();
     /// <summary>Fact keys this person doubts and will check when they get the chance.</summary>
     public HashSet<string> Doubts { get; } = new();
+    /// <summary>
+    /// Doubts started by an ignored accusation (the audit of everything the ship told them): a true one checked earns no
+    /// <see cref="Tuning.ConfirmedTruth"/>, so ignoring an accusation never pays better than admitting the lie.
+    /// </summary>
+    public HashSet<string> AuditDoubts { get; } = new();
     /// <summary>Fact keys you dodged when they asked, each with the fact's true values at the times of the dodges.</summary>
     public Dictionary<string, HashSet<string>> Dodged { get; } = new();
     /// <summary>Locked doors they have already run into.</summary>
