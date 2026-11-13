@@ -137,16 +137,54 @@ public sealed partial class Voyage
     private void Ship(string text) => Log.Add(new LogEntry(LogKind.Ship, "SHIP", text));
     private void Recorded(string text, string? secret = null) => Log.Add(new LogEntry(LogKind.Recorded, "", text) { Secret = secret });
 
+    /// <summary>Crew lines held back while a step that can kill runs (<see cref="HoldSpeech"/>), with their speakers.</summary>
+    private List<(CrewMember Speaker, LogEntry Entry)>? _heldSpeech;
+
     private void Speak(CrewMember c, string kind, string decision, string detail = "")
     {
+        // The dead say nothing.
+        if (!c.Alive)
+            return;
         var entry = new LogEntry(LogKind.Crew, c.Name.ToUpperInvariant(), Lines.For(c, kind, _rng, detail))
         {
             CrewId = c.Id,
             Intent = new CrewIntent(kind, decision),
         };
+        if (_heldSpeech != null)
+            _heldSpeech.Add((c, entry));
+        else
+            Emit(c, entry);
+    }
+
+    private void Emit(CrewMember c, LogEntry entry)
+    {
         Log.Add(entry);
         Attend(c.Name + " has something to say");
         CrewSpoke?.Invoke(entry);
+    }
+
+    /// <summary>
+    /// Holds crew lines back for a step in which several people can die (time passing, a drift): only those still alive
+    /// after the whole step say what they said in it. Returns whether this call started the hold (and must release it).
+    /// </summary>
+    private bool HoldSpeech()
+    {
+        if (_heldSpeech != null)
+            return false;
+        _heldSpeech = new();
+        return true;
+    }
+
+    /// <summary>Ends a hold: the lines of those still alive are said, in order; the lines of those who died in the step are dropped.</summary>
+    private void ReleaseSpeech()
+    {
+        var held = _heldSpeech;
+        _heldSpeech = null;
+        if (held is null)
+            return;
+        foreach (var (c, entry) in held)
+            if (c.Alive)
+                Emit(c, entry);
     }
 
     private static void Clamp(CrewMember c)
@@ -183,9 +221,10 @@ public sealed partial class Voyage
         Attend(c.Name + " died");
         if (!quiet)
             Ship(c.Name + " " + how + ".");
+        // A quiet death is part of a drift report: the witnesses take it in silently, the report says it.
         if (seen)
             foreach (var w in Awake.ToList())
-                Learn(w, "alive:" + c.Id, "dead", "evidence", silent: witnessesSilent);
+                Learn(w, "alive:" + c.Id, "dead", "evidence", silent: witnessesSilent || quiet, witnessed: c.Name);
         DropIllnessOf(c);
     }
 

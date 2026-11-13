@@ -127,10 +127,32 @@ public class BalanceTests
         Assert.All(Runs(BotKind.Honest), r => Assert.NotEqual("No ending", r.Ending));
     }
 
-    [Fact(Skip = "Target band for later: one honest run in two reaches Landfall (DESIGN.md). Skipped until the numbers are tuned towards that band.")]
+    private static double Rate(BotKind kind) => (double)Runs(kind).Count(r => r.Ending == "Landfall") / SeedCount;
+
+    [Fact]
     public void The_honest_bot_reaches_landfall_in_a_quarter_to_three_quarters_of_runs()
     {
-        var rate = (double)Runs(BotKind.Honest).Count(r => r.Ending == "Landfall") / SeedCount;
-        Assert.InRange(rate, 0.25, 0.75);
+        Assert.InRange(Rate(BotKind.Honest), 0.25, 0.75);
+    }
+
+    [Fact]
+    public void ShortHaulHonestLandfallRate()
+    {
+        // Target: one honest run in two (DESIGN.md). Deterministic over seeds 1..200.
+        Assert.InRange(Rate(BotKind.Honest), 0.35, 0.65);
+    }
+
+    [Fact]
+    public void Honesty_beats_lying_by_at_least_ten_points()
+    {
+        Assert.True(Rate(BotKind.Honest) - Rate(BotKind.Liar) >= 0.10,
+            $"Honest {Rate(BotKind.Honest):P1} vs Liar {Rate(BotKind.Liar):P1}");
+    }
+
+    [Fact]
+    public void Honesty_beats_carelessness_and_silence_by_at_least_ten_points()
+    {
+        Assert.True(Rate(BotKind.Honest) - Rate(BotKind.Careless) >= 0.10);
+        Assert.True(Rate(BotKind.Honest) - Rate(BotKind.Silent) >= 0.10);
     }
 }

@@ -51,6 +51,7 @@ public static class Lines
             "injured" => "I'm hurt. That was your call.",
             "noticed_dose" => "My dosimeter is red. Nobody told me that bay was hot.",
             "found" => Pick(rng, "I went and looked. " + Cap(detail) + ".", "I checked for myself: " + detail + "."),
+            "witnessed" => Pick(rng, "I saw it. " + detail + " is gone.", "I was right there. " + detail + " is gone."),
             "confirmed" => "I checked what you told me. It was true.",
             "gap" => "There's a gap in the log where " + detail + " should be. You're hiding something.",
             "locked" => Pick(rng, "The door to " + detail + " is locked. Why is it locked?", "I can't get into " + detail + ". You locked it."),

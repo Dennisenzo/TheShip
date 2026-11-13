@@ -101,7 +101,10 @@ public sealed partial class Voyage
                     if (l.PendingQuestion is not { } q)
                         continue;
                     // A dodge is not an answer: the question stays pending. Its trust cost is charged once per question.
-                    l.Dodged.Add(q);
+                    // What the answer was when it was avoided: a dodge only hid what was already true (Learn).
+                    if (!l.Dodged.TryGetValue(q, out var truths))
+                        l.Dodged[q] = truths = new HashSet<string>();
+                    truths.Add(_facts[q].Truth);
                     if (!l.DodgeCharged)
                     {
                         l.DodgeCharged = true;
@@ -182,8 +185,9 @@ public sealed partial class Voyage
     /// <summary>
     /// A person comes to hold a value for a fact. From evidence or a witness, every false statement they heard about
     /// that fact with another value is found out: the lookup of DESIGN.md, "How a lie is caught".
+    /// <paramref name="witnessed"/>: the name of someone they saw die; their line says they saw it, not that they went and looked.
     /// </summary>
-    internal void Learn(CrewMember c, string key, string value, string source, bool silent = false)
+    internal void Learn(CrewMember c, string key, string value, string source, bool silent = false, string? witnessed = null)
     {
         var f = _facts[key];
         c.Beliefs.TryGetValue(key, out var old);
@@ -215,10 +219,16 @@ public sealed partial class Voyage
         if (hard > 0 && news)
         {
             c.Morale -= hard;
-            if (c.Dodged.Contains(key))
+            // The dodge is found out only if it hid this: the answer was already this when the ship avoided the question.
+            if (c.Dodged.TryGetValue(key, out var hidden) && hidden.Any(h => f.Same(h, value)))
                 c.Trust -= Tuning.Dodge;
             if (!caught && !silent)
-                Speak(c, "found", "You found out for yourself, not from the ship: " + f.Say(value) + ".", f.Say(value));
+            {
+                if (witnessed != null)
+                    Speak(c, "witnessed", "You saw it happen in front of you: " + f.Say(value) + ".", witnessed);
+                else
+                    Speak(c, "found", "You found out for yourself, not from the ship: " + f.Say(value) + ".", f.Say(value));
+            }
         }
         Clamp(c);
         EvidenceMet?.Invoke(c, f, value);

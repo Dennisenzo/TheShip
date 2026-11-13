@@ -19,8 +19,13 @@ public sealed partial class ShipGame
 
     private void StepTour()
     {
-        if (_options.TourDir is not { } dir || _fatal)
+        if (_options.TourDir is not { } dir || _tourDone)
             return;
+        if (_fatal)
+        {
+            FinishTour(dir, "The tour could not start: " + _loadingText);
+            return;
+        }
         if (_tour is null)
         {
             if (_voyage is null || _mind is null)
@@ -30,16 +35,25 @@ public sealed partial class ShipGame
             _tour = TourScript(dir).GetEnumerator();
         }
         if (!_tour.MoveNext())
+            FinishTour(dir, null);
+    }
+
+    private bool _tourDone;
+
+    /// <summary>Writes tour.txt (once) and exits; <paramref name="failure"/> is why the tour could not run, or null.</summary>
+    private void FinishTour(string dir, string? failure)
+    {
+        _tourDone = true;
+        Directory.CreateDirectory(dir);
+        File.WriteAllLines(Path.Combine(dir, "tour.txt"), new[]
         {
-            File.WriteAllLines(Path.Combine(dir, "tour.txt"), new[]
-            {
-                "The Ship tour, seed " + _options.Seed + ", " + (DateTime.UtcNow - _tourStarted).TotalSeconds.ToString("0") + " s.",
-                "Session log: " + (_session?.FilePath ?? "(none)"),
-                "Ending: " + (_voyage?.Ending?.Title ?? "(voyage not ended)"),
-                "Screenshots:",
-            }.Concat(_tourShots));
-            Exit();
-        }
+            "The Ship tour, seed " + _options.Seed + ", " + (_tourStarted == default ? 0 : (DateTime.UtcNow - _tourStarted).TotalSeconds).ToString("0") + " s.",
+            failure ?? "Completed.",
+            "Session log: " + (_session?.FilePath ?? "(none)"),
+            "Ending: " + (_voyage?.Ending?.Title ?? "(voyage not ended)"),
+            "Screenshots:",
+        }.Concat(_tourShots));
+        Exit();
     }
 
     /// <summary>Render the current screen into a 1600 x 900 target and save it as <c>NN-name.png</c>.</summary>
@@ -82,6 +96,8 @@ public sealed partial class ShipGame
         {
             var tag = "alert" + v.Current.Number;
             Shoot(dir, tag + "-start");
+            if (v.Current.Faults.Count >= 3)
+                Shoot(dir, tag + "-many-cards");
 
             // Best-qualified people for each open fault (critical first); wake the sleepers among them, up to MaxAwake.
             var plan = new List<(CrewMember Who, Fault Fault)>();
@@ -122,14 +138,15 @@ public sealed partial class ShipGame
                 Shoot(dir, tag + "-line-said");
             }
 
-            // Plain repairs for everyone awake and assigned.
+            // Patches in the first two alerts (they come back later, so the later alerts have three or four faults); plain repairs after that.
+            var patch = v.Current.Number <= 2;
             foreach (var (who, fault) in plan)
             {
                 if (who.State != CrewState.Awake || fault.Resolved || fault.State != FaultState.Open)
                     continue;
                 var p = who;
                 var f = fault;
-                Act("repair " + f.Name + " by " + p.Name, () => v.Assign(p, f, patch: false));
+                Act("repair " + f.Name + " by " + p.Name, () => v.Assign(p, f, patch: patch));
             }
             foreach (var w in Settle()) yield return w;
             _target = v.Awake.FirstOrDefault();
@@ -173,11 +190,11 @@ public sealed partial class ShipGame
             foreach (var w in Settle()) yield return w;
             Act("drift to the next alert", v.Drift, snapshot: true);
             foreach (var w in Settle()) yield return w;
-            Shoot(dir, tag + "-drift");
+            if (v.Phase != Phase.Ended)
+                Shoot(dir, tag + "-drift");
         }
         foreach (var w in Settle()) yield return w;
         Shoot(dir, "ending");
-        _tourTarget?.Dispose();
     }
 
     private static string Capitalise(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];

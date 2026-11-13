@@ -287,22 +287,28 @@ public sealed class ShipMind : IDisposable
         if (entry.Intent is null || entry.CrewId is null)
             return;
         var c = _voyage.Crew.First(x => x.Id == entry.CrewId);
+        // The dead say nothing: their line keeps its template (the voyage does not log one for a dead speaker).
+        if (!c.Alive)
+            return;
         var system = Prompts.CrewSystem(c, _voyage);
         var user = Prompts.CrewUser(entry.Intent, c, _voyage, entry);
         var beliefs = new Dictionary<string, Belief>(c.Beliefs);
         var context = new LineContext(c.Id, entry.Intent.Decision, c.PendingQuestion,
             Prompts.Recent(c, _voyage, entry).Select(e => e.Text).ToList());
         entry.Pending = true;
-        _ = VoiceAsync(entry, system, user, beliefs, context);
+        _ = VoiceAsync(entry, c, system, user, beliefs, context);
     }
 
-    private async Task VoiceAsync(LogEntry entry, string system, string user, Dictionary<string, Belief> beliefs, LineContext context)
+    private async Task VoiceAsync(LogEntry entry, CrewMember speaker, string system, string user, Dictionary<string, Belief> beliefs, LineContext context)
     {
         string? line = null;
         try
         {
             line = await _worker.Enqueue<string?>(LlmPriority.Dialogue, async (llm, ct) =>
             {
+                // Died while the line waited its turn: no model call for a dead speaker.
+                if (!speaker.Alive)
+                    return null;
                 // A reply that states something the speaker doesn't know is rejected and written again, once.
                 for (var attempt = 0; attempt < 2; attempt++)
                 {

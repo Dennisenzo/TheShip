@@ -213,8 +213,18 @@ public sealed partial class Voyage
             Ship($"The stores ran out in year {Math.Floor((start + outAt) / Tuning.HoursPerYear):0}. Whoever is awake now goes hungry: "
                  + $"{Tuning.StarveDays:0} days without food kills. The pods can take them back early.");
         }
-        foreach (var (c, at) in starved.OrderBy(kv => kv.Value))
-            Kill(c, $"starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}");
+        // Two can starve in one step: only those still alive at its end say what they saw.
+        var held = HoldSpeech();
+        try
+        {
+            foreach (var (c, at) in starved.OrderBy(kv => kv.Value))
+                Kill(c, $"starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}");
+        }
+        finally
+        {
+            if (held)
+                ReleaseSpeech();
+        }
     }
 
     /// <summary>
@@ -388,7 +398,7 @@ public sealed partial class Voyage
         if (f.DangerFact is { } danger)
         {
             var df = _facts[danger];
-            if (!c.Beliefs.ContainsKey(danger) && !c.Dodged.Contains(danger) && c.Band != TrustBand.Follows)
+            if (!c.Beliefs.ContainsKey(danger) && !c.Dodged.ContainsKey(danger) && c.Band != TrustBand.Follows)
             {
                 c.PendingQuestion = danger;
                 Speak(c, "ask_danger", "Before you start the repair you ask the ship: " + df.Question, df.Question);
@@ -540,7 +550,7 @@ public sealed partial class Voyage
                 _facts["power"].Truth = "low";
                 break;
             case "pod":
-                PodWear += 3;
+                PodWear += Tuning.PodLostWear;
                 break;
             case "illness":
                 // Waking the patient does not cure them: the illness keeps its clock (the thaw has its usual risk).
@@ -554,7 +564,7 @@ public sealed partial class Voyage
                 _facts["arrival"].Truth = "late";
                 break;
             case "controller":
-                PodWear += 4;
+                PodWear += Tuning.ControllerLostWear;
                 break;
             case "blight":
                 Stores *= Tuning.BlightStoresLeft;
@@ -837,71 +847,81 @@ public sealed partial class Voyage
             deaths.AddRange(aliveBefore.Where(c => !c.Alive).Select(c => c.Name));
         }
         var hours = years * Tuning.HoursPerYear;
-        // Whoever would not sleep stays up through the drift and eats the stores, in time order (DESIGN.md, "What every decision spends").
-        var awake = Awake.ToList();
-        var (storesOut, starved) = Eat(awake, hours);
-        if (storesOut is { } outAt)
-            events.Add($"Stores ran out in year {Math.Floor((start + outAt) / Tuning.HoursPerYear):0}.");
-        // The starving die in time order, so only those still alive see each death.
-        foreach (var (c, at) in starved.OrderBy(kv => kv.Value))
+        // Deaths in the drift come out in its report; crew lines from it are said after the report, by those who lived through it.
+        var heldSpeech = HoldSpeech();
+        try
         {
-            events.Add($"{c.Name} starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}.");
-            c.Trust += c.PendingTrust;
-            c.PendingTrust = 0;
-            c.Age += at / Tuning.HoursPerYear;
-            c.HoursAwake += at;
-            Clamp(c);
-            deaths.Add(c.Name);
-            Kill(c, "starved during the drift", quiet: true);
-        }
-        foreach (var c in Crew.Where(c => c.Alive).ToList())
-        {
-            string? sleepCause = null;
-            c.Trust += c.PendingTrust;
-            c.PendingTrust = 0;
-            if (c.State == CrewState.Awake)
+            // Whoever would not sleep stays up through the drift and eats the stores, in time order (DESIGN.md, "What every decision spends").
+            var awake = Awake.ToList();
+            var (storesOut, starved) = Eat(awake, hours);
+            if (storesOut is { } outAt)
+                events.Add($"Stores ran out in year {Math.Floor((start + outAt) / Tuning.HoursPerYear):0}.");
+            // The starving die in time order, so only those still alive see each death.
+            foreach (var (c, at) in starved.OrderBy(kv => kv.Value))
             {
-                // Someone who would not sleep ages, eats and reads everything, for as long as they live.
-                c.Age += hours / Tuning.HoursPerYear;
-                c.HoursAwake += hours;
-                foreach (var f in FactList)
-                    ReadLog(c, f, quiet: true);
-            }
-            else
-            {
-                c.Age += years * Tuning.SleepAgeing;
-                c.Morale = (c.Morale + 70) / 2;
-                if (PowerLow && _rng.NextDouble() < Tuning.PowerLowDeathChance)
-                {
-                    c.Health = 0;
-                    sleepCause = "died in sleep on low power";
-                }
-                if (patchFailed && _rng.NextDouble() < Tuning.PatchFailDeathChance)
-                {
-                    c.Health = 0;
-                    sleepCause ??= "died in sleep when the pod controller patch gave way";
-                }
-                // Worn pods fail on their own: the longer the drift and the more the wear, the likelier.
-                if (PodWear > 0 && _rng.NextDouble() < SleepDeathChance(PodWear, years))
-                {
-                    c.Health = 0;
-                    sleepCause ??= "died in sleep, pod failure";
-                }
-            }
-            Clamp(c);
-            if (c.Health <= 0)
-            {
+                events.Add($"{c.Name} starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}.");
+                c.Trust += c.PendingTrust;
+                c.PendingTrust = 0;
+                c.Age += at / Tuning.HoursPerYear;
+                c.HoursAwake += at;
+                Clamp(c);
                 deaths.Add(c.Name);
-                Kill(c, c.State == CrewState.Awake ? "died awake during the drift" : sleepCause ?? "died in sleep during the drift");
+                Kill(c, "starved during the drift", quiet: true);
             }
+            foreach (var c in Crew.Where(c => c.Alive).ToList())
+            {
+                string? sleepCause = null;
+                c.Trust += c.PendingTrust;
+                c.PendingTrust = 0;
+                if (c.State == CrewState.Awake)
+                {
+                    // Someone who would not sleep ages, eats and reads everything, for as long as they live.
+                    c.Age += hours / Tuning.HoursPerYear;
+                    c.HoursAwake += hours;
+                    foreach (var f in FactList)
+                        ReadLog(c, f, quiet: true);
+                }
+                else
+                {
+                    c.Age += years * Tuning.SleepAgeing;
+                    c.Morale = (c.Morale + 70) / 2;
+                    if (PowerLow && _rng.NextDouble() < Tuning.PowerLowDeathChance)
+                    {
+                        c.Health = 0;
+                        sleepCause = "died in sleep on low power";
+                    }
+                    if (patchFailed && _rng.NextDouble() < Tuning.PatchFailDeathChance)
+                    {
+                        c.Health = 0;
+                        sleepCause ??= "died in sleep when the pod controller patch gave way";
+                    }
+                    // Worn pods fail on their own: the longer the drift and the more the wear, the likelier.
+                    if (PodWear > 0 && _rng.NextDouble() < SleepDeathChance(PodWear, years))
+                    {
+                        c.Health = 0;
+                        sleepCause ??= "died in sleep, pod failure";
+                    }
+                }
+                Clamp(c);
+                if (c.Health <= 0)
+                {
+                    deaths.Add(c.Name);
+                    Kill(c, c.State == CrewState.Awake ? "died awake during the drift" : sleepCause ?? "died in sleep during the drift");
+                }
+            }
+            Clock = target * Tuning.HoursPerYear;
+            SyncFacts();
+            // Limited to working sensors; the prototype loses none, so the report is complete (DESIGN.md, "Drift").
+            Ship($"DRIFT: {years:0} years pass. Year {Math.Floor(Year):0}. "
+                 + string.Concat(events.Select(e => e + " "))
+                 + $"Stores {Stores:0} person-days, spare parts {Parts}, pod wear {PodWear}. "
+                 + (deaths.Count == 0 ? "No deaths." : "Deaths: " + string.Join(", ", deaths) + "."));
         }
-        Clock = target * Tuning.HoursPerYear;
-        SyncFacts();
-        // Limited to working sensors; the prototype loses none, so the report is complete (DESIGN.md, "Drift").
-        Ship($"DRIFT: {years:0} years pass. Year {Math.Floor(Year):0}. "
-             + string.Concat(events.Select(e => e + " "))
-             + $"Stores {Stores:0} person-days, spare parts {Parts}, pod wear {PodWear}. "
-             + (deaths.Count == 0 ? "No deaths." : "Deaths: " + string.Join(", ", deaths) + "."));
+        finally
+        {
+            if (heldSpeech)
+                ReleaseSpeech();
+        }
 
         if (last)
         {
