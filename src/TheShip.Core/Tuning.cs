@@ -38,6 +38,10 @@ public static class Tuning
     public const double PatchFailDeathChance = 0.15;
     public const double ThawRiskPerWear = 0.012;
     public const double ThawInjury = 25;
+    /// <summary>Share of failed thaws that kill outright instead of injuring.</summary>
+    public const double ThawFatalShare = 0.3;
+    /// <summary>A sleeper's death chance in a drift is pod wear x years x this.</summary>
+    public const double SleepDeathPerWearYear = 0.0001;
     public const double PowerLowDeathChance = 0.10;
     public const int PodsWornAt = 8;
     public const double StoresShortAt = 300;
@@ -60,6 +64,12 @@ public static class Tuning
     public const double RequestIgnored = 4;
     public const double HurtByOrder = 10;
     public const double Dodge = 3;
+    /// <summary>A pending question still unanswered after an aftermath beat: they ask again and lose this much trust.</summary>
+    public const double QuestionIgnored = 2;
+    /// <summary>Going to sleep with a question still pending.</summary>
+    public const double QuestionIgnoredAtSleep = 4;
+    /// <summary>How often a person repeats a question before they give up and check it themselves.</summary>
+    public const int QuestionRepeatsMax = 2;
     public const double LogGap = 5;
     public const double LockedDoor = 5;
     public const double ConfirmedTruth = 3;

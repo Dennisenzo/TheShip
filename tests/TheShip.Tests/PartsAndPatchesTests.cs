@@ -104,13 +104,24 @@ public class PartsAndPatchesTests
         Assert.Equal("nav-again", again.Id);
     }
 
-    private static Voyage ToTheLastDrift(int seed)
+    /// <summary>Null when a thaw or pod death on the way (wear can kill) broke the scripted path to the last drift for this seed.</summary>
+    private static Voyage? ToTheLastDriftOrNull(int seed)
     {
         var v = new Voyage(seed);
-        var mara = VoyageTests.RefuserAtTheLastAlert(v);
+        try
+        {
+            VoyageTests.RefuserAtTheLastAlert(v);
+        }
+        catch (Xunit.Sdk.XunitException)
+        {
+            return null;
+        }
         v.Stores = 100000;
         return v;
     }
+
+    private static Voyage ToTheLastDrift(int seed) =>
+        ToTheLastDriftOrNull(seed) ?? throw new InvalidOperationException("seed " + seed + " does not reach the last drift on the scripted path");
 
     [Fact]
     public void A_patched_pod_controller_at_the_last_drift_adds_wear_and_kills_sleepers()
@@ -118,7 +129,9 @@ public class PartsAndPatchesTests
         var sleeperDeaths = 0;
         for (var seed = 1; seed <= 40; seed++)
         {
-            var v = ToTheLastDrift(seed);
+            var v = ToTheLastDriftOrNull(seed);
+            if (v is null)
+                continue;
             var wear = v.PodWear;
             var dead = v.Crew.Count(c => c.State == CrewState.Dead);
             InjectPatched(v, "controller");
@@ -291,14 +304,17 @@ public class PartsAndPatchesTests
         var checkedDeaths = 0;
         for (var seed = 1; seed <= 40; seed++)
         {
-            var v = ToTheLastDrift(seed);
-            if (v.PowerLow)
+            var v = ToTheLastDriftOrNull(seed);
+            if (v is null || v.PowerLow)
                 continue;
             InjectPatched(v, "controller");
             var asleep = v.Crew.Where(c => c.State == CrewState.Asleep).ToList();
             v.Drift();
             foreach (var c in asleep.Where(c => c.State == CrewState.Dead))
             {
+                // Worn pods can kill a sleeper on their own in the same drift; that one is not the patch's.
+                if (v.Log.Any(e => e.Kind == LogKind.Ship && e.Text == c.Name + " died in sleep, pod failure."))
+                    continue;
                 Assert.Contains(v.Log, e => e.Kind == LogKind.Ship && e.Text == c.Name + " died in sleep when the pod controller patch gave way.");
                 checkedDeaths++;
             }

@@ -134,6 +134,7 @@ public class AdvanceTests
         v.Wake(tomas);
         v.Go();
         Assert.Equal(CrewState.Awake, tomas.State);
+        tomas.PendingQuestion = null; // an unanswered wake question would be asked again and stop the advance first
         Assert.False(v.CanSleepNow(mara));
         Assert.True(v.CanSleepNow(tomas));
 
@@ -156,6 +157,7 @@ public class AdvanceTests
         v.Go(); // the thaw
         v.Go(); // a two-week beat: the early offer
         Assert.Equal(CrewState.Awake, tomas.State);
+        tomas.PendingQuestion = null; // an unanswered wake question would be asked again and stop the advance first
         Assert.True(v.CanSleepNow(mara));
         Assert.Contains(v.Log, e => e.Text.StartsWith("The stores won't last Mara three months awake"));
 

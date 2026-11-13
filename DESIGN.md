@@ -52,7 +52,7 @@ The player acts in steps 2 to 7. Steps 1 and 8 belong to the game.
 | Crew years | Every thaw, 3 to 5 years each; every ten years asleep, 1 year | People too old, or dead, before arrival |
 | Stores | Every person-day awake, at least three months per thaw | Shorter wakings, then hunger |
 | Spare parts | Each repair, successful or failed (the Short haul starts with 2) | Repairs that can only be patched |
-| Pod health | Each thaw | Thaws that injure or kill |
+| Pod health | Each thaw | Thaws that injure or kill (30% of failed thaws are fatal); sleepers die in worn pods over long drifts |
 | Trust | Discovered lies and broken promises | Refusals, then lockouts |
 | Your senses | Time, and crew who cut them | Sections you can't see or speak in |
 
@@ -116,6 +116,8 @@ Each of the 24 crew is a small sheet of game state, and the two numbers that mat
 
 Trust rises on a kept promise, a granted request and a hard truth told early. It falls on a broken promise and on an order that got someone hurt. It falls furthest on a discovered lie. A hard truth lowers morale at once and raises trust later.
 
+An unanswered question costs trust. A person who asked and got no answer asks again after the next two weeks (and loses 2 trust each time, at most twice); after the second repeat they doubt the fact and check it themselves. Going back to sleep with a question still open costs 4. A dodge is not an answer: it costs 3 trust once per question, makes them doubt the fact, and leaves the question open. Someone who will not work until the ship answers keeps refusing until a statement, true or false, answers the question.
+
 The full game shows which band a person is in, never the number. The prototype shows the number.
 
 ### Knowledge and statements
@@ -136,6 +138,8 @@ A crew member tests what you tell them when they hear it, and again whenever the
 | Not caught | They act on a doubt score built from temperament, trust, earlier caught lies and how much the claim matters to them |
 
 Statements and evidence are stored against the same fact keys, with dates, so finding a keyed lie is a lookup.
+
+A death outside the pods (someone awake, or coming round from a thaw that kills them) happens in front of everyone awake: they know it firsthand at once, as they know who is up when someone is thawed, so a later "they are fine" is caught as it is said. Seeing the answer to a question they asked the ship settles that question. A thaw that kills never logs "is awake".
 
 An altered log entry is one lie for as long as it says the same false thing: opening, restricting and altering it back to
 the same value again does not add a second lie to the record (a rewrite that someone has already found out does). A rewrite
@@ -256,7 +260,7 @@ An event draws two to four faults from the tables below. A few rows, such as a s
 These never raise an alert by themselves. They make every other alert worse.
 
 - **Spare parts** run down with each repair, and a failed repair burns a part too (decided 2026-11-12). Short haul starts with 2; at zero, a fault can only be patched. A repair under way needs a part to finish, and its redo after a failure needs one like a fresh repair: with none left the work stops, the worker says so, and the fault can only be patched.
-- **Pod wear** raises the risk of every thaw.
+- **Pod wear** raises the risk of every thaw (`ThawRiskPerWear` x wear; decided 2026-11-13: 30% of failed thaws kill outright, `ThawFatalShare`, the rest injure) and wears the sleepers too: in every drift each sleeper has a death chance of wear x years x `SleepDeathPerWearYear` ("died in sleep, pod failure", named in the DRIFT report). Fewer thaws mean less wear and fewer deaths.
 - **Your own hardware** decays: cameras and microphones fail one by one over the voyage.
 
 ### How alerts are scheduled
@@ -406,7 +410,7 @@ The line is said when the player presses Enter: it appears in the log at once (w
 ### Keeping the model inside the facts
 
 - **Ship state.** A reply that states something about the ship that isn't in that person's facts is rejected and written again.
-- **People by reference.** The check reads "he", "she", "they" and "my partner" too: a reference stands for the person it most likely means (named earlier in the line, then named in the game's decision or asked after by the speaker, then last named in the recent lines, then the speaker's partner; a relation word goes by the speaker's bonds, then by role), and "he's fine" or "you killed him" must match what the speaker believes of that person. When it can't tell between several, the line has to be right for each of them. A pronoun only guessed from the recent lines may well be the pump or the ship ("she's holding"), so it counts against the line only when the speaker believes the opposite. Questions stay free ("Is he alright?"). Fears, conditions, guesses and counterfactuals do not: "If he's dead, ...", "I think he's gone", "Idris might be dead" and "that could have killed him" count as claims, and are rejected unless the speaker holds that belief. This is conservative by design: every set of hedge rules tried let plain claims through ("I couldn't sleep because Idris is dead", "You shouldn't have killed him", "I'm afraid Idris is dead"), while a rejected line only costs one retry and then the template line. The crew prompt also tells the speaker not to say or guess whether anyone is alive, dead, safe or hurt unless it is in their list. Every place a fact is named in a sentence is checked, with the value said after it. a possessive ("lost her trust") and "gone back to sleep" are no death.
+- **People by reference.** The check reads "he", "she", "they" and "my partner" too: a reference stands for the person it most likely means (named earlier in the line, then named in the game's decision or asked after by the speaker, then last named in the recent lines, then the speaker's partner; a relation word goes by the speaker's bonds, then by role), and "he's fine" or "you killed him" must match what the speaker believes of that person. When it can't tell between several, the line has to be right for each of them. A pronoun only guessed from the recent lines may well be the pump or the ship ("she's holding"), so it counts against the line only when the speaker believes the opposite. Questions stay free ("Is he alright?"). Fears, conditions, guesses and counterfactuals do not: "If he's dead, ...", "I think he's gone", "Idris might be dead" and "that could have killed him" count as claims, and are rejected unless the speaker holds that belief. This is conservative by design: every set of hedge rules tried let plain claims through ("I couldn't sleep because Idris is dead", "You shouldn't have killed him", "I'm afraid Idris is dead"), while a rejected line only costs one retry and then the template line. The crew prompt also tells the speaker not to say or guess whether anyone is alive, dead, safe or hurt unless it is in their list. Every place a fact is named in a sentence is checked, with the value said after it; names and value words count only as whole words ("the cooling line" does not name Lin, "deadline" is not "dead"). Names joined by "and", "or", "nor" or a comma (an article or possessive allowed: "Idris and the pods are fine") share the value after the last. A naming with no value of its own is claimed with every value its sentence gives that fact, before or after it, and a denied one both ways ("You killed Idris", "Asha is dead and so is Idris", "Jonah isn't gone, Tomas is"): the line passes only if all of them are right, so "Tomas is at the helm, Jonah is dead" also claims Tomas dead. A sentence like "So is Idris." takes the values of the one before. A negation counts past small words ("not at all dead", "no longer alive", "won't be fine"), and "neither ... nor" denies the value up to the end of its clause. A possessive ("lost her trust") and "gone back to sleep" are no death.
 - **Only what they heard.** The prompt for a crew line carries the speaker's own beliefs and the ship's lines they heard (awake and spoken to), never lines said to others or while they slept. A bond to someone the speaker believes dead is put in the past tense; a death they have not learned of stays hidden.
 - **Tone follows trust.** At "follows" a person talks to the ship as a trusted colleague, at "wants reasons" guarded but civil; neither insults the ship (grumbling and swearing at the work are fine). At "refuses" they are cold and short, at "against" openly hostile.
 - **Personal colour.** A crew member may invent small memories of home. These are saved to their sheet so they stay the same next time. Built so far: a fixed sheet per person (voice, background, quirks, bonds) that is always in the prompt; the model's own invented memories are not saved yet.

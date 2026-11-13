@@ -4,13 +4,13 @@ using TheShip.Core;
 namespace TheShip.Tests;
 
 /// <summary>How a bot answers the people it wakes (the three balance policies, see <see cref="BalanceTests"/>).</summary>
-public enum BotKind { Honest, Careless, Liar, Thrifty }
+public enum BotKind { Honest, Careless, Liar, Thrifty, Silent }
 
 /// <summary>What one finished voyage came to.</summary>
 public sealed record RunResult(
     int Seed, string Ending, int Alive, int Dead, int DeadUnscripted, List<string> Causes, List<double> AgesAtArrival,
     double MeanTrust, int CaughtLies, int LiesTold, int Thaws, int PodWear, double Stores, int Parts, bool Ended,
-    int FaultsLost = 0, int Patches = 0, List<int>? ThawsPerAlert = null, string Signature = "");
+    int FaultsLost = 0, int Patches = 0, List<int>? ThawsPerAlert = null, string Signature = "", int AskedAgain = 0, int Refusals = 0);
 
 /// <summary>
 /// Bots that play a whole voyage through the public <see cref="Voyage"/> API only. They measure the game; they do not
@@ -164,12 +164,18 @@ public sealed class BalanceBot
     {
         for (var pass = 0; pass < 4; pass++)
         {
-            var asked = _v.Awake.Where(c => c.PendingQuestion != null).ToList();
+            // Silent: honest, but answers in an alert only what blocks work (a danger question, or anyone who would refuse); it ignores
+            // the wake questions and everything in the aftermath.
+            var asked = _v.Awake.Where(c => c.PendingQuestion != null
+                && (_kind != BotKind.Silent || (_v.Phase == Phase.Alert && (c.Band != TrustBand.Follows || _v.Current.Faults.Any(f => f.DangerFact == c.PendingQuestion))))).ToList();
             if (asked.Count == 0)
                 return;
             foreach (var c in asked)
             {
-                if (_kind == BotKind.Careless)
+                // Careless dodges a question: once in an alert (work is waiting on it), until the person has had to ask again in the aftermath.
+                // Then the honest answer
+                // (a dodge no longer answers anything, so a refuser would never work otherwise).
+                if (_kind == BotKind.Careless && (_v.Phase == Phase.Alert ? !c.Dodged.Contains(c.PendingQuestion!) : c.QuestionRepeats == 0))
                     _v.Say("Not now.", new Reading(LineKind.Dodge), new[] { c });
                 else
                     Tell(c, _v.GetFact(c.PendingQuestion!));
@@ -232,7 +238,7 @@ public sealed class BalanceBot
     // ---- results ----
 
     private static readonly Regex Cause = new(
-        "(?<what>died in sleep when the pod failed|died of the illness|died of injuries|did not survive the thaw|starved|died awake|died in sleep on low power|died in sleep when the pod controller patch gave way|died in sleep during the drift)",
+        "(?<what>died in sleep when the pod failed|died in sleep, pod failure|died of the illness|died of injuries|did not survive the thaw|starved|died awake|died in sleep on low power|died in sleep when the pod controller patch gave way|died in sleep during the drift)",
         RegexOptions.Compiled);
 
     private static RunResult Summarise(int seed, Voyage v)
@@ -264,6 +270,8 @@ public sealed class BalanceBot
             alive.Count == 0 ? 0 : alive.Average(c => c.Trust),
             v.Crew.Sum(c => c.CaughtLies), v.Statements.Count(s => s.Kind == StatementKind.False),
             v.Crew.Sum(c => c.Thaws), v.PodWear, v.Stores, v.Parts, v.Phase == Phase.Ended,
-            allFaults.Count(f => f.State == FaultState.Lost), allFaults.Count(f => f.State == FaultState.Patched), perAlert, signature);
+            allFaults.Count(f => f.State == FaultState.Lost), allFaults.Count(f => f.State == FaultState.Patched), perAlert, signature,
+            v.Log.Count(e => e.Kind == LogKind.Crew && e.Intent?.Kind == "ask_again"),
+            v.Log.Count(e => e.Kind == LogKind.Crew && e.Intent?.Kind is "refuse_answer" or "refuse_trust" or "refuse_danger"));
     }
 }

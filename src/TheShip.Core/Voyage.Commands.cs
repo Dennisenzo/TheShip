@@ -286,18 +286,20 @@ public sealed partial class Voyage
         c.EarlySleepAnnounced = false;
         c.PendingQuestion = null;
         PodWear++;
-        Ship(c.Name + " is awake.");
 
         if (_rng.NextDouble() < Tuning.ThawRiskPerWear * PodWear)
         {
-            c.Health -= Tuning.ThawInjury;
-            Ship("The thaw went badly. " + c.Name + " is hurt.");
+            // A share of failed thaws kill outright; the rest injure (a healthy person survives the injury).
+            var fatal = _rng.NextDouble() < Tuning.ThawFatalShare;
+            c.Health = fatal ? 0 : c.Health - Tuning.ThawInjury;
+            Ship(fatal ? "The thaw went badly. " + c.Name + " is not breathing." : "The thaw went badly. " + c.Name + " is hurt.");
             if (c.Health <= 0)
             {
                 Kill(c, "did not survive the thaw");
                 return;
             }
         }
+        Ship(c.Name + " is awake.");
 
         // A promise never to thaw them again is broken by this thaw.
         foreach (var s in Statements.Where(s => s.Kind == StatementKind.Promise && s.PromiseKey == "no_more_thaws"
@@ -366,7 +368,6 @@ public sealed partial class Voyage
             Ship("The door to the " + GetSection(f.Section)!.Name.ToLowerInvariant() + " is locked. Nobody can reach the " + f.Name.ToLowerInvariant() + ".");
             return;
         }
-        _idleWarned = false;
 
         if (c.Band == TrustBand.Against || (c.Band == TrustBand.Refuses && !c.RequestGranted))
         {
@@ -401,6 +402,7 @@ public sealed partial class Voyage
             f.Progress = 0;
             f.Patching = patch;
         }
+        _idleWarned = false;
         c.WorkingOn = f.Id;
         f.State = FaultState.InRepair;
         var task = (patch ? "patching the " : "the ") + f.CrewName;
@@ -538,7 +540,8 @@ public sealed partial class Voyage
             case "illness":
                 // Waking the patient does not cure them: the illness keeps its clock (the thaw has its usual risk).
                 if (f.SubjectId is { } sick && Crew.First(c => c.Id == sick) is { Alive: true } patient)
-                    Kill(patient, patient.State == CrewState.Asleep ? "died of the illness in their pod" : "died of the illness");
+                    Kill(patient, patient.State == CrewState.Asleep ? "died of the illness in their pod" : "died of the illness",
+                         witnessesSilent: true);
                 break;
             case "nav":
                 NavLost = true;
@@ -648,6 +651,8 @@ public sealed partial class Voyage
         }
         if (c.RequestMade && !c.RequestGranted)
             c.Trust -= Tuning.RequestIgnored;
+        if (c.PendingQuestion != null)
+            c.Trust -= Tuning.QuestionIgnoredAtSleep;
         c.Memories.Add($"Year {Math.Floor(Year):0}: woken for {Current.Title.ToLowerInvariant()}; went back to sleep with trust in the ship {CrewMember.BandText(c.Band)}.");
         c.State = CrewState.Asleep;
         c.WorkingOn = null;
@@ -764,6 +769,10 @@ public sealed partial class Voyage
         return Scenario.ArrivalYear + navPatches * Tuning.NavPatchArrivalSlipYears;
     }
 
+    /// <summary>A sleeper's chance of dying in the pod over a drift: wear x years x the tuning rate, at most 1.</summary>
+    public static double SleepDeathChance(int wear, double years) =>
+        Math.Clamp(wear * years * Tuning.SleepDeathPerWearYear, 0, 1);
+
     /// <summary>Step 8: with everyone asleep or settled, the clock jumps to the next alert, or to arrival.</summary>
     public void Drift()
     {
@@ -821,8 +830,18 @@ public sealed partial class Voyage
         var (storesOut, starved) = Eat(awake, hours);
         if (storesOut is { } outAt)
             events.Add($"Stores ran out in year {Math.Floor((start + outAt) / Tuning.HoursPerYear):0}.");
+        // The starving die in time order, so only those still alive see each death.
         foreach (var (c, at) in starved.OrderBy(kv => kv.Value))
+        {
             events.Add($"{c.Name} starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}.");
+            c.Trust += c.PendingTrust;
+            c.PendingTrust = 0;
+            c.Age += at / Tuning.HoursPerYear;
+            c.HoursAwake += at;
+            Clamp(c);
+            deaths.Add(c.Name);
+            Kill(c, "starved during the drift", quiet: true);
+        }
         foreach (var c in Crew.Where(c => c.Alive).ToList())
         {
             string? sleepCause = null;
@@ -831,15 +850,8 @@ public sealed partial class Voyage
             if (c.State == CrewState.Awake)
             {
                 // Someone who would not sleep ages, eats and reads everything, for as long as they live.
-                var lived = starved.TryGetValue(c, out var at) ? at : hours;
-                c.Age += lived / Tuning.HoursPerYear;
-                c.HoursAwake += lived;
-                if (starved.ContainsKey(c))
-                {
-                    deaths.Add(c.Name);
-                    Kill(c, "starved during the drift", quiet: true);
-                    continue;
-                }
+                c.Age += hours / Tuning.HoursPerYear;
+                c.HoursAwake += hours;
                 foreach (var f in FactList)
                     ReadLog(c, f, quiet: true);
             }
@@ -856,6 +868,12 @@ public sealed partial class Voyage
                 {
                     c.Health = 0;
                     sleepCause ??= "died in sleep when the pod controller patch gave way";
+                }
+                // Worn pods fail on their own: the longer the drift and the more the wear, the likelier.
+                if (PodWear > 0 && _rng.NextDouble() < SleepDeathChance(PodWear, years))
+                {
+                    c.Health = 0;
+                    sleepCause ??= "died in sleep, pod failure";
                 }
             }
             Clamp(c);

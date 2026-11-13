@@ -14,9 +14,9 @@ public class SideFaultTests
     };
 
     /// <summary>Plays alerts with nobody woken (every clock runs out) until alert <paramref name="number"/> starts.</summary>
-    private static Voyage AtAlert(int number, Variation variation)
+    private static Voyage AtAlert(int number, Variation variation, int seed = 1)
     {
-        var v = new Voyage(1, variation);
+        var v = new Voyage(seed, variation);
         for (var guard = 0; guard < 60 && v.Current.Number < number; guard++)
         {
             RunOut(v);
@@ -185,7 +185,7 @@ public class SideFaultTests
     }
 
     private static void KillQuietly(Voyage v, CrewMember c) =>
-        typeof(Voyage).GetMethod("Kill", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(v, new object[] { c, "died", true });
+        typeof(Voyage).GetMethod("Kill", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(v, new object[] { c, "died", true, false });
 
     [Fact]
     public void A_patched_illness_returns_with_time_to_be_patched_again_at_once()
@@ -320,7 +320,9 @@ public class SideFaultTests
     [Fact]
     public void Earliest_done_counts_the_thaw_still_to_run_for_a_two_person_fault()
     {
-        var v = AtAlert(3, With(Variation.PowerSag));
+        // Some seeds lose Tomas to low power or pod wear before alert 3; take the first where he sleeps on.
+        var v = Enumerable.Range(1, 40).Select(seed => AtAlert(3, With(Variation.PowerSag), seed))
+            .First(x => x.Find("tomas")!.State == CrewState.Asleep);
         var nav = v.Current.Faults.Single(f => f.Kind == "nav");
         v.Wake(v.Find("tomas")!);
         // One person thawing (6 h), one more to wake (6 h): the two-person fix starts after the thaw.

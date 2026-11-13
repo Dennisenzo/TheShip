@@ -42,6 +42,17 @@ public sealed partial class Voyage
                     ReadLog(c, unread[_rng.Next(unread.Count)]);
             }
 
+            // A question left unanswered: they ask again, twice at most, then check it themselves.
+            if (c.PendingQuestion is { } pq && c.QuestionRepeats < Tuning.QuestionRepeatsMax)
+            {
+                c.QuestionRepeats++;
+                c.Trust -= Tuning.QuestionIgnored;
+                if (c.QuestionRepeats >= Tuning.QuestionRepeatsMax && !c.Beliefs.ContainsKey(pq))
+                    c.Doubts.Add(pq);
+                var q = _facts[pq].Question;
+                Speak(c, "ask_again", "You asked the ship something and got no answer. You ask again: " + q, q);
+            }
+
             // Their one request of this waking.
             if (!c.RequestMade && c.HoursAwake > 200)
             {
