@@ -201,6 +201,24 @@ public sealed partial class Voyage
         f.ExposureFact = "alive:" + patient.Id;
     }
 
+    private static bool IsSide(Fault f) => f.Id is "side3" or "side5";
+
+    /// <summary>The side fault needs a living crew member with the skill; if nobody has it the other kind is tried, and if neither, there is none.</summary>
+    private void ChooseSideFault(Alert alert)
+    {
+        var f = alert.Faults.FirstOrDefault(IsSide);
+        if (f is null)
+            return;
+        bool Doable(Fault x) => Crew.Any(c => c.Alive && c.SkillOf(x.Skill) >= x.Level);
+        if (Doable(f))
+            return;
+        var slack = Variation.SlackHours[alert.Number - 1];
+        var other = Scenario.SideFault(f.Kind == "blight" ? Variation.PowerSag : Variation.Blight, slack, f.Id);
+        alert.Faults.Remove(f);
+        if (Doable(other))
+            alert.Faults.Add(other);
+    }
+
     private void StartAlert()
     {
         var alert = Current;
@@ -219,6 +237,12 @@ public sealed partial class Voyage
             }
             _patched.Clear();
         }
+
+        if (alert.Number is 3 or 5)
+            ChooseSideFault(alert);
+        // At most four faults, returning patches first: the drawn side fault is the one dropped.
+        while (alert.Faults.Count > Tuning.MaxFaultsPerAlert && alert.Faults.LastOrDefault(IsSide) is { } extra)
+            alert.Faults.Remove(extra);
 
         var report = alert.Report;
         if (alert.Number == 2)

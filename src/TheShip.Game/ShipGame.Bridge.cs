@@ -40,10 +40,17 @@ public sealed partial class ShipGame
         if (v.Current.Faults.Count == 0)
             y = _p.Paragraph(v.Phase == Phase.Ended ? "The voyage is over." : "Nothing needs repair.", x, y, width, Painter.Ink);
 
+        // Three or more open faults would not fit full cards: they get a compact card (no exposure lines, one-line needs).
+        var compact = v.Current.Faults.Count(f => !f.Resolved) >= 3;
         var number = 0;
         foreach (var f in v.Current.Faults)
         {
             number++;
+            if (compact)
+            {
+                y = DrawCompactIssue(v, f, number, x, y, width);
+                continue;
+            }
             var cardTop = y;
             y += 12;
             var state = f.State switch
@@ -54,7 +61,8 @@ public sealed partial class ShipGame
                 FaultState.Patched => "PATCHED",
                 _ => "LOST",
             };
-            _p.Text(_p.Small, number.ToString("00", CultureInfo.InvariantCulture) + " - " + state, ix, y, f.Resolved ? Painter.Dim : Painter.Accent);
+            _p.Text(_p.Small, number.ToString("00", CultureInfo.InvariantCulture) + " - " + state + (f.Critical && !f.Resolved ? " - CRITICAL" : ""),
+                ix, y, f.Resolved ? Painter.Dim : Painter.Accent);
             if (!f.Resolved)
                 _p.TextRight(_p.Head, Voyage.Hours(Math.Max(0, f.Deadline - v.Clock)), x + width - 14, y - 4, Painter.Bright);
             y += 24;
@@ -66,7 +74,8 @@ public sealed partial class ShipGame
                 var where = v.GetSection(f.Section)?.Name ?? "";
                 var needs = Sentence(where) + ". Needs " + f.Skill.ToString().ToLowerInvariant() + " " + f.Level
                             + (f.People > 1 ? ", " + f.People + " people" : "") + ", " + N(f.Hours) + " hours. If the clock runs out: " + f.IfIgnored + ".";
-                y = _p.Paragraph(needs, ix, y, inner, Painter.Dim) + 6;
+                y = _p.Paragraph(needs, ix, y, inner, Painter.Dim);
+                y = _p.Paragraph(v.EarliestDoneText(f), ix, y, inner, Painter.Ink) + 6;
 
                 var workers = v.Awake.Where(c => c.WorkingOn == f.Id).Select(c => c.Name).ToList();
                 if (f.State == FaultState.InRepair)
@@ -123,6 +132,52 @@ public sealed partial class ShipGame
             Act("advance to next event", v.Go, snapshot: true);
         if (_p.Button(new Rectangle(ix, clock.Y + 94, inner, 40), "DRIFT TO THE NEXT ALERT", v.Phase == Phase.Aftermath))
             Act("drift to the next alert", v.Drift, snapshot: true);
+    }
+
+    /// <summary>A short issue card for an alert with three or more open faults. Returns the y below the card.</summary>
+    private int DrawCompactIssue(Voyage v, Fault f, int number, int x, int y, int width)
+    {
+        var ix = x + 14;
+        var inner = width - 28;
+        var cardTop = y;
+        y += 8;
+        if (f.Resolved)
+        {
+            var done = f.State switch { FaultState.Repaired => "REPAIRED", FaultState.Patched => "PATCHED", _ => "LOST" };
+            _p.Text(_p.Small, number.ToString("00", CultureInfo.InvariantCulture) + " - " + done + " - " + f.Name, ix, y, Painter.Dim);
+            y += 26;
+            _p.Frame(new Rectangle(x, cardTop, width, y - cardTop), Painter.Edge);
+            return y + 6;
+        }
+        var state = f.State switch { FaultState.Open => "OPEN", _ => f.Patching ? "PATCHING" : "IN REPAIR" };
+        _p.Text(_p.Small, number.ToString("00", CultureInfo.InvariantCulture) + " - " + state + (f.Critical ? " - CRITICAL" : ""), ix, y, Painter.Accent);
+        _p.TextRight(_p.Body, Voyage.Hours(Math.Max(0, f.Deadline - v.Clock)), x + width - 14, y - 2, Painter.Bright);
+        y += 20;
+        _p.Text(_p.Body, f.Name, ix, y, Painter.Bright);
+        y += 24;
+        var where = v.GetSection(f.Section)?.Name ?? "";
+        y = _p.Paragraph(Sentence(where) + ". " + f.Skill.ToString() + " " + f.Level + (f.People > 1 ? ", " + f.People + " people" : "") + ", " + N(f.Hours) + " h. "
+                         + v.EarliestDoneText(f).Replace("Earliest done if started now: ", "Earliest done: "), ix, y, inner, Painter.Dim);
+        var workers = v.Awake.Where(c => c.WorkingOn == f.Id).Select(c => c.Name).ToList();
+        if (f.State == FaultState.InRepair)
+        {
+            _p.Meter(new Rectangle(ix, y + 2, inner, 6), f.Progress / f.Hours, Painter.Ink);
+            y += 10;
+        }
+        if (workers.Count > 0)
+            y = _p.Paragraph(string.Join(" and ", workers) + (workers.Count == 1 ? " is" : " are") + " on it"
+                             + (workers.Count < f.People ? " (" + workers.Count + " of " + f.People + ")" : "") + ".", ix, y, inner, Painter.Ink);
+        y += 4;
+        var who = _target is { State: CrewState.Awake } ? _target : null;
+        var half = (inner - 8) / 2;
+        var fault = f;
+        if (_p.Button(new Rectangle(ix, y, half, 34), who is null ? "SELECT SOMEONE" : "REPAIR: " + who.Name.ToUpperInvariant(), who != null) && who != null)
+            Act("repair " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: false));
+        if (_p.Button(new Rectangle(ix + half + 8, y, half, 34), "PATCH", who != null) && who != null)
+            Act("patch " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: true));
+        y += 34 + 8;
+        _p.Frame(new Rectangle(x, cardTop, width, y - cardTop), f.State == FaultState.InRepair ? Painter.Wire : Painter.Accent);
+        return y + 6;
     }
 
     // ---- The ship plan ----
@@ -251,24 +306,30 @@ public sealed partial class ShipGame
         }
 
         // Faults, numbered as in the issue list, with a leader to a label outside the hull.
+        // Faults in the same section sit side by side, and their labels stack, so none covers another.
         var index = 0;
+        var inSection = new Dictionary<string, int>();
+        var labelsAbove = 0;
+        var labelsBelow = 0;
         foreach (var f in v.Current.Faults)
         {
             index++;
             if (f.Resolved || v.GetSection(f.Section) is not { } s)
                 continue;
-            var centre = P(s.Spot.X, s.Spot.Y);
-            _p.Diamond(centre, 13, Painter.Accent);
+            var slot = inSection.TryGetValue(s.Id, out var seen) ? seen : 0;
+            inSection[s.Id] = slot + 1;
+            var centre = P(s.Spot.X + slot * 34, s.Spot.Y);
+            _p.Diamond(centre, 13, f.Critical ? Painter.Bright : Painter.Accent, f.Critical ? 3f : 2f);
             _p.TextCentre(_p.Small, index.ToString(CultureInfo.InvariantCulture), centre.X, centre.Y - 8, Painter.Accent);
             var above = s.Spot.Y < 235;
-            var end = P(s.Spot.X, above ? 36 + index % 2 * 18 : 404);
+            var end = P(s.Spot.X + slot * 34, above ? 36 + labelsAbove++ * 18 : 404 - labelsBelow++ * 18);
             _p.Line(new Vector2(centre.X, centre.Y + (above ? -13 : 13)), end, Painter.Accent, 1f);
             _p.Line(end, end + new Vector2(-10, 0), Painter.Accent, 1f);
-            var label = index.ToString("00", CultureInfo.InvariantCulture) + " " + f.Name.ToUpperInvariant() + " - " + Voyage.Hours(Math.Max(0, f.Deadline - v.Clock));
+            var label = index.ToString("00", CultureInfo.InvariantCulture) + " " + f.Name.ToUpperInvariant() + (f.Critical ? " (CRITICAL)" : "") + " - " + Voyage.Hours(Math.Max(0, f.Deadline - v.Clock));
             _p.TextRight(_p.Small, label, end.X - 14, end.Y - 8, Painter.Accent);
         }
 
-        _p.Text(_p.Small, "door outlined: open   grey: closed   amber: locked     dashed blue: coolant     diamond: fault     triangle: awake",
+        _p.Text(_p.Small, "door outlined: open   grey: closed   amber: locked     dashed blue: coolant     diamond: fault (bold: critical)     triangle: awake",
             rect.X + 14, rect.Bottom - 24, Painter.Dim);
     }
 

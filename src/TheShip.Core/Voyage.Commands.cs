@@ -72,6 +72,46 @@ public sealed partial class Voyage
         return (skilled ? 1 : Tuning.UnskilledRate) * (f.Patching ? Tuning.PatchRate : 1);
     }
 
+    /// <summary>
+    /// Hours until the fault is done if the work started now: the thaw first if nobody who qualifies is awake (or a person more must be woken),
+    /// then the remaining work at the rate the team would work (DESIGN.md, "Alerts": the clock rule). Ignores that someone may be busy elsewhere.
+    /// </summary>
+    public double EarliestDoneHours(Fault f, bool patch = false)
+    {
+        var up = Crew.Where(c => c.State is CrewState.Awake or CrewState.Thawing).ToList();
+        var qualifiedUp = up.Where(c => c.SkillOf(f.Skill) >= f.Level).ToList();
+        double wait;
+        bool skilled;
+        if (qualifiedUp.Count > 0)
+        {
+            skilled = true;
+            wait = qualifiedUp.Any(c => c.State == CrewState.Awake) ? 0 : qualifiedUp.Min(c => Math.Max(0, c.ThawDoneAt - Clock));
+        }
+        else if (Crew.Any(c => c.State == CrewState.Asleep && c.SkillOf(f.Skill) >= f.Level))
+        {
+            skilled = true;
+            wait = Tuning.ThawHours;
+        }
+        else
+        {
+            skilled = false;
+            wait = up.Count > 0 && up.Any(c => c.State == CrewState.Awake) ? 0 : Tuning.ThawHours;
+        }
+        if (up.Count < f.People)
+            wait = Math.Max(wait, Tuning.ThawHours);
+        var rate = (skilled ? 1 : Tuning.UnskilledRate) * (patch ? Tuning.PatchRate : 1);
+        var done = f.Patching == patch ? f.Progress : 0;
+        return wait + Math.Max(0, f.Hours - done) / rate;
+    }
+
+    /// <summary>The issue card's line: when the fault could be done, and whether the clock allows it.</summary>
+    public string EarliestDoneText(Fault f)
+    {
+        var hours = EarliestDoneHours(f);
+        var text = "Earliest done if started now: " + Hours(Math.Ceiling(hours));
+        return hours > f.Deadline - Clock + 0.001 ? text + " - too late for the clock" : text;
+    }
+
     private void GoAlert()
     {
         var open = Current.Faults.Where(f => !f.Resolved).ToList();
@@ -486,6 +526,13 @@ public sealed partial class Voyage
                 break;
             case "controller":
                 PodWear += 4;
+                break;
+            case "blight":
+                Stores *= Tuning.BlightStoresLeft;
+                break;
+            case "powersag":
+                PowerLow = true;
+                _facts["power"].Truth = "low";
                 break;
         }
     }

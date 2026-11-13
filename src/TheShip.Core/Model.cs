@@ -249,7 +249,7 @@ public sealed class Fault
     public Fault Again(string id, string name) => new()
     {
         Id = id, Kind = Kind, Name = Prefix + Plain(name).ToLowerInvariant(), Skill = Skill, Level = Level, People = People, Hours = Hours,
-        ClockHours = ClockHours / 2, IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact, Section = Section, Critical = Critical, SubjectId = SubjectId
+        ClockHours = Math.Max(ClockHours / 2, Tuning.ThawHours + Hours + Tuning.AgainMinSlackHours), IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact, Section = Section, Critical = Critical, SubjectId = SubjectId
     };
 }
 
