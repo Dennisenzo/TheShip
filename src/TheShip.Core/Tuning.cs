@@ -38,6 +38,10 @@ public static class Tuning
     public const double PatchFailDeathChance = 0.15;
     public const double ThawRiskPerWear = 0.012;
     public const double ThawInjury = 25;
+    /// <summary>Share of failed thaws that kill outright instead of injuring.</summary>
+    public const double ThawFatalShare = 0.3;
+    /// <summary>A sleeper's death chance in a drift is pod wear x years x this.</summary>
+    public const double SleepDeathPerWearYear = 0.0001;
     public const double PowerLowDeathChance = 0.10;
     public const int PodsWornAt = 8;
     public const double StoresShortAt = 300;
