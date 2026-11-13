@@ -135,6 +135,7 @@ public static class Scenario
 
         // The coolant bay is hot from the start: the repair always gives a dose.
         facts.First(f => f.Key == "dose").Truth = "dosed";
+        facts.First(f => f.Key == "dose").Noun = "radiation dose";
 
         foreach (var c in crew)
         {

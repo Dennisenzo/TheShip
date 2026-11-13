@@ -7,8 +7,8 @@ public sealed partial class Voyage
     private static string Num(double x) => x.ToString("0.#", CultureInfo.InvariantCulture);
 
     /// <summary>
-    /// The terms <paramref name="c"/> works <paramref name="f"/> on, in words: "If Mara starts now: Mara knows the dose - precautions: work 10% slower,
-    /// dose 8 health instead of 15, no trust lost if hurt. Mara has not been told the cause: telling Mara adds 8% to the repair odds."
+    /// The terms <paramref name="c"/> works <paramref name="f"/> on, in words: "If Mara starts now: Mara knows about the radiation dose: precautions,
+    /// work 10% slower, half the dose, no trust lost if hurt. Mara has not been told the cause; telling them: 3% faster, +8% odds."
     /// Built from what they believe and the fault, never from the truth, so it never says whether anything told them was true.
     /// Empty when the fault has neither a risk nor a cause.
     /// </summary>
@@ -20,7 +20,7 @@ public sealed partial class Voyage
         switch (t.Risk)
         {
             case RiskKnowledge.Briefed:
-                parts.Add(name + " knows the " + RiskLabel(f) + ": precautions, work " + Num((1 - Tuning.PrecautionRate) * 100) + "% slower, half the dose, no trust lost if hurt.");
+                parts.Add(name + " knows about the " + RiskLabel(f) + ": precautions, work " + Num((1 - Tuning.PrecautionRate) * 100) + "% slower, " + HarmShareText() + " the dose, no trust lost if hurt.");
                 break;
             case RiskKnowledge.Reassured:
                 parts.Add(name + " expects no harm: no precautions, full dose.");
@@ -40,7 +40,12 @@ public sealed partial class Voyage
         return (c.WorkingOn == f.Id ? name + " works on it: " : "If " + name + " starts now: ") + string.Join(" ", parts);
     }
 
-    private string RiskLabel(Fault f) => f.DangerFact is { } d && _facts.TryGetValue(d, out var fact) ? fact.Label : "danger";
+    /// <summary>The risk as a short noun ("radiation dose"), to follow "the" in a sentence.</summary>
+    private string RiskLabel(Fault f) => f.DangerFact is { } d && _facts.TryGetValue(d, out var fact) && fact.Noun is { } noun ? noun : "danger";
+
+    /// <summary>How much of the harm a briefed worker takes, as words before "the dose": "half", or "40% of".</summary>
+    private static string HarmShareText() =>
+        Math.Abs(Tuning.PrecautionHarm - 0.5) < 1e-9 ? "half" : Num(Tuning.PrecautionHarm * 100) + "% of";
 
     /// <summary>What the ship knows of this fault's cause, once the log shows it (its alert has started); null otherwise.</summary>
     public string? CauseKnown(Fault f) =>

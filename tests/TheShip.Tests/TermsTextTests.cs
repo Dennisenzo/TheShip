@@ -62,6 +62,20 @@ public class TermsTextTests
     }
 
     [Fact]
+    public void The_risk_is_named_with_a_short_noun()
+    {
+        var (v, mara, f) = Ready();
+        var unaware = v.TermsText(mara, f);
+        Assert.Contains("Mara has not been told about the radiation dose: full dose", unaware);
+        Tell(v, mara, "dose", "dosed");
+        var briefed = v.TermsText(mara, f);
+        Assert.Contains("Mara knows about the radiation dose: precautions", briefed);
+        Assert.Contains(Tuning.PrecautionHarm == 0.5 ? "half the dose" : "% of the dose", briefed);
+        foreach (var text in new[] { unaware, briefed })
+            Assert.DoesNotContain("the whether", text);
+    }
+
+    [Fact]
     public void A_fault_with_no_risk_and_no_cause_has_no_terms_text()
     {
         var (v, mara, f) = Ready();

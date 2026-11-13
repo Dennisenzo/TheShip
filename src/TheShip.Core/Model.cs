@@ -151,6 +151,8 @@ public sealed class Fact
     public required string Key { get; init; }
     /// <summary>"whether Idris is alive": for prompts and the record.</summary>
     public required string Label { get; init; }
+    /// <summary>A short noun for the risk this fact names, for prose ("the radiation dose"); null when the fact is not a risk.</summary>
+    public string? Noun { get; set; }
     /// <summary>What a crew member asks: "How is Idris?"</summary>
     public required string Question { get; init; }
     /// <summary>The values it can take; empty for a number.</summary>
