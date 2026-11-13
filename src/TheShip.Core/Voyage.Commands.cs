@@ -72,6 +72,50 @@ public sealed partial class Voyage
         return (skilled ? 1 : Tuning.UnskilledRate) * (f.Patching ? Tuning.PatchRate : 1);
     }
 
+    /// <summary>
+    /// Hours until the fault is done if the work started now: the thaw of whoever is still thawing or must be woken to reach the people it needs
+    /// (the thaw of a qualified sleeper if nobody qualified is up), then the remaining work at the rate that team would work
+    /// (DESIGN.md, "Alerts": the clock rule). Ignores that someone may be busy elsewhere.
+    /// </summary>
+    public double EarliestDoneHours(Fault f, bool patch = false)
+    {
+        bool Qualified(CrewMember c) => c.SkillOf(f.Skill) >= f.Level;
+        double Thaw(CrewMember c) => c.State == CrewState.Thawing ? Math.Max(0, c.ThawDoneAt - Clock) : 0;
+        var team = Crew.Where(c => c.State is CrewState.Awake or CrewState.Thawing)
+            .OrderByDescending(Qualified).ThenBy(Thaw).Take(f.People).ToList();
+        var wait = team.Count == 0 ? 0 : team.Max(Thaw);
+        var skilled = team.Any(Qualified);
+        if (!skilled && Crew.Any(c => c.State == CrewState.Asleep && Qualified(c)))
+        {
+            // Someone qualified is woken to lead the team.
+            skilled = true;
+            wait = Tuning.ThawHours;
+        }
+        if (team.Count < f.People)
+            wait = Math.Max(wait, Tuning.ThawHours);
+        var rate = (skilled ? 1 : Tuning.UnskilledRate) * (patch ? Tuning.PatchRate : 1);
+        var done = f.Patching == patch ? f.Progress : 0;
+        return wait + Math.Max(0, f.Hours - done) / rate;
+    }
+
+    /// <summary>
+    /// The issue card's line: when the fault could be done at the rate it is being worked at (a repair, or a patch while it is being patched),
+    /// and whether the clock allows it; a fault only a patch can still save says so.
+    /// </summary>
+    public string EarliestDoneText(Fault f)
+    {
+        var patching = f.State == FaultState.InRepair && f.Patching;
+        var hours = EarliestDoneHours(f, patching);
+        var left = f.Deadline - Clock + 0.001;
+        var text = "Earliest done if started now: " + Hours(Math.Ceiling(hours));
+        if (hours <= left)
+            return text;
+        var patchHours = EarliestDoneHours(f, true);
+        return !patching && patchHours <= left
+            ? text + " - only a patch could make it (" + Hours(Math.Ceiling(patchHours)) + ")"
+            : text + " - too late for the clock";
+    }
+
     private void GoAlert()
     {
         var open = Current.Faults.Where(f => !f.Resolved).ToList();
@@ -104,9 +148,10 @@ public sealed partial class Voyage
 
         Pass(Math.Max(0, next - Clock));
         FinishThaws();
-        foreach (var f in open.Where(f => f.State == FaultState.InRepair && Staffed(f) && f.Progress >= f.Hours - 0.001).ToList())
+        // A fault dropped meanwhile (a sick person died) is no longer on the alert.
+        foreach (var f in open.Where(f => Current.Faults.Contains(f) && f.State == FaultState.InRepair && Staffed(f) && f.Progress >= f.Hours - 0.001).ToList())
             CompleteRepair(f);
-        foreach (var f in open.Where(f => !f.Resolved && f.Deadline <= Clock + 0.001).ToList())
+        foreach (var f in open.Where(f => Current.Faults.Contains(f) && !f.Resolved && f.Deadline <= Clock + 0.001).ToList())
             Lose(f);
         CheckAlertOver();
     }
@@ -415,6 +460,13 @@ public sealed partial class Voyage
             }
             if (f.ExposureFact is { } seen)
                 Learn(w, seen, _facts[seen].Truth, "evidence");
+            if (f.Kind == "illness")
+            {
+                // Treating the patient they stand next to the dead pod of the one who was lost.
+                w.Morale += Tuning.IllnessTreatedMorale;
+                if (_alert2Victim is { } v)
+                    Learn(w, "alive:" + v, _facts["alive:" + v].Truth, "evidence");
+            }
             Clamp(w);
         }
     }
@@ -437,7 +489,25 @@ public sealed partial class Voyage
         foreach (var w in Workers(f).ToList())
             w.WorkingOn = null;
         Ship(f.Name + ": the clock ran out. " + Cap(f.IfIgnored) + ".");
+        var patient = f.Kind == "illness" && f.SubjectId is { } sid ? Crew.First(c => c.Id == sid) : null;
+        var wasAlive = patient is { Alive: true };
         Consequence(f);
+        // "You let them die" only when this clock running out did the killing.
+        if (wasAlive && patient is { State: CrewState.Dead })
+            LeftBehind(patient);
+    }
+
+    /// <summary>Everyone awake saw the clock run out on a sleeper: they say so, and trust and morale drop.</summary>
+    private void LeftBehind(CrewMember gone)
+    {
+        foreach (var c in Awake.ToList())
+        {
+            c.Trust -= Tuning.LeftBehindTrust;
+            // Learning of the death is the morale cost (the hardness of the fact); the left_behind line replaces the "found out" line.
+            Learn(c, "alive:" + gone.Id, "dead", "evidence", silent: true);
+            Clamp(c);
+            Speak(c, "left_behind", "You say to the ship that it let " + gone.Name + " die in the pod when the clock ran out on the illness.", gone.Name);
+        }
     }
 
     /// <summary>What a fault does when it is lost, or when a patch on it is still outstanding at the last drift.</summary>
@@ -452,6 +522,11 @@ public sealed partial class Voyage
             case "pod":
                 PodWear += 3;
                 break;
+            case "illness":
+                // Waking the patient does not cure them: the illness keeps its clock (the thaw has its usual risk).
+                if (f.SubjectId is { } sick && Crew.First(c => c.Id == sick) is { Alive: true } patient)
+                    Kill(patient, patient.State == CrewState.Asleep ? "died of the illness in their pod" : "died of the illness");
+                break;
             case "nav":
                 NavLost = true;
                 _facts["course"].Truth = "drifting";
@@ -459,6 +534,13 @@ public sealed partial class Voyage
                 break;
             case "controller":
                 PodWear += 4;
+                break;
+            case "blight":
+                Stores *= Tuning.BlightStoresLeft;
+                break;
+            case "powersag":
+                PowerLow = true;
+                _facts["power"].Truth = "low";
                 break;
         }
     }
@@ -702,7 +784,8 @@ public sealed partial class Voyage
         var patchFailed = false;
         if (last && _patched.Count > 0)
         {
-            foreach (var id in _patched)
+            var aliveBefore = Crew.Where(c => c.Alive).ToList();
+            foreach (var id in _patched.ToList())
             {
                 var old = Alerts.SelectMany(a => a.Faults).First(f => f.Id == id);
                 if (old.Kind == "nav")
@@ -716,6 +799,8 @@ public sealed partial class Voyage
                 patchFailed |= old.Kind == "controller";
             }
             _patched.Clear();
+            // A patched illness that gave way killed its patient: they are in the drift report's deaths.
+            deaths.AddRange(aliveBefore.Where(c => !c.Alive).Select(c => c.Name));
         }
         var hours = years * Tuning.HoursPerYear;
         // Whoever would not sleep stays up through the drift and eats the stores, in time order (DESIGN.md, "What every decision spends").

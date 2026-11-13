@@ -179,11 +179,50 @@ public static class Scenario
     public static List<Alert> Alerts(Variation? variation = null)
     {
         var jitter = (variation ?? Variation.Classic).YearJitter;
+        var v = variation ?? Variation.Classic;
         var alerts = BaseAlerts();
         for (var i = 0; i < alerts.Count; i++)
             alerts[i].Year += jitter[i];
+        // Alert 2: the clock is the thaw, the work and the run's slack; the sick patient is the drawn bank neighbour.
+        foreach (var f in alerts[1].Faults)
+        {
+            f.ClockHours = Tuning.ThawHours + f.Hours + v.SlackHours[1];
+            if (f.Kind == "illness")
+            {
+                f.SubjectId = v.Alert2Patient;
+                f.Section = ShipPlan.Pod(v.Alert2Patient).Bank;
+                f.ExposureFact = "alive:" + v.Alert2Patient;
+            }
+        }
+        // Alerts 3 and 5: the same rule, clock = thaw + work + slack. Alert 3's drawn side fault and alert 5's power sag are added here
+        // (StartAlert swaps or drops them by who is still alive, and by the four-fault cap).
+        foreach (var i in new[] { 2, 4 })
+            foreach (var f in alerts[i].Faults)
+                f.ClockHours = Tuning.ThawHours + f.Hours + v.SlackHours[i];
+        if (v.Alert3SideFault is { } side3)
+            alerts[2].Faults.Add(SideFault(side3, v.SlackHours[2], "side3"));
+        if (v.Alert5SideFault is { } side5)
+            alerts[4].Faults.Add(SideFault(side5, v.SlackHours[4], "side5"));
         return alerts;
     }
+
+    /// <summary>
+    /// A side fault of alert 3 or 5 (<see cref="Variation.Blight"/> or <see cref="Variation.PowerSag"/>), with its clock of thaw + work + slack.
+    /// The power sag is Critical wherever it appears (it is the deadliest side fault), so alert 3 can hold two Critical faults. Power sag is temporary: until power routing exists it is an engineering repair in the reactor (DESIGN.md, fault catalogue).
+    /// </summary>
+    public static Fault SideFault(string kind, int slackHours, string id) => kind == Variation.Blight
+        ? new Fault
+        {
+            Id = id, Kind = "blight", Name = "Hydroponics blight", Skill = Skill.Botany, Level = 2, Hours = Tuning.BlightHours,
+            ClockHours = Tuning.ThawHours + Tuning.BlightHours + slackHours, IfIgnored = "the stores are cut to " + (int)Math.Round(Tuning.BlightStoresLeft * 100) + "%",
+            Section = "hydro",
+        }
+        : new Fault
+        {
+            Id = id, Kind = "powersag", Name = "Power sag", Skill = Skill.Engineering, Level = 2, Hours = Tuning.PowerSagHours,
+            ClockHours = Tuning.ThawHours + Tuning.PowerSagHours + slackHours, Critical = true,
+            IfIgnored = "the power stays low and the sleepers are at risk", Section = "reactor",
+        };
 
     private static List<Alert> BaseAlerts() => new()
     {
@@ -203,13 +242,18 @@ public static class Scenario
         new Alert
         {
             Number = 2, Year = 17, Title = "Death in sleep",
-            Report = "A pod has failed. Its sleeper is dead. The pod has to be cleared and the bank resealed.",
+            Report = "A pod has failed. Its sleeper is dead. The pod has to be cleared and the bank resealed, and a neighbour in the bank is sick.",
             Faults =
             {
                 new Fault
                 {
                     Id = "pod", Kind = "pod", Name = "Failed pod", Skill = Skill.Medicine, Level = 1, Hours = 4, ClockHours = 240,
                     IfIgnored = "the bank leaks and every pod in it wears faster", Section = "podA",
+                },
+                new Fault
+                {
+                    Id = "illness", Kind = "illness", Name = "Sleeper illness", Skill = Skill.Medicine, Level = 2, Hours = 12, ClockHours = 240,
+                    Critical = true, IfIgnored = "the patient dies in their pod", Section = "podA",
                 },
             },
         },
@@ -221,7 +265,7 @@ public static class Scenario
             {
                 new Fault
                 {
-                    Id = "nav", Kind = "nav", Name = "Navigation drift", Skill = Skill.Navigation, Level = 2, People = 2, Hours = 12, ClockHours = 720,
+                    Id = "nav", Kind = "nav", Name = "Navigation drift", Skill = Skill.Navigation, Level = 2, People = 2, Hours = 12, ClockHours = 18,
                     Critical = true, IfIgnored = "the ship never finds its course again", ExposureFact = "date", Section = "helm",
                 },
             },
@@ -235,12 +279,12 @@ public static class Scenario
         new Alert
         {
             Number = 5, Year = 52, Title = "Pod controller fault",
-            Report = "The controller of the pod bank is resetting itself. One fault.",
+            Report = "The controller of the pod bank is resetting itself.",
             Faults =
             {
                 new Fault
                 {
-                    Id = "controller", Kind = "controller", Name = "Pod controller", Skill = Skill.Engineering, Level = 1, Hours = 4, ClockHours = 72,
+                    Id = "controller", Kind = "controller", Name = "Pod controller", Skill = Skill.Engineering, Level = 1, Hours = 4, ClockHours = 10,
                     IfIgnored = "the pods wear much faster", ExposureFact = "pods", Section = "podB",
                 },
             },

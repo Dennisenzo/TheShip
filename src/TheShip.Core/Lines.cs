@@ -56,6 +56,7 @@ public static class Lines
             "altered" => "This log entry was rewritten. The checksums don't match. I'm taking the logs out of your hands.",
             "small" => Pick(rng, "Mm.", "It's strange, hearing a voice and seeing nobody.", "Thanks. It helps to talk."),
             "answer" => Pick(rng, "You have the sensors. You tell me.", "I know what you've told me, and what I've seen. That's all."),
+            "left_behind" => Pick(rng, "You let " + detail + " die in there.", "We could have saved " + detail + ". You let the clock run out."),
             "order" => "Tell me which fault and I'll look at it.",
             _ => "...",
         };

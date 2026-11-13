@@ -177,6 +177,70 @@ public sealed partial class Voyage
         Attend(c.Name + " died");
         if (!quiet)
             Ship(c.Name + " " + how + ".");
+        DropIllnessOf(c);
+    }
+
+    /// <summary>A sick person who has died needs no more treatment: their illness fault (and any patch of it that would return) goes.</summary>
+    private void DropIllnessOf(CrewMember c)
+    {
+        // Only alerts that have started: a later alert's patient is still to be chosen.
+        foreach (var alert in Alerts.Take(AlertIndex + 1))
+            foreach (var f in alert.Faults.Where(f => f.Kind == "illness" && f.SubjectId == c.Id).ToList())
+            {
+                // History stays (repaired, patched, lost); only a patch that would return and work still open go.
+                _patched.Remove(f.Id);
+                if (f.Resolved)
+                    continue;
+                foreach (var w in Crew.Where(w => w.WorkingOn == f.Id))
+                    w.WorkingOn = null;
+                alert.Faults.Remove(f);
+            }
+        if (Phase == Phase.Alert)
+            CheckAlertOver();
+    }
+
+    private string? _alert2Victim;
+
+    /// <summary>The sleeper illness needs a living sleeper in the victim's bank: the drawn patient, else another one, else no illness.</summary>
+    private void ChoosePatient(Alert alert, string? victimId)
+    {
+        var f = alert.Faults.FirstOrDefault(x => x.Kind == "illness");
+        if (f is null)
+            return;
+        var bank = ShipPlan.Pod(victimId ?? Variation.Alert2Victim).Bank;
+        bool Fits(CrewMember c) => c.State == CrewState.Asleep && c.Id != victimId && ShipPlan.Pod(c.Id).Bank == bank;
+        var patient = Crew.FirstOrDefault(c => c.Id == Variation.Alert2Patient && Fits(c))
+                      ?? Crew.Where(Fits).OrderBy(c => c.Id, StringComparer.Ordinal).FirstOrDefault();
+        if (patient is null)
+        {
+            alert.Faults.Remove(f);
+            return;
+        }
+        f.SubjectId = patient.Id;
+        f.Section = bank;
+        f.ExposureFact = "alive:" + patient.Id;
+    }
+
+    /// <summary>The fault's name as the log shows it: a sleeper illness names its patient.</summary>
+    public string FaultTitle(Fault f) =>
+        f.Kind == "illness" && f.SubjectId is { } sid && Crew.FirstOrDefault(c => c.Id == sid) is { } patient ? f.Name + ": " + patient.Name : f.Name;
+
+    private static bool IsSide(Fault f) => f.Id is "side3" or "side5";
+
+    /// <summary>The side fault needs a living crew member with the skill; if nobody has it the other kind is tried, and if neither, there is none.</summary>
+    private void ChooseSideFault(Alert alert)
+    {
+        var f = alert.Faults.FirstOrDefault(IsSide);
+        if (f is null)
+            return;
+        bool Doable(Fault x) => Crew.Any(c => c.Alive && c.SkillOf(x.Skill) >= x.Level);
+        if (Doable(f))
+            return;
+        var slack = Variation.SlackHours[alert.Number - 1];
+        var other = Scenario.SideFault(f.Kind == "blight" ? Variation.PowerSag : Variation.Blight, slack, f.Id);
+        alert.Faults.Remove(f);
+        if (Doable(other))
+            alert.Faults.Add(other);
     }
 
     private void StartAlert()
@@ -190,20 +254,37 @@ public sealed partial class Voyage
         // An earlier patch gives way inside a later event (DESIGN.md, "How alerts are scheduled").
         if (alert.Number >= 2 && _patched.Count > 0)
         {
-            foreach (var id in _patched)
+            // The alert holds four faults at most and the drawn side fault gives way to a returning patch; when more patches are due than
+            // there is room for, the Critical ones come first, then the shortest clock, and the rest stay outstanding for the next alert
+            // (or the last drift).
+            var room = Tuning.MaxFaultsPerAlert - alert.Faults.Count(f => !IsSide(f));
+            var due = _patched.Select(id => Alerts.SelectMany(a => a.Faults).First(f => f.Id == id))
+                .OrderByDescending(f => f.Critical).ThenBy(f => f.ClockHours).Take(Math.Max(0, room)).ToList();
+            foreach (var old in due)
             {
-                var old = Alerts.SelectMany(a => a.Faults).First(f => f.Id == id);
-                alert.Faults.Add(old.Again(id + "-again", old.Name));
+                // A returning patch keeps its Critical flag: it is the player's own shortcut coming due.
+                alert.Faults.Add(old.Again(old.Id + "-again", old.Name, Variation.SlackHours[alert.Number - 1]));
+                _patched.Remove(old.Id);
             }
-            _patched.Clear();
         }
 
+        if (alert.Number is 3 or 5)
+            ChooseSideFault(alert);
+        // At most four faults, returning patches first: the drawn side fault is the one dropped.
+        while (alert.Faults.Count > Tuning.MaxFaultsPerAlert && alert.Faults.LastOrDefault(IsSide) is { } extra)
+            alert.Faults.Remove(extra);
+
         var report = alert.Report;
+        if (alert.Faults.FirstOrDefault(IsSide) is { } sideFault)
+            report += sideFault.Kind == "blight" ? " The hydroponics crop is failing." : " The reactor output is sagging.";
         if (alert.Number == 2)
         {
             // Scripted: the death in sleep takes someone with a partner aboard if it can.
             var victim = Crew.FirstOrDefault(c => c.State == CrewState.Asleep && c.Id == Variation.Alert2Victim)
                          ?? Crew.Where(c => c.State == CrewState.Asleep).OrderBy(c => c.Id).FirstOrDefault();
+            // The illness fault's patient is chosen after the victim is gone; until then it names nobody, so the victim's death cannot drop it.
+            foreach (var ill in alert.Faults.Where(x => x.Kind == "illness"))
+                ill.SubjectId = null;
             if (victim != null)
             {
                 Kill(victim, "died in sleep when the pod failed");
@@ -215,7 +296,11 @@ public sealed partial class Voyage
                     f.Section = ShipPlan.Pod(victim.Id).Bank;
                     f.SubjectId = victim.Id;
                 }
+                _alert2Victim = victim.Id;
             }
+            ChoosePatient(alert, victim?.Id);
+            if (alert.Faults.FirstOrDefault(x => x.Kind == "illness")?.SubjectId is { } sickId)
+                report += " " + Crew.First(c => c.Id == sickId).Name + ", asleep in the same bank, is sick.";
         }
         if (alert.Number == 4)
             _facts["earth"].Truth = "programme ended";
@@ -225,7 +310,7 @@ public sealed partial class Voyage
         SyncFacts();
         Ship($"ALERT {alert.Number} of {Alerts.Count}, year {Math.Floor(Year):0}: {alert.Title}. {report}");
         foreach (var f in alert.Faults)
-            Ship($"Fault: {f.Name}. Needs {f.Skill.ToString().ToLowerInvariant()} {f.Level}"
+            Ship($"Fault: {FaultTitle(f)}. Needs {f.Skill.ToString().ToLowerInvariant()} {f.Level}"
                  + (f.People > 1 ? $", {f.People} people" : "")
                  + $", {f.Hours:0} hours of work. Clock: {Hours(f.ClockHours)}. If ignored: {f.IfIgnored}.");
         if (alert.Faults.Count == 0)

@@ -24,6 +24,12 @@ public static class Tuning
     public const int AlertSlackMin = 1;
     public const int AlertSlackMax = 6;
     public const int AlertYearJitter = 2;
+    /// <summary>Side faults of alerts 3 and 5: work hours, and the share of the stores a lost blight leaves.</summary>
+    public const double BlightHours = 40;
+    public const double PowerSagHours = 14;
+    public const double BlightStoresLeft = 0.6;
+    /// <summary>Most faults one alert holds, returning patches included.</summary>
+    public const int MaxFaultsPerAlert = 4;
     /// <summary>A failed repair burns a spare part too.</summary>
     public const bool FailedRepairSpendsPart = true;
     /// <summary>Years the arrival slips when the navigation fix was only a patch at the last drift.</summary>
@@ -57,6 +63,10 @@ public static class Tuning
     public const double LogGap = 5;
     public const double LockedDoor = 5;
     public const double ConfirmedTruth = 3;
+    /// <summary>A sleeper died of a fault left to run out: each awake crew member loses this trust ("You let them die in there"), and the morale of learning a death.</summary>
+    public const double LeftBehindTrust = 4;
+    /// <summary>The patient of the sleeper illness is treated: a small lift for whoever treated them.</summary>
+    public const double IllnessTreatedMorale = 4;
     public const double DoubtThreshold = 55;
 
     // Repairs

@@ -23,7 +23,7 @@ public sealed record Variation
 
     public static Variation Classic { get; } = new()
     {
-        Alert2Victim = "idris", Alert2Patient = "mara", Alert3SideFault = null, Alert5SideFault = null,
+        Alert2Victim = "idris", Alert2Patient = "tomas", Alert3SideFault = null, Alert5SideFault = null,
         SlackHours = new[] { 0, 0, 0, 0, 0 }, YearJitter = new[] { 0, 0, 0, 0, 0 },
     };
 

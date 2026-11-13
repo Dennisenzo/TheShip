@@ -20,10 +20,14 @@ public sealed class BalanceBot
 {
     private readonly Voyage _v;
     private readonly BotKind _kind;
+    /// <summary>Whether a bot patches a minor fault to keep a spare part for a critical one still waiting (set to compare the table with and without).</summary>
+    public static bool ReserveParts { get; set; } = true;
     /// <summary>Who is meant to work on which fault.</summary>
     private readonly Dictionary<string, string> _plan = new();
     /// <summary>Person+fault pairs the bot gave up on (a refusal; asking again would only keep the clock from running out).</summary>
     private readonly HashSet<string> _gaveUp = new();
+    /// <summary>Person+skill pairs that refused work once: a bot does not wake that person again for the same kind of work (a player sees the numbers).</summary>
+    private readonly HashSet<string> _refusedKind = new();
     private int _alertSeen = -1;
     /// <summary>Total thaws when each alert began (to get thaws per alert).</summary>
     private readonly List<int> _thawMarks = new();
@@ -109,9 +113,11 @@ public sealed class BalanceBot
             {
                 var up = _v.Crew.Count(Up);
                 var pick = _v.Crew
-                    .Where(c => c.Alive && !Committed(c) && !GaveUp(c, f.Id) && (Up(c) || (wakeAllowed && up < Tuning.MaxAwake)))
+                    .Where(c => c.Alive && !Committed(c) && !GaveUp(c, f.Id)
+                                && (Up(c) || (wakeAllowed && up < Tuning.MaxAwake && !_refusedKind.Contains(c.Id + "/" + f.Skill))))
                     .OrderByDescending(c => c.SkillOf(f.Skill) >= f.Level)
                     .ThenByDescending(Up)              // someone already up costs no thaw
+                    .ThenByDescending(c => c.Trust >= 30)   // then someone who will do the work
                     .ThenByDescending(c => c.SkillOf(f.Skill))
                     .ThenByDescending(c => c.Trust)
                     .FirstOrDefault();
@@ -139,13 +145,17 @@ public sealed class BalanceBot
             Tell(c, _v.GetFact(danger));
         for (var attempt = 0; attempt < 3 && c.WorkingOn != f.Id; attempt++)
         {
-            var patch = _kind == BotKind.Careless ? _v.Parts <= Tuning.PartsShortAt
-                : _kind == BotKind.Thrifty && f.Id != _primary ? true : _v.Parts <= 0;
+            var patch = _kind == BotKind.Careless ? _v.Parts <= 0 || (!Critical(f) && _v.Parts <= Tuning.PartsShortAt)
+                : _kind == BotKind.Thrifty && f.Id != _primary ? true
+                : _v.Parts <= 0 || (ReserveParts && !Critical(f) && _v.Parts <= _v.Current.Faults.Count(x => Critical(x) && !x.Resolved));
             _v.Assign(c, f, patch);
             AnswerAll();
         }
         if (c.WorkingOn != f.Id)
+        {
             _gaveUp.Add(c.Id + "/" + f.Id);
+            _refusedKind.Add(c.Id + "/" + f.Skill);
+        }
     }
 
     // ---- what is said ----
@@ -222,7 +232,7 @@ public sealed class BalanceBot
     // ---- results ----
 
     private static readonly Regex Cause = new(
-        "(?<what>died in sleep when the pod failed|died of injuries|did not survive the thaw|starved|died awake|died in sleep on low power|died in sleep when the pod controller patch gave way|died in sleep during the drift)",
+        "(?<what>died in sleep when the pod failed|died of the illness|died of injuries|did not survive the thaw|starved|died awake|died in sleep on low power|died in sleep when the pod controller patch gave way|died in sleep during the drift)",
         RegexOptions.Compiled);
 
     private static RunResult Summarise(int seed, Voyage v)
