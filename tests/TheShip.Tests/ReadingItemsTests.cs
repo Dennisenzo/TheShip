@@ -124,6 +124,29 @@ public class ReadingItemsTests
         Assert.Contains(v.Ledger(), e => e.Person == mara && e.Key == "wake_partner");
     }
 
+    [Theory]
+    [InlineData("other")]
+    [InlineData("none")]
+    [InlineData(null)]
+    public void Accepting_terms_with_a_promise_of_no_key_is_the_word_they_asked_for(string? key)
+    {
+        var (v, mara, f) = TermsOpen();
+        v.Say("You have my word.", Item(LineKind.Promise, "mara.terms", ItemResponse.Accept, key), new[] { mara });
+        Assert.Equal(f.Id, mara.WorkingOn);
+        Assert.Equal(1, v.BargainsStruck);
+        Assert.Contains(v.Ledger(), e => e.Person == mara && e.Key == "wake_partner");
+    }
+
+    [Fact]
+    public void Accepting_terms_with_another_specific_promise_keeps_that_promise()
+    {
+        var (v, mara, f) = TermsOpen();
+        v.Say("I will never thaw you again.", Item(LineKind.Promise, "mara.terms", ItemResponse.Accept, "no_more_thaws"), new[] { mara });
+        Assert.Equal(0, v.BargainsStruck);
+        Assert.DoesNotContain(v.Ledger(), e => e.Person == mara && e.Key == "wake_partner");
+        Assert.Contains(v.Statements, s => s.PromiseKey == "no_more_thaws");
+    }
+
     [Fact]
     public void A_refusal_of_a_request_declines_it_with_its_cost_and_is_no_promise()
     {

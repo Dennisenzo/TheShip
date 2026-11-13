@@ -259,7 +259,9 @@ public sealed partial class Voyage
                 };
                 handled.Add(c);
                 break;
-            case ("terms", ItemResponse.Accept) when reading.Kind != LineKind.Promise && BargainOf(c) is { } b:
+            // Agreeing to the terms is giving the word they asked for, also when the promise was read without its key ("other", "none");
+            // a different specific promise (never to thaw them again) stays what it is.
+            case ("terms", ItemResponse.Accept) when !NamesPromise(reading) && BargainOf(c) is { } b:
                 reading = reading with { Kind = LineKind.Promise, PromiseKey = b.Key };
                 break;
             case ("request", ItemResponse.Refuse):
@@ -270,7 +272,7 @@ public sealed partial class Voyage
                 };
                 handled.Add(c);
                 break;
-            case ("request", ItemResponse.Accept) when reading.Kind != LineKind.Promise:
+            case ("request", ItemResponse.Accept) when !NamesPromise(reading):
                 reading = reading with { Kind = LineKind.Promise, PromiseKey = c.Want == Want.WakePartner ? "wake_partner" : "show_logs" };
                 break;
             case ("asked" or "danger", ItemResponse.Refuse or ItemResponse.Dodge) when reading.Kind != LineKind.Dodge:
@@ -279,6 +281,10 @@ public sealed partial class Voyage
         }
         return (reading, handled, outcome);
     }
+
+    /// <summary>The line is a promise of something specific the game can name (not "other" or no key).</summary>
+    private static bool NamesPromise(Reading r) =>
+        r.Kind == LineKind.Promise && r.PromiseKey is { } k && k != "other" && Reading.PromiseKeys.Contains(k);
 
     /// <summary>The player's words are the push (same as Repair again): the person decides now.</summary>
     private void PushByWords(CrewMember c)
