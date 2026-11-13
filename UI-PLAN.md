@@ -20,6 +20,11 @@ Where the code differs from the plan below:
 - **Tooltips.** The coolant and power lines have none (their bounding boxes cover half the plan).
 - **Ending.** The whole ending screen fades in over 1.5 s; the title does not come first.
 - **Plan motion** keeps running under a transition.
+- **Input during a transition** (validator findings and the user's decision 3, 2026-11-13). A transition is not an overlay: a click or a key
+  ends it and goes through (the click acts on the bridge, a typed character reaches the voice line, Esc only ends it). Only a click on
+  the transition's own box (the rolling year, the drift report card, the alert title) is kept from the bridge; on the year it jumps to
+  the report, on the report it goes on to the new alert, on the title it ends the reveal. A transition plays on the bridge only: a held
+  clock click returns to the bridge when its transition starts. Overlays (clicks and keys blocked) are the briefing and the picker.
 - **Step 0's "screenshots unchanged" check** no longer applies as written: the later steps change the bridge on purpose.
 
 ## Goals
@@ -224,7 +229,9 @@ Done when: every clickable thing reacts within one frame of the mouse arriving, 
 
 1. **Repair without a selection** opens a picker of awake crew with their skill. Selecting a card first still works.
 2. **Trust deltas** are shown, but only after the line that explains them is in the log.
-3. **The drift transition** is 3 seconds and skippable, and the drift report always waits for CONTINUE.
+3. **The drift transition** is 3 seconds and skippable. The drift report stays up until the player does something, but nothing
+   requires CONTINUE: any click or key closes it and goes through (a click on the bridge does its job, a key reaches the voice line).
+   A click on the report card itself is CONTINUE (on to the new alert). The user's decision, 2026-11-13: no step that only confirms.
 4. **The briefing** never mentions lying.
 
 ## Not in this plan

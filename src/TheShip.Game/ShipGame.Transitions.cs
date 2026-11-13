@@ -34,7 +34,7 @@ public sealed partial class ShipGame
         public Before From = new();
         /// <summary>When the current beat started.</summary>
         public double Start;
-        /// <summary>A drift has three beats: 0 the years roll, 1 the report waits for CONTINUE, 2 the new alert appears.</summary>
+        /// <summary>A drift has three beats: 0 the years roll, 1 the report waits until the player does something, 2 the new alert appears.</summary>
         public int Beat;
         public string Report = "";
         public string Banner = "";
@@ -127,12 +127,13 @@ public sealed partial class ShipGame
         _sounds.Alert();
     }
 
-    /// <summary>The drift report is up: it waits for the player and takes every click and key (<see cref="OverlayUp"/>).</summary>
-    private bool ReportUp => _transition is { Kind: SkipKind.Drift, Beat: 1 };
+    /// <summary>The drift report's width on the plan.</summary>
+    private const int ReportWidth = 620;
 
     /// <summary>
-    /// The transition's own box, which takes a click on it: the year while it rolls, the alert's title while it shows.
-    /// Anywhere else a click skips the transition and goes through to the bridge.
+    /// The transition's own box, which takes a click on it: the year while it rolls, the drift report while it waits,
+    /// the alert's title while it shows. Anywhere else a click ends the transition and goes through to the bridge
+    /// (the user's decision, 2026-11-13: no step that only confirms; the report stays up until the player does something).
     /// </summary>
     private Rectangle? TransitionBlock(Voyage v)
     {
@@ -141,6 +142,8 @@ public sealed partial class ShipGame
         var centre = PlanRect.X + PlanRect.Width / 2;
         if (t.Beat == 0)
             return new Rectangle(centre - 150, PlanRect.Y + PlanRect.Height / 2 - 62, 300, 124);
+        if (t.Beat == 1)
+            return new Rectangle(centre - ReportWidth / 2, PlanRect.Y + 48, ReportWidth, 196 + _p.Lines(ReportText(t), ReportWidth - 48) * 19 + 76);
         if (t.Beat == 2 && (float)(_now - t.Start) < Motion.Seconds(Motion.AlertTitle))
         {
             var width = Math.Max(360, (int)(v.Current.Title.Length * _p.HeadWidth) + 64);
@@ -149,7 +152,9 @@ public sealed partial class ShipGame
         return null;
     }
 
-    /// <summary>A click on the transition's box, Enter or Esc on the report: on to its next beat, or to its end.</summary>
+    private static string ReportText(Transition t) => t.Report.Length > 0 ? t.Report : "The years pass.";
+
+    /// <summary>A click on the transition's box: on to its next beat, or to its end.</summary>
     private void SkipTransition()
     {
         if (_transition is not { } t)
@@ -298,7 +303,7 @@ public sealed partial class ShipGame
             return;
         // A click on the transition's box moves it on a beat; a click anywhere else ends it, and the screen below had it
         // too (DrawScene): it goes through. The end is queued first, so a clock move clicked now starts a transition of its own.
-        if (_p.Click && !ReportUp)
+        if (_p.Click)
         {
             if (TransitionBlock(v) is { } block && _p.Over(block))
                 Do(SkipTransition);
@@ -347,10 +352,9 @@ public sealed partial class ShipGame
         }
         else if (t.Beat == 1)
         {
-            const int width = 620;
-            var text = t.Report.Length > 0 ? t.Report : "The years pass.";
-            var lines = _p.Lines(text, width - 48);
-            var card = new Rectangle(centre - width / 2, plan.Y + 48, width, 196 + lines * 19 + 76);
+            const int width = ReportWidth;
+            var text = ReportText(t);
+            var card = TransitionBlock(v)!.Value;
             _p.Box(card, Painter.Bright);
             var x = card.X + 24;
             var y = card.Y + 20;
@@ -371,9 +375,9 @@ public sealed partial class ShipGame
             var aliveBefore = t.From.Crew.Values.Count(c => c.State != CrewState.Dead);
             Row("ALIVE", aliveBefore.ToString(CultureInfo.InvariantCulture), alive.ToString(CultureInfo.InvariantCulture), alive < aliveBefore);
             y = _p.Paragraph(text, x, y + 6, width - 48, Painter.Ink) + 16;
-            if (_p.Button(new Rectangle(x, y, 200, 44), "CONTINUE", primary: true))
-                Do(ContinueDrift);
-            _p.Text(_p.Small, "Enter", x + 216, y + 14, Painter.Dim);
+            // A click anywhere on the card is CONTINUE (on to the new alert); a click or key elsewhere closes it and goes through.
+            _ = _p.Button(new Rectangle(x, y, 200, 44), "CONTINUE", primary: true);
+            _p.Text(_p.Small, "or carry on: any click or key", x + 216, y + 14, Painter.Dim);
         }
         else
         {

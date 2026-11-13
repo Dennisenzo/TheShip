@@ -471,9 +471,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _p.Click = _click;
         _p.BeginFrame();
         // Under an overlay the screen is drawn as if the mouse were elsewhere; the overlay then gets the real mouse and click.
-        // Under a running transition only its own box (the year, the alert title) keeps the mouse from the screen.
+        // Under a running transition only its own box (the year, the drift report, the alert title) keeps the mouse from the screen.
         var overlay = _voyage is not null && OverlayUp;
-        // A running transition (not the report) lets the screen have the mouse, except over its own box.
+        // A running transition lets the screen have the mouse, except over its own box.
         var playing = _voyage is not null && !overlay && _transition is not null && _screen == Screen.Bridge;
         var mouse = _p.Mouse;
         var down = _p.Down;

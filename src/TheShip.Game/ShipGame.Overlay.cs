@@ -9,18 +9,16 @@ namespace TheShip.Game;
 public sealed partial class ShipGame
 {
     /// <summary>
-    /// A popup that takes every click and key: the briefing, the picker, and the drift report. The other parts of a
-    /// transition are not one: a click or key skips them and goes through (<see cref="TransitionBlock"/>).
+    /// A popup that takes every click and key: the briefing and the picker. A transition (the drift report included) is
+    /// not one: a click or key ends it and goes through (<see cref="TransitionBlock"/>).
     /// </summary>
-    private bool OverlayUp => _briefing || _picker is not null || ReportUp;
+    private bool OverlayUp => _briefing || _picker is not null;
 
     /// <summary>Enter or Esc while an overlay is up.</summary>
     private void OverlayKey(bool enter)
     {
         if (_briefing)
             CloseBriefing();
-        else if (ReportUp)
-            SkipTransition();
         else if (!enter)
             _picker = null;
     }
@@ -30,8 +28,6 @@ public sealed partial class ShipGame
     {
         if (_briefing)
             DrawBriefing(v);
-        else if (ReportUp)
-            DrawTransition(v);
         else
             DrawPicker(v);
     }
