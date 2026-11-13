@@ -17,6 +17,10 @@ public sealed class FakeLlm : ILlmProvider
 
     /// <summary>The system prompt and turns of the last crew line call (the "reply" kind).</summary>
     public string? LastReplySystem { get; private set; }
+    /// <summary>The system prompt, user turn and grammar of the last reading call (the "read" kind).</summary>
+    public string? LastReadSystem { get; private set; }
+    public string? LastReadUser { get; private set; }
+    public string? LastReadGrammar { get; private set; }
     public IReadOnlyList<ChatTurn>? LastReplyTurns { get; private set; }
 
     public string Name => "fake (unit tests)";
@@ -31,6 +35,12 @@ public sealed class FakeLlm : ILlmProvider
         {
             LastReplySystem = system;
             LastReplyTurns = turns;
+        }
+        if (options.Kind == "read")
+        {
+            LastReadSystem = system;
+            LastReadUser = turns[^1].Content;
+            LastReadGrammar = options.Grammar;
         }
         var reply = options.Kind switch
         {

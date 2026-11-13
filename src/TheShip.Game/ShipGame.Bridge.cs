@@ -824,6 +824,10 @@ public sealed partial class ShipGame
             .FirstOrDefault(c => c == selected || asking == 1);
         if (staked != null)
             yield return (staked, v.StakesText(staked));
+        // The conditions a wary person stated for their job, one checklist per person that ticks off as each is met.
+        foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1))
+            if (v.JobText(c) is { } job)
+                yield return (c, job);
         // What a wary person wants before starting: the selected one's (or the only one's) bargain, ahead of the bay items.
         var bargainers = v.Awake.Where(c => v.BargainOf(c) != null).ToList();
         // With several and none of them selected, the first one's, and a hint to select the others.
@@ -853,7 +857,7 @@ public sealed partial class ShipGame
         var owed = v.Ledger().Where(e => e.State == "open").ToList();
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {
-            if (c != staked && c.PendingQuestion != null && v.HasFact(c.PendingQuestion))
+            if (c != staked && c.PendingQuestion != null && v.HasFact(c.PendingQuestion) && v.JobText(c) is null)
                 yield return (c, c.Name + " asked: " + v.GetFact(c.PendingQuestion).Question);
             if (c.RequestMade && !c.RequestGranted)
                 yield return (c, c.Name + " asked you " + (c.Want == Want.WakePartner ? "to wake their partner." : "to open the logs."));

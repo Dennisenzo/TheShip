@@ -95,7 +95,7 @@ public sealed class ShipMind : IDisposable
     {
         var heard = hearers.ToList();
         var entry = _voyage.BeginSay(text, heard);
-        var prompt = BuildReadPrompt(text, heard);
+        var prompt = BuildReadPrompt(text, heard, entry);
         var step = new Step { Entry = entry, Text = text, Hearers = heard };
         var ahead = _steps.Count(s => s.Action is null);
         _steps.Enqueue(step);
@@ -188,10 +188,10 @@ public sealed class ShipMind : IDisposable
     }
 
     /// <summary>Game thread: the read prompt from the voyage as it is now.</summary>
-    private ReadPrompt BuildReadPrompt(string text, IReadOnlyList<CrewMember> hearers) => new(text,
-        Prompts.ReadSystem(_voyage), Prompts.ReadUser(text, hearers, _voyage),
-        new LlmOptions("read", MaxTokens: 80, Temperature: 0f,
-            Grammar: Grammars.ReadingFor(_voyage.FactList.Select(f => f.Key)), Dialogue: false));
+    private ReadPrompt BuildReadPrompt(string text, IReadOnlyList<CrewMember> hearers, LogEntry? current = null) => new(text,
+        Prompts.ReadSystem(_voyage), Prompts.ReadUser(text, hearers, _voyage, current),
+        new LlmOptions("read", MaxTokens: 100, Temperature: 0f,
+            Grammar: Grammars.ReadingFor(_voyage.FactList.Select(f => f.Key), _voyage.OpenItems(hearers).Select(i => i.Id)), Dialogue: false));
 
     /// <summary>
     /// Asks the model for a reading; touches no voyage state. Empty when the call failed or was cancelled.
@@ -241,7 +241,7 @@ public sealed class ShipMind : IDisposable
         var voyage = new Voyage(0);
         var hearers = voyage.Crew.Take(1).ToList();
         var read = new LlmOptions("warmup", MaxTokens: 80, Temperature: 0f,
-            Grammar: Grammars.ReadingFor(voyage.FactList.Select(f => f.Key)), Dialogue: false);
+            Grammar: Grammars.ReadingFor(voyage.FactList.Select(f => f.Key), new[] { "mara.asked" }), Dialogue: false);
         await llm.ChatAsync(Prompts.ReadSystem(voyage),
             new[] { new ChatTurn("user", Prompts.ReadUser("We are twelve years out.", hearers, voyage)) }, read, null, ct);
         await llm.ChatAsync(Prompts.CrewSystem(hearers[0], voyage),
@@ -259,23 +259,25 @@ public sealed class ShipMind : IDisposable
         if (json is null)
             return null;
         var fact = LlmJson.Str(json, "fact");
+        var item = LlmJson.Str(json, "item") is { } id && id != "none" && id.Length <= 40 ? id : null;
+        var response = Array.IndexOf(Reading.ResponseWords, LlmJson.Str(json, "response") ?? "none") is var r and > 0 && item != null ? (ItemResponse)r : ItemResponse.None;
         switch (LlmJson.Str(json, "kind"))
         {
             case "statement":
                 if (fact is null || fact == "none" || !_voyage.HasFact(fact))
-                    return new Reading(LineKind.Statement);
+                    return new Reading(LineKind.Statement, Item: item, Response: response);
                 var value = _voyage.GetFact(fact).Normalize(LlmJson.Str(json, "value"));
-                return value is null ? null : new Reading(LineKind.Statement, fact, value);
+                return value is null ? null : new Reading(LineKind.Statement, fact, value, Item: item, Response: response);
             case "promise":
-                return new Reading(LineKind.Promise, PromiseKey: LlmJson.Str(json, "promise"));
+                return new Reading(LineKind.Promise, PromiseKey: LlmJson.Str(json, "promise"), Item: item, Response: response);
             case "order":
-                return new Reading(LineKind.Order);
+                return new Reading(LineKind.Order, Item: item, Response: response);
             case "question":
-                return new Reading(LineKind.Question);
+                return new Reading(LineKind.Question, Item: item, Response: response);
             case "dodge":
-                return new Reading(LineKind.Dodge);
+                return new Reading(LineKind.Dodge, Item: item, Response: response);
             case "plain":
-                return Reading.Plain;
+                return item == null ? Reading.Plain : new Reading(LineKind.Plain, Item: item, Response: response);
             default:
                 return null;
         }

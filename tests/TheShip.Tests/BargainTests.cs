@@ -356,9 +356,9 @@ public class BargainTests
     {
         var (v, mara, f) = Setup();
         var hearers = new List<CrewMember> { mara };
-        Assert.DoesNotContain("wants the ship's word", Prompts.ReadUser("Agreed.", hearers, v));
+        Assert.DoesNotContain(".terms", Prompts.ReadUser("Agreed.", hearers, v));
         v.Assign(mara, f, patch: false);
-        Assert.Contains("(wants the ship's word to: wake_partner)", Prompts.ReadUser("Agreed.", hearers, v));
+        Assert.Contains("mara.terms: Mara will start the coolant leak only if the ship gives its word to wake Idris", Prompts.ReadUser("Agreed.", hearers, v));
     }
 
     [Fact]

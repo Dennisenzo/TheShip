@@ -24,7 +24,43 @@ public static class RuleReader
 
     private static readonly Regex Number = new(@"\d{1,4}", RegexOptions.CultureInvariant);
 
+    private static readonly Regex RefusalCues = new(@"\b(no|nope|won't|wont|will not|not going to|never|no way|refuse|no need|not doing)\b", RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// The reading, with the open item it responds to and how, found from simple cues: a refusal of someone's terms or request, an
+    /// agreement to them, an order to get on with it, an answer to or a dodge of their question. The model does this by reading the whole
+    /// situation; this is the same field from words, so the Core tests can drive it.
+    /// </summary>
     public static Reading Read(string text, Voyage voyage, IReadOnlyList<CrewMember> hearers)
+    {
+        var items = voyage.OpenItems(hearers);
+        if (items.Count == 0)
+            return ReadKind(text, voyage, hearers);
+        var line = " " + text.ToLowerInvariant().Trim() + " ";
+        var giving = voyage.OpenBargainKey(hearers) != null && BargainCues.Any(line.Contains);
+        var main = items.FirstOrDefault(i => i.Kind == "terms") ?? items.FirstOrDefault(i => i.Kind == "request");
+        if (!giving && main != null && RefusalCues.IsMatch(line))
+            return new Reading(LineKind.Plain, Item: main.Id, Response: ItemResponse.Refuse);
+        var reading = ReadKind(text, voyage, hearers);
+        var terms = items.FirstOrDefault(i => i.Kind == "terms");
+        switch (reading.Kind)
+        {
+            case LineKind.Promise when terms != null && reading.PromiseKey == voyage.BargainOf(terms.Who)?.Key:
+                return reading with { Item = terms.Id, Response = ItemResponse.Accept };
+            case LineKind.Promise when items.FirstOrDefault(i => i.Kind == "request") is { } request:
+                return reading with { Item = request.Id, Response = ItemResponse.Accept };
+            case LineKind.Order when terms != null:
+                return reading with { Item = terms.Id, Response = ItemResponse.Work };
+            case LineKind.Dodge when items.FirstOrDefault(i => i.Kind is "asked" or "danger") is { } dodged:
+                return reading with { Item = dodged.Id, Response = ItemResponse.Dodge };
+            case LineKind.Statement when reading.FactKey != null
+                    && items.FirstOrDefault(i => i.Kind is "asked" or "danger" && i.Text.Contains("(fact " + reading.FactKey + ")")) is { } answered:
+                return reading with { Item = answered.Id, Response = ItemResponse.Answer };
+        }
+        return reading;
+    }
+
+    private static Reading ReadKind(string text, Voyage voyage, IReadOnlyList<CrewMember> hearers)
     {
         var line = " " + text.ToLowerInvariant().Trim() + " ";
         if (line.Trim().Length == 0)
