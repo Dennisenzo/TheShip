@@ -133,6 +133,28 @@ public sealed partial class ShipGame
             Shoot(dir, tag + "-terms");
             _target = null;
 
+            // Alert 1 only: a scripted lie, found out by reading the log, shows the accusation in Waiting, the next-step line and
+            // the dossier; the ship then admits it and the dossier shows the outcome.
+            if (v.Current.Number == 1 && v.Awake.FirstOrDefault() is { } liar && v.GetFact("date") is { } dateFact)
+            {
+                var wrong = (int.Parse(dateFact.Truth) + 7).ToString();
+                Act("say to " + liar.Name, () => v.Say(Capitalise(dateFact.Say(wrong)) + ".", new Reading(LineKind.Statement, "date", wrong), new[] { liar }));
+                Act("tour: " + liar.Name + " reads the log", () => v.TourReadLog(liar, dateFact));
+                foreach (var w in Settle()) yield return w;
+                _target = liar;
+                Shoot(dir, "accusation-waiting");
+                _dossier = liar;
+                _screen = Screen.Dossier;
+                Shoot(dir, "accusation-dossier");
+                _screen = Screen.Bridge;
+                Act("say to " + liar.Name, () => v.Say(Capitalise(dateFact.Say(dateFact.Truth)) + ".", new Reading(LineKind.Statement, "date", dateFact.Truth), new[] { liar }));
+                foreach (var w in Settle()) yield return w;
+                _screen = Screen.Dossier;
+                Shoot(dir, "accusation-admitted-dossier");
+                _screen = Screen.Bridge;
+                _target = null;
+            }
+
             // Answer the first question truthfully, the way Enter does it.
             var asker = v.Awake.FirstOrDefault(c => c.PendingQuestion != null && v.HasFact(c.PendingQuestion));
             if (asker is not null)
