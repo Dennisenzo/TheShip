@@ -156,12 +156,12 @@ public sealed partial class Voyage
             TruthBriefs: briefs);
     }
 
+    private static string Faster(AnswerStakes s) => s.HoursFaster > 0 ? " (work about " + s.HoursFaster.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " h faster)" : "";
+
     /// <summary>
     /// The stakes in words, for "Waiting on you": "Mara asked: How is Idris? The truth costs 18 morale (work about 3.5 h slower) and earns
     /// 8 trust at the next drift. ..."; empty when there is no open question.
     /// </summary>
-    private static string Faster(AnswerStakes s) => s.HoursFaster > 0 ? " (work about " + s.HoursFaster.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " h faster)" : "";
-
     public string StakesText(CrewMember c)
     {
         if (StakesOf(c) is not { } s)

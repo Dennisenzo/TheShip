@@ -20,7 +20,11 @@ public sealed partial class Voyage
                     // They started with no word on the danger: an order that got someone hurt (a worker told, or told "safe", pays nothing here).
                     c.Trust -= Tuning.HurtByOrder;
                     TermStats.HurtUnbriefed++;
-                    Speak(c, "noticed_dose", "You found out the repair hurt you and the ship never told you: " + _facts[key].Say(_facts[key].Truth) + ".");
+                    // A word from the ship after the start does not change the charge, only how it is put.
+                    var told = c.Beliefs.TryGetValue(key, out var held) && held.Source is "ship" or "log"
+                        ? _facts[key].HardnessOf(held.Value) > 0 ? "told you only after you had started" : "told you it was safe after you had started"
+                        : "never told you";
+                    Speak(c, "noticed_dose", "You found out the repair hurt you and the ship " + told + ": " + _facts[key].Say(_facts[key].Truth) + ".");
                 }
                 Learn(c, key, _facts[key].Truth, "evidence", how: "saw the dosimeter turn red");
             }

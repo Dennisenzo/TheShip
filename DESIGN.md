@@ -183,7 +183,7 @@ A faction forms when three or more living crew share a stance. It acts as a grou
 
 Designed 2026-11-13; not built, except where a rule says so. All numbers are starting values for playtest and belong in `Tuning.cs`.
 
-A conversation is a scene with an agenda, a cost and an outcome. The crew member wants something from it, it takes time off the clock, and it ends in a result the player can see on the ship. What exists today is the Question agenda only: a person asks, the ship answers, trust moves.
+A conversation is a scene with an agenda, a cost and an outcome. The crew member wants something from it, it takes time off the clock, and it ends in a result the player can see on the ship. What exists today is the Question agenda (a person asks, the ship answers, trust moves), bargains for work and work terms set by the briefing ("First build" below).
 
 ### Agendas
 
@@ -427,7 +427,7 @@ The same simulation supports seven modes, and each changes one rule of the stand
 | Mode | What changes | What it tests |
 | --- | --- | --- |
 | Standard voyage | 200 years, 24 crew, 8 to 10 alerts | The full arc |
-| Short haul | 60 years, 8 crew, 5 alerts, about 30 minutes | One generation; the lies come due within the run |
+| Short haul | 60 years, 8 crew (prototype 6), 5 alerts, about 30 minutes | One generation; the lies come due within the run |
 | Generations | Few pods; most crew live, age and raise children awake | Speaking to people who inherited their view of you |
 | Oath of truth | The game refuses any false statement; you may only withhold | Timing and silence instead of lies |
 | Black box | You start with a memory fault and don't know what you told the crew before | Finding out your own record from the people you talk to |
@@ -540,7 +540,7 @@ The first build is the Short haul mode in text only, smaller than the mode table
 - **Two lockouts:** the logs, and the cold-sleep bay ("Losing control").
 - **One ending screen:** survivors and the full record of what you said.
 - **Ship plan:** a wireframe schematic with sections, doors (only locking has an effect), coolant and power lines, pods and fault markers.
-- **Conversations (designed, not built):** bargains with promises and work terms set by the briefing; see "Conversations".
+- **Conversations:** the Question agenda, bargains for work (promises with a due date) and work terms set by the briefing are built; the other agendas are designed, not built (see "Conversations").
 - **Left out:** cameras, factions, children, signals from ahead, all modes and modifiers, run variation except: the alert-2 victim and patient, side-fault draws, clock slack, year jitter.
 
 The prototype passes if, across three playthroughs, the player lies at least once without being prompted and calls a discovered lie fair.

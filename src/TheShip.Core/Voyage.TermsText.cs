@@ -52,7 +52,8 @@ public sealed partial class Voyage
         f.CauseFact is { } cf && _facts.TryGetValue(cf, out var fact) && InLog(fact) ? fact.Say(fact.Truth) : null;
 
     /// <summary>
-    /// The terms in two rows of "Waiting on you" (about 90 characters): "Mara, unbriefed: full dose, hurt costs trust; cause untold (+8% odds)."
+    /// The terms in two rows of "Waiting on you" (about 90 characters): "Mara, unbriefed: full dose, hurt costs trust; cause untold (+3% speed)."
+    /// The cause part quotes the speed (<see cref="Tuning.CauseRate"/>); the odds bonus is only in the long form.
     /// The long form (<see cref="TermsText"/>) is its tooltip. From belief and fault only, like the long form. Empty when there are no terms.
     /// </summary>
     public string TermsShort(CrewMember c, Fault f, bool withRisk = true)

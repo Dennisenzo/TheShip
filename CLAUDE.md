@@ -209,28 +209,31 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-13: bargains validation fixes (fix/bargains-validation). A promise said again while the same one to that person is still open is that promise (`Statement.Repeated`: no second due date, settled once, no extra credit; 4 promises and a Wake gave 4 promise_kept, three show_logs promises bought a bay taker at trust 5 the bay back). The push guard counts from every Repair/Patch click for a person, so the click that makes the offer can't be followed by a push, and PATCH is drawn on a guarded frame. Sleeping still settles an open promise at once, now visible: the ledger says "12 days left or when she sleeps" (`Voyage.DueText`, `LedgerLine`) and the SLEEP tooltip warns ("Mara still waits for Idris: sleeping now breaks that promise.", `SleepBreaksText`). A struck bargain runs `Assign`'s gates again (`Voyage.Refuses`: trust band, waiting question, danger): a gate that stops them says its refusal, the bargain closes and the word stands as an ordinary promise. A promise to wake a partner already dead is moot (`Statement.Moot`: no trust, no ledger entry); logs the crew locked no longer keep a show_logs promise (`ShipOpenedLogs`; the lockout releases it); under the bay "Waiting on you" says to promise to open the logs. `BargainOf` only reads (the draw calls it); `LapseBargains` runs after Go, Say, Wake and SetLog and also lapses a condition whose person left the wary band. NEXT says "they start" without a pronoun (`Voyage.StartsText`) and asks for the word only while the fault waits on that person (`AwaitsWord`); with two bargainers and none selected, Waiting shows the first one's price and a hint. Balance (200 seeds) unchanged: Honest 44.5%, Thrifty 36.5%, Careless 18.5%, Silent 16.0%, Liar 13.5%, Breaker 44.5%. 14 tests in `BargainValidationTests` (two `BargainTests` adjusted: a stale condition clears at the next step; the different-word test starts at trust 50 so the +2 keeps her wary). 535 tests pass, 0 warnings.
 - 2026-11-13: the Record screen's lists scroll (fix/record-scroll). The ship log list stopped drawing after 20 rows, and the work-terms cause facts (`cause:*`, in the log once their alert started) pushed the `alive:*` and `alert:*` entries off the bottom from alert 3 on (seed 3, alert 5: 26 entries; Jonah's death and all five "There was ..." entries could not be seen, restricted or altered). Both lists on the screen now scroll with the mouse wheel over them (one row a notch, `ShipGame.RecordWheel`) and UP/DOWN buttons, with a cue line ("Entries 1 to 19 of 26, 7 below"); scrolling stops at the last full page (`ListWindow`) and is kept across log clicks. Every log entry is shown in full (long cause sentences wrap, as does an altered "now reads:" text) with OPEN/RESTRICT/ALTER on every row; the record of statements (which said "... and earlier lines." with no way to see them) scrolls the same way. Tour: `NN-alertN-record.png` and `NN-alertN-record-scrolled.png` from alert 3 on.
 - 2026-11-13: work terms validation fixes (fix/work-terms-validation). Dose, injury and the hurt rule read the terms fixed at the start (`CompleteRepair` read `TermsOf` after clearing `WorkingOn`, so a briefing given mid-work halved the dose and dropped `HurtByOrder`). The terms text names the risk with a short noun (`Fact.Noun`, "radiation dose"; it read "knows the whether the coolant repair ..."). "Waiting on you" shows the terms in two rows (`Voyage.TermsShort`, the full text as the row's tooltip; only the cause, one row, while the danger question's stakes are shown), so it fits under a six-row stakes item or a four-row bargain. The danger question's stakes count the terms each answer gives (`Voyage.TermsIfBelieved`, `AnswerStakes.TruthBriefs`: "(1.5 h slower; half dose, no trust lost if hurt)"). A doubt about a fact with no record yet (`InLog`: a cause of a fault still to come) is not checked until it has one (`CheckEvidence`; a false nav cause was caught at a console in year 3). The Recorded start line is written once per start, with the "Recorded:" prefix, "believing that ...", and "halved" from `Tuning.PrecautionHarm`. The two longest cause sentences are shorter (every card cause line fits two lines) and the card's ".." cut drops punctuation before it. Balance at 600 seeds unchanged (Honest 43.2, Breaker 39.8, Thrifty 38.5, Careless 27.3, Silent 25.2, Liar 4.2). 574 tests pass, 0 warnings.
+- 2026-11-13: low findings and a docs cleanup (fix/low-and-docs). A worker hurt by a repair they started unbriefed and were told about mid-work is still charged `HurtByOrder`, but the notice now says "the ship told you only after you had started" (or "told you it was safe after you had started"), not "never told you"; the template fallback says "Nobody warned me ... before I went in". "Waiting on you" says a doubt about a fact with no record yet (a cause of a fault still to come) "will check once it comes up" (`Voyage.DoubtText`). A regression test for a failed repair that spends the last part and injures a lead whose beliefs changed mid-work (start terms). Docs: "Differences from DESIGN.md" keeps only what DESIGN.md does not record (the Cities LLM-stack note moved to README.md), "Not built yet" and "Next steps" name what is really open, the balance table is the current 600-seed one from DESIGN.md, the B1 `WorkingAge` table is marked stale, and the Record screen's TRUE/LIE tags are a new decision for the user. DESIGN.md: the prototype's conversations (Question, bargains, work terms) are built; Short haul is "8 crew (prototype 6)". Tests: `WorkTermsTests` (2 new), `DoubtTextTests`.
 
-### Balance table (main after the morale-speed step, 2026-11-13, 200 seeds, Short haul)
+### Balance table (600 seeds, Short haul, main after work terms, 2026-11-13)
 
-| Bot | Landfall | Quiet ship | Adrift | Survivors | Deaths excl. scripted | End trust | Thaws | Main causes (per run) |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Honest | 43.5% | 36% | 20.5% | 3.44 | 1.57 | 60.6 | 13.10 | starved 0.59, pod failure 0.41, thaw 0.23, low power 0.21 |
-| Thrifty | 39% | 37.5% | 23.5% | 3.53 | 1.48 | 61.1 | 9.73 | low power 0.48, starved 0.32, pod failure 0.31, thaw 0.28 |
-| Silent | 22.5% | 51.5% | 26% | 3.15 | 1.86 | 55.9 | 12.15 | starved 0.97, pod failure 0.30, thaw 0.25 |
-| Liar | 17.5% | 25.5% | 57% | 1.62 | 3.39 | 27.1 | 11.03 | starved 2.70, pod failure 0.21, thaw 0.20 |
-| Careless | 16.5% | 64% | 19.5% | 3.15 | 1.85 | 58.8 | 12.20 | starved 1.00, pod failure 0.30, thaw 0.24 |
+The current figures and their history are in DESIGN.md, "Balance" (the last table is under "Work terms and the balance bots"). Copied from there:
 
-Measured on main at 75c1240 (bay takeover, UI plan and lie temptation merged). The B1 table this replaces (before morale set the work speed) had Landfall Honest 48.5%, Thrifty 36%, Silent 25%, Liar 20%, Careless 18.5%; Adrift rose for every bot since (Honest 12.5% to 20.5%), because slower work loses more navigation faults. The bay takeover fires in one Liar run in 200 and "Landfall without you" in none.
+| Bot | Landfall | Survivors | Adrift |
+| --- | --- | --- | --- |
+| Honest | 43.2% | 3.49 | 20.0% |
+| Breaker | 39.8% | 3.42 | 21.0% |
+| Thrifty | 38.5% | 3.47 | 20.5% |
+| Careless | 27.3% | 3.17 | 14.0% |
+| Silent | 25.2% | 3.18 | 18.8% |
+| Liar | 4.2% | 1.18 | 66.8% |
 
-The scripted pod death (1.0 per run) is in every row. Liar is bimodal (a caught liar's crew stays awake and starves); Careless and Silent starve one person a run.
+The balance test (`ShortHaulHonestLandfallRate`) holds Honest in 35-65% at 200 seeds; `SHIP_SEEDS=600 dotnet test --filter Category=Balance` for the 600-seed run.
+The scripted pod death (1.0 per run) is in every run.
 
 ### Decisions for the user to review
 
 - `WorkingAge` is 64. The user's design value was 50 (2026-11-12, chosen on an estimate of about 6 thaws a run), but the code had 65 before this branch, so the
   effective change is 65 to 64 alongside the stricter rule (4 alive and 3 of working age, was 3 alive and 2). Measured thaws per run are 13.18 for Honest and 9.76 for Thrifty,
   and at 3 to 5 years a thaw "3 under 50" is nearly unreachable: at 50 Landfall is Honest 0%, Careless 0%, Silent 0.5%, Liar 1%, Thrifty 8.5%.
-  64 is the lowest value that puts the honest bot in 45-55%. Landfall by `WorkingAge` (200 seeds, merged tree, measured at B1: before morale set the work speed,
-  which took the honest bot at 64 from 48.5% to 43.5%, below that band; the table has not been measured again):
+  At B1, 64 was the lowest value that put the honest bot in 45-55%. The balance test's band is 35-65%, and Honest is now 43.2% at 600 seeds (DESIGN.md, "Balance").
+  Landfall by `WorkingAge` below, **measured at B1 and stale** (200 seeds, before morale set the work speed, the cause facts and the bot briefings; not measured again):
 
 | WorkingAge | Honest | Thrifty | Silent | Liar | Careless |
 | --- | --- | --- | --- | --- | --- |
@@ -243,8 +246,8 @@ The scripted pod death (1.0 per run) is in every row. Liar is bimodal (a caught 
 
   The honest rate moves about 5 points a year around 64, so this is the number to choose. Alternatives: ageing per thaw (a pillar), fewer faults, or fewer required people.
 - `LieTrust` 22 (was 25), to keep Liar out of hopeless (12% to 20%). Review whether lying is costly enough.
-- After the morale-speed step the honest bot lands 43.5%, below the 45-55% band that justified `WorkingAge` 64, and Adrift rose for every bot (Honest 12.5% -> 20.5%:
-  slower work loses more navigation faults). Levers: `MoraleRateSpan` / `MoraleRateMin` (120 / 0.8 measured 40.5%, 100 / 0.7 34%; a wider span or higher minimum softens it),
+- After the morale-speed step the honest bot landed 43.5% (now 43.2% at 600 seeds), below the 45-55% band that justified `WorkingAge` 64 at B1 though inside the
+  test's 35-65%, and Adrift rose for every bot (Honest 12.5% -> 20.5%: slower work loses more navigation faults). Levers: `MoraleRateSpan` / `MoraleRateMin` (120 / 0.8 measured 40.5%, 100 / 0.7 34%; a wider span or higher minimum softens it),
   `WorkingAge` 65 (53.5% at B1, before the morale step; not re-measured), or more clock slack on the navigation fault.
 - Breaking a promise costs too little (bargains, 2026-11-13). The Breaker bot (honest answers, accepts every bargain, keeps none) lands 43.8% against Honest 41.3%
   (600 seeds): one person's -15 trust and -8 morale rarely matters. Tried and reverted: `PromiseBroken` 20/25/30 (Breaker 43.5/40.5/40.5%), a grudge rule (the wronged person
@@ -254,6 +257,15 @@ The scripted pod death (1.0 per run) is in every row. Liar is bimodal (a caught 
   (7.6 lies, 7.2 caught per run): Liar Landfall 12.8% -> 4.2%, Adrift 66.8% (600 seeds). The bot lies every time it can; a player would pick their lies.
   Earlier the user's direction was "lying should be tempting and costly, not hopeless" (`LieTrust` 25 -> 22). Levers: a cause lie caught only when the worker
   can see it (not every completion), a smaller `LieTrust` for a cause lie, or a Liar bot that lies only about the danger. To choose.
+
+- The Record screen tags every statement TRUE or LIE (`ShipGame.Screens.cs`, `Standing`; the dossier's "what you told them" uses the same tags) and its header
+  counts "N lines, M lies, K found out". That sits against the rule "what the player sees never says whether a statement is true" (DESIGN.md, "Trust" and
+  "Reading"). What history shows: the tags were intended. The design canvas's Record artboard (2026-11-12) has TRUE / LIE / PROMISE / DODGE tags, "1 lie, not found
+  out" in the header and notes like "True when you said it."; the game built it in 610aa75. The rule came a day later with say-at-once (2026-11-13), which hid
+  "(true)/(false)" in the log's "Recorded" line (`LogEntry.Secret`); DESIGN.md then wrote it as a general rule (the hard-truth credit is unannounced because of it),
+  but neither change looked at the Record. Options: keep the tags (the ship knows what it said; the rule is about the log and the crew-facing lines), remove them
+  (the Record lists what was said and to whom, the header counts lines only), or show LIE only for statements already found out (the player learns a lie's
+  status when the crew does). To choose.
 
 ### Built
 
@@ -290,25 +302,24 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
 
 ### Differences from DESIGN.md to settle
 
-- Up to three people awake (kept). Alert 4 (the signal) has faults only when a patch returns into it, so with no outstanding patch it can be drifted past with nobody woken. Power sag is an engineering repair until power routing exists; a lost blight cuts the stores to 60% once (the design halves them for every later waking). Alert 3 can hold two Critical faults (navigation drift and a power sag), against the design's "at most one critical"; a returning patch keeps its own Critical flag.
-- Adrift when a navigation fault's clock runs out unrepaired (including a returned patch); a patch still outstanding at the last drift slips the arrival by 9 years instead. A slip by decades for other cases is not built.
-- Shorter wakings are all or nothing: the three-month minimum is waived as soon as the stores can't feed everyone up through a
-  person's remaining three months (`Voyage.CanSleepNow`); there is no rationing. Once the stores are empty, whoever stays awake dies
-  after `Tuning.StarveDays` (60 days).
+DESIGN.md records the prototype's other departures where they apply (alert 3's two Critical faults, the blight's 60%, power sag as a repair, the nav patch's
+9-year slip, shorter wakings, doors).
+
 - "Landfall without you" happens only through the cold-sleep bay takeover (two awake Against people with Engineering 2 between them); muting you is not built.
 - Terminal notes and paper notes are not in. The drift report is complete because no sensors are lost yet.
-- Doors: only locking has an effect. Open and closed look different and behave the same. Nobody reacts to being locked in.
 - The design canvas shows things the game does not simulate: a section without sensors, a "next event" line on the clock, crew notes in the drift report.
-- Not ported from Cities' LLM stack: the separate model host process, CUDA backend, reply prefix cache, VRAM budget (the session log is now in, as plain text).
 
 ### Not built yet
 
-Everything the design lists outside the prototype scope: lights, power routing, cameras and microphones,
-conversations beyond the question agenda (DESIGN.md, "Conversations"), factions, children, the other events and faults, the other lockouts and endings, modes, mission types, modifiers, run variation, voice input.
+Outside the prototype scope (DESIGN.md): lights, power routing, cameras and microphones; the conversation agendas Test, Accusation, Confidence and Proposal, and
+bargains over sleep or silence (DESIGN.md, "Conversations"; the Question agenda, bargains for work and work terms are built); crew who lie to you; factions,
+children, the other events and faults, terminal and paper notes, muting the ship and the other lockouts and endings, modes, mission types, modifiers, the
+directive and upkeep, voice input. Run variation is partly built: the alert-2 victim and patient, side faults, clock slack, year jitter and the fault causes
+are drawn (`Variation.cs`); hidden truth, crew secrets, bonds, layout, ship class, inherited record and rare events are not.
 
 ### Next steps
 
-1. `dotnet build TheShip.slnx` and fix what it reports; then `dotnet test`.
-2. Play a run end to end; tune `Tuning.cs` towards "one honest run in two reaches Landfall".
-3. Run the three playthroughs of the prototype's pass test (DESIGN.md, "Prototype scope").
-4. `feature/ui-plan` is merged: play a run to look at the transitions. Decisions 1, 2 and 4 at the end of `UI-PLAN.md` are still the user's to confirm (3 is decided).
+1. Run the three playthroughs of the prototype's pass test (DESIGN.md, "Prototype scope").
+2. The open decisions for the user ("Decisions for the user to review" above).
+3. "The lie comes due" is in progress on `feature/lie-comes-due`.
+4. Decisions 1, 2 and 4 at the end of `UI-PLAN.md` are still the user's to confirm (3 is decided).
