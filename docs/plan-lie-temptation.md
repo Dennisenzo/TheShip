@@ -30,6 +30,12 @@ Each step is one commit. Numbers go in `Tuning.cs`.
    repair odds for the selected person; the opening notes state the goal, the cost of a thaw, the spare parts and where the stakes and the record are.
 5. **Tests and documents.** `LieTemptationTests.cs`; DESIGN.md (Trust, Knowledge and statements, Prototype scope); CLAUDE.md Progress.
 
+## Status
+
+All five steps are done on the branch, one commit each. Found while doing step 1: the morale a hard truth costs is hidden by the repair
+chance's 0.97 cap for a skilled lead (Mara, Engineering 3, on the level 2 coolant leak loses no odds at all), so the stakes text names
+repair odds only where they really drop.
+
 ## Left out on purpose
 
 - No new penalty on the truth (a "shaken" delay was considered): alert clocks have 1 to 6 hours of slack, and it could not be measured here.
