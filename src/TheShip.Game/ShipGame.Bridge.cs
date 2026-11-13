@@ -458,9 +458,14 @@ public sealed partial class ShipGame
         DrawHoldNote(new Rectangle(rect.X, inputTop, rect.Width, rect.Bottom - inputTop));
     }
 
-    /// <summary>"REPAIR: MARA 97%": the chance the repair holds if this person takes it on now (a patch always holds, and comes back).</summary>
+    /// <summary>
+    /// "REPAIR: MARA 97%": the chance the repair holds if this person takes it on now (a patch always holds, and comes back);
+    /// "REPAIR: NO PARTS" when no spare parts are left and a repair would be refused.
+    /// </summary>
     private static string RepairLabel(Voyage v, CrewMember who, Fault f) =>
-        "REPAIR: " + who.Name.ToUpperInvariant() + " " + N(Math.Round(v.RepairChanceWith(who, f) * 100)) + "%";
+        v.RepairChanceWith(who, f) is { } chance
+            ? "REPAIR: " + who.Name.ToUpperInvariant() + " " + N(Math.Round(chance * 100)) + "%"
+            : "REPAIR: NO PARTS";
 
     // ---- The crew ----
 

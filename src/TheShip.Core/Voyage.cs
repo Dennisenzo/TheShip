@@ -30,7 +30,7 @@ public sealed partial class Voyage
     public double Clock { get; private set; }
     public double Year => Clock / Tuning.HoursPerYear;
     public double Stores { get; internal set; } = Tuning.StartStores;
-    public int Parts { get; private set; } = Tuning.StartParts;
+    public int Parts { get; internal set; } = Tuning.StartParts;
     public int PodWear { get; internal set; }
     public bool PowerLow { get; private set; }
     public bool NavLost { get; private set; }

@@ -38,9 +38,14 @@ public sealed partial class Voyage
         Crew.Where(c => c == joining || (c.State == CrewState.Awake && c.WorkingOn == f.Id))
             .OrderByDescending(c => c.SkillOf(f.Skill)).First();
 
-    /// <summary>The chance that the repair holds if <paramref name="joining"/> takes it on now: what the Repair button shows.</summary>
-    public double RepairChanceWith(CrewMember joining, Fault f)
+    /// <summary>
+    /// The chance that the repair holds if <paramref name="joining"/> takes it on now: what the Repair button shows. Null when the
+    /// repair would be refused before anyone is asked (no spare parts left), so the button shows no odds.
+    /// </summary>
+    public double? RepairChanceWith(CrewMember joining, Fault f)
     {
+        if (Parts <= 0)
+            return null;
         var lead = LeadWith(joining, f);
         return RepairChance(lead, f, lead.Morale);
     }

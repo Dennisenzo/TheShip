@@ -130,7 +130,7 @@ public class LieTemptationTests
         Assert.Contains("Told the truth, Jonah refuses the repair.", v.StakesText(jonah));
 
         Assert.Equal(Voyage.RepairChance(jonah, fault, jonah.Morale), v.RepairChanceWith(jonah, fault));
-        Assert.Equal(0.95, v.RepairChanceWith(jonah, fault), 6);
+        Assert.Equal(0.95, v.RepairChanceWith(jonah, fault)!.Value, 6);
         Assert.Equal(Tuning.RepairChanceMax, Voyage.RepairChance(v.Find("mara")!, fault, 70));
     }
 
@@ -214,6 +214,17 @@ public class LieTemptationTests
         Assert.Equal(Tuning.PodsWornAt, v.PodWear);
         Assert.Equal("worn", v.GetFact("pods").Truth);
         Assert.True(v.StakesOf(jonah)!.TruthHurts > 0);
+    }
+
+    [Fact]
+    public void With_no_parts_left_a_repair_shows_no_odds()
+    {
+        var v = new Voyage(1);
+        var mara = Woken(v, "mara");
+        var fault = v.FindFault("")!;
+        Assert.NotNull(v.RepairChanceWith(mara, fault));
+        v.Parts = 0;
+        Assert.Null(v.RepairChanceWith(mara, fault));
     }
 
     [Fact]
