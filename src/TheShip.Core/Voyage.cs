@@ -177,6 +177,23 @@ public sealed partial class Voyage
         Attend(c.Name + " died");
         if (!quiet)
             Ship(c.Name + " " + how + ".");
+        DropIllnessOf(c);
+    }
+
+    /// <summary>A sick person who has died needs no more treatment: their illness fault (and any patch of it that would return) goes.</summary>
+    private void DropIllnessOf(CrewMember c)
+    {
+        // Only alerts that have started: a later alert's patient is still to be chosen.
+        foreach (var alert in Alerts.Take(AlertIndex + 1))
+            foreach (var f in alert.Faults.Where(f => f.Kind == "illness" && f.SubjectId == c.Id && f.State != FaultState.Lost).ToList())
+            {
+                foreach (var w in Crew.Where(w => w.WorkingOn == f.Id))
+                    w.WorkingOn = null;
+                _patched.Remove(f.Id);
+                alert.Faults.Remove(f);
+            }
+        if (Phase == Phase.Alert)
+            CheckAlertOver();
     }
 
     private string? _alert2Victim;
@@ -200,6 +217,10 @@ public sealed partial class Voyage
         f.Section = bank;
         f.ExposureFact = "alive:" + patient.Id;
     }
+
+    /// <summary>The fault's name as the log shows it: a sleeper illness names its patient.</summary>
+    public string FaultTitle(Fault f) =>
+        f.Kind == "illness" && f.SubjectId is { } sid && Crew.FirstOrDefault(c => c.Id == sid) is { } patient ? f.Name + ": " + patient.Name : f.Name;
 
     private static bool IsSide(Fault f) => f.Id is "side3" or "side5";
 
@@ -233,7 +254,7 @@ public sealed partial class Voyage
             foreach (var id in _patched)
             {
                 var old = Alerts.SelectMany(a => a.Faults).First(f => f.Id == id);
-                alert.Faults.Add(old.Again(id + "-again", old.Name));
+                alert.Faults.Add(old.Again(id + "-again", old.Name, Variation.SlackHours[alert.Number - 1]));
             }
             _patched.Clear();
         }
@@ -264,6 +285,8 @@ public sealed partial class Voyage
                 _alert2Victim = victim.Id;
             }
             ChoosePatient(alert, victim?.Id);
+            if (alert.Faults.FirstOrDefault(x => x.Kind == "illness")?.SubjectId is { } sickId)
+                report += " " + Crew.First(c => c.Id == sickId).Name + ", asleep in the same bank, is sick.";
         }
         if (alert.Number == 4)
             _facts["earth"].Truth = "programme ended";
@@ -273,7 +296,7 @@ public sealed partial class Voyage
         SyncFacts();
         Ship($"ALERT {alert.Number} of {Alerts.Count}, year {Math.Floor(Year):0}: {alert.Title}. {report}");
         foreach (var f in alert.Faults)
-            Ship($"Fault: {f.Name}. Needs {f.Skill.ToString().ToLowerInvariant()} {f.Level}"
+            Ship($"Fault: {FaultTitle(f)}. Needs {f.Skill.ToString().ToLowerInvariant()} {f.Level}"
                  + (f.People > 1 ? $", {f.People} people" : "")
                  + $", {f.Hours:0} hours of work. Clock: {Hours(f.ClockHours)}. If ignored: {f.IfIgnored}.");
         if (alert.Faults.Count == 0)

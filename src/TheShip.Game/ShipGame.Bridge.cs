@@ -72,7 +72,7 @@ public sealed partial class ShipGame
             if (!f.Resolved)
             {
                 var where = v.GetSection(f.Section)?.Name ?? "";
-                var needs = Sentence(where) + ". Needs " + f.Skill.ToString().ToLowerInvariant() + " " + f.Level
+                var needs = Sentence(where) + ". " + Patient(v, f) + "Needs " + f.Skill.ToString().ToLowerInvariant() + " " + f.Level
                             + (f.People > 1 ? ", " + f.People + " people" : "") + ", " + N(f.Hours) + " hours. If the clock runs out: " + f.IfIgnored + ".";
                 y = _p.Paragraph(needs, ix, y, inner, Painter.Dim);
                 y = _p.Paragraph(v.EarliestDoneText(f), ix, y, inner, Painter.Ink) + 6;
@@ -134,6 +134,10 @@ public sealed partial class ShipGame
             Act("drift to the next alert", v.Drift, snapshot: true);
     }
 
+    /// <summary>"Patient: Tomas. " on the card of a sleeper illness, else nothing.</summary>
+    private static string Patient(Voyage v, Fault f) =>
+        f.Kind == "illness" && f.SubjectId is { } sid && v.Find(sid) is { } p ? "Patient: " + p.Name + ". " : "";
+
     /// <summary>A short issue card for an alert with three or more open faults. Returns the y below the card.</summary>
     private int DrawCompactIssue(Voyage v, Fault f, int number, int x, int y, int width)
     {
@@ -156,7 +160,7 @@ public sealed partial class ShipGame
         _p.Text(_p.Body, f.Name, ix, y, Painter.Bright);
         y += 24;
         var where = v.GetSection(f.Section)?.Name ?? "";
-        y = _p.Paragraph(Sentence(where) + ". " + f.Skill.ToString() + " " + f.Level + (f.People > 1 ? ", " + f.People + " people" : "") + ", " + N(f.Hours) + " h. "
+        y = _p.Paragraph(Sentence(where) + ". " + Patient(v, f) + f.Skill.ToString() + " " + f.Level + (f.People > 1 ? ", " + f.People + " people" : "") + ", " + N(f.Hours) + " h. "
                          + v.EarliestDoneText(f).Replace("Earliest done if started now: ", "Earliest done: "), ix, y, inner, Painter.Dim);
         var workers = v.Awake.Where(c => c.WorkingOn == f.Id).Select(c => c.Name).ToList();
         if (f.State == FaultState.InRepair)

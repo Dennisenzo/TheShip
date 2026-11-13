@@ -28,9 +28,8 @@ public static class Tuning
     public const double BlightHours = 40;
     public const double PowerSagHours = 14;
     public const double BlightStoresLeft = 0.6;
-    /// <summary>Most faults one alert holds, returning patches included; a returning patch's clock never drops below thaw + work + this many hours.</summary>
+    /// <summary>Most faults one alert holds, returning patches included.</summary>
     public const int MaxFaultsPerAlert = 4;
-    public const double AgainMinSlackHours = 2;
     /// <summary>A failed repair burns a spare part too.</summary>
     public const bool FailedRepairSpendsPart = true;
     /// <summary>Years the arrival slips when the navigation fix was only a patch at the last drift.</summary>

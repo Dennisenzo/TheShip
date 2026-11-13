@@ -67,7 +67,7 @@ public class PartsAndPatchesTests
         var again = v.Current.Faults.Single(f => f.Id == fault.Id + "-again");
         Assert.StartsWith("Old patch gives way: ", again.Name);
         Assert.DoesNotContain("gives way: old patch", again.Name, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(Math.Max(fault.ClockHours / 2, Tuning.ThawHours + fault.Hours + Tuning.AgainMinSlackHours), again.ClockHours);
+        Assert.Equal(Math.Max(fault.ClockHours / 2, Tuning.ThawHours + fault.Hours / Tuning.PatchRate), again.ClockHours);
     }
 
     [Fact]

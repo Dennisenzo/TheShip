@@ -111,10 +111,11 @@ public class SideFaultTests
     {
         var coolant = Scenario.Alerts()[0].Faults.Single();
         Assert.Equal(30, coolant.ClockHours);
-        Assert.Equal(Tuning.ThawHours + 8 + Tuning.AgainMinSlackHours, coolant.Again("coolant-again", "Coolant leak").ClockHours);
+        Assert.Equal(15, coolant.Again("coolant-again", "Coolant leak", 3).ClockHours);   // half the clock wins
+        Assert.Equal(Tuning.ThawHours + 8 / Tuning.PatchRate + 12, coolant.Again("coolant-again", "Coolant leak", 12).ClockHours);
         var nav = Scenario.Alerts()[2].Faults.Single();
         Assert.Equal(18, nav.ClockHours);
-        Assert.Equal(Tuning.ThawHours + 12 + Tuning.AgainMinSlackHours, nav.Again("nav-again", "Navigation drift").ClockHours);
+        Assert.Equal(Tuning.ThawHours + 12 / Tuning.PatchRate + 5, nav.Again("nav-again", "Navigation drift", 5).ClockHours);
         var roomy = new Fault { Id = "x", Kind = "pod", Name = "x", Skill = Skill.Medicine, Level = 1, Hours = 4, ClockHours = 100, IfIgnored = "" };
         Assert.Equal(50, roomy.Again("x-again", "x").ClockHours);
     }
@@ -127,13 +128,15 @@ public class SideFaultTests
         for (var guard = 0; guard < 20 && v.Current.Number < 3; guard++)
         {
             RunOut(v);
-            if (v.Phase == Phase.Aftermath)
+            if (v.Phase != Phase.Aftermath)
+                continue;
+            if (v.Current.Number == 2)
             {
                 // Keep the three earlier patches outstanding for alert 3.
                 patched.Clear();
                 patched.AddRange(new[] { "coolant", "pod", "illness" });
-                v.Drift();
             }
+            v.Drift();
         }
         Assert.Equal(3, v.Current.Number);
         Assert.Equal(4, v.Current.Faults.Count);
@@ -166,5 +169,95 @@ public class SideFaultTests
         Assert.DoesNotContain("too late", v.EarliestDoneText(blight));
         blight.Deadline = v.Clock + 20;
         Assert.Contains("too late", v.EarliestDoneText(blight));
+    }
+
+    private static CrewMember WakeAndAnswer(Voyage v, string id)
+    {
+        var c = v.Find(id)!;
+        v.Wake(c);
+        v.Go();
+        while (c.PendingQuestion is { } key)
+        {
+            var f = v.GetFact(key);
+            v.Say(f.Say(f.Truth), new Reading(LineKind.Statement, f.Key, f.Truth), new[] { c });
+        }
+        return c;
+    }
+
+    private static void KillQuietly(Voyage v, CrewMember c) =>
+        typeof(Voyage).GetMethod("Kill", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(v, new object[] { c, "died", true });
+
+    [Fact]
+    public void A_patched_illness_returns_with_time_to_be_patched_again_at_once()
+    {
+        var variation = With(Variation.PowerSag, victim: "idris", patient: "tomas", slack: 1);
+        var v = new Voyage(1, variation);
+        RunOut(v);
+        v.Drift();
+        Assert.Equal(2, v.Current.Number);
+        var lin = WakeAndAnswer(v, "lin");
+        var ill = v.Current.Faults.Single(f => f.Kind == "illness");
+        v.Assign(lin, ill, patch: true);
+        VoyageTests.FinishAlert(v);
+        Assert.Equal(FaultState.Patched, ill.State);
+        VoyageTests.SleepWhenAllowed(v, lin);
+        for (var guard = 0; guard < 10 && v.Current.Number < 3; guard++)
+            v.Drift();
+        Assert.Equal(3, v.Current.Number);
+        var again = v.Current.Faults.Single(f => f.Kind == "illness");
+        Assert.True(again.ClockHours >= Tuning.ThawHours + again.Hours / Tuning.PatchRate + variation.SlackHours[2]);
+        lin = WakeAndAnswer(v, "lin");
+        v.Assign(lin, again, patch: true);
+        VoyageTests.FinishAlert(v);
+        Assert.Equal(FaultState.Patched, again.State);
+        Assert.True(v.Find("tomas")!.Alive);
+    }
+
+    [Fact]
+    public void A_patient_who_dies_otherwise_drops_the_illness_and_nobody_says_left_behind()
+    {
+        var v = new Voyage(1, With(Variation.PowerSag, victim: "idris", patient: "tomas"));
+        RunOut(v);
+        v.Drift();
+        var mara = WakeAndAnswer(v, "mara");
+        var ill = v.Current.Faults.Single(f => f.Kind == "illness");
+        KillQuietly(v, v.Find("tomas")!);
+        Assert.DoesNotContain(ill, v.Current.Faults);
+        RunOut(v);
+        Assert.DoesNotContain(v.Log, l => l.Intent?.Kind == "left_behind");
+        Assert.Equal(CrewState.Awake, mara.State);
+    }
+
+    [Fact]
+    public void The_alert_report_and_fault_line_name_the_patient()
+    {
+        var v = new Voyage(1, With(Variation.PowerSag, victim: "idris", patient: "tomas"));
+        RunOut(v);
+        v.Drift();
+        Assert.Contains(v.Log, l => l.Kind == LogKind.Ship && l.Text.Contains("Tomas, asleep in the same bank, is sick."));
+        Assert.Contains(v.Log, l => l.Kind == LogKind.Ship && l.Text.StartsWith("Fault: Sleeper illness: Tomas."));
+    }
+
+    [Fact]
+    public void A_patched_illness_that_kills_at_the_last_drift_is_in_the_deaths_list()
+    {
+        var v = new Voyage(1, With(Variation.PowerSag, victim: "idris", patient: "tomas"));
+        RunOut(v);
+        v.Drift();
+        var lin = WakeAndAnswer(v, "lin");
+        var ill = v.Current.Faults.Single(f => f.Kind == "illness");
+        v.Assign(lin, ill, patch: true);
+        VoyageTests.FinishAlert(v);
+        Assert.Equal(FaultState.Patched, ill.State);
+        // The patch is still outstanding when the last drift comes; this one has nothing at the later alerts to carry it.
+        var patched = (List<string>)typeof(Voyage).GetField("_patched", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(v)!;
+        typeof(Voyage).GetProperty("AlertIndex")!.GetSetMethod(true)!.Invoke(v, new object[] { v.Alerts.Count - 1 });
+        VoyageTests.SleepWhenAllowed(v, lin);
+        Assert.Contains(ill.Id, patched);
+        v.Drift();
+        var drift = v.Log.Last(l => l.Kind == LogKind.Ship && l.Text.StartsWith("DRIFT")).Text;
+        Assert.False(v.Find("tomas")!.Alive);
+        Assert.Contains("Deaths:", drift);
+        Assert.Contains("Tomas", drift);
     }
 }

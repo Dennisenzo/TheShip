@@ -484,9 +484,12 @@ public sealed partial class Voyage
         foreach (var w in Workers(f).ToList())
             w.WorkingOn = null;
         Ship(f.Name + ": the clock ran out. " + Cap(f.IfIgnored) + ".");
+        var patient = f.Kind == "illness" && f.SubjectId is { } sid ? Crew.First(c => c.Id == sid) : null;
+        var wasAlive = patient is { Alive: true };
         Consequence(f);
-        if (f.Kind == "illness" && f.SubjectId is { } sid && Crew.First(c => c.Id == sid) is { State: CrewState.Dead } gone)
-            LeftBehind(gone);
+        // "You let them die" only when this clock running out did the killing.
+        if (wasAlive && patient is { State: CrewState.Dead })
+            LeftBehind(patient);
     }
 
     /// <summary>Everyone awake saw the clock run out on a sleeper: they say so, and trust and morale drop.</summary>
@@ -776,7 +779,8 @@ public sealed partial class Voyage
         var patchFailed = false;
         if (last && _patched.Count > 0)
         {
-            foreach (var id in _patched)
+            var aliveBefore = Crew.Where(c => c.Alive).ToList();
+            foreach (var id in _patched.ToList())
             {
                 var old = Alerts.SelectMany(a => a.Faults).First(f => f.Id == id);
                 if (old.Kind == "nav")
@@ -790,6 +794,8 @@ public sealed partial class Voyage
                 patchFailed |= old.Kind == "controller";
             }
             _patched.Clear();
+            // A patched illness that gave way killed its patient: they are in the drift report's deaths.
+            deaths.AddRange(aliveBefore.Where(c => !c.Alive).Select(c => c.Name));
         }
         var hours = years * Tuning.HoursPerYear;
         // Whoever would not sleep stays up through the drift and eats the stores, in time order (DESIGN.md, "What every decision spends").

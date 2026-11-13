@@ -172,6 +172,10 @@ A faction forms when three or more living crew share a stance. It acts as a grou
 
 An alert is one event that breaks several things at once, and the player can rarely fix all of them in time. Every fault has its own severity, a clock, a skill need, a cost if ignored, and an exposure: what the people fixing it will see or learn while they work.
 
+### The clock rule
+
+Every fault's clock is the thaw (6 hours) + the work + the run's slack for that alert (`Variation.SlackHours`, 1 to 6 hours; alert 1 keeps its loose clock). A plan that wakes every needed person at once and starts at once saves every fault; one worker cannot save them all. An alert holds at most four faults, returning patches included; returning patches fill first and the drawn side fault is dropped if the total would pass four. The issue card shows "earliest done if started now": the thaw if nobody who qualifies is awake, plus the work at the current rate, and says when that is too late for the clock.
+
 ### How an event plays
 
 1. **Draw.** Each event has a list of faults it can cause, with odds. The ship's state changes the odds: old patches and worn pods fail first.
@@ -219,11 +223,11 @@ An event draws two to four faults from the tables below. A few rows, such as a s
 | --- | --- | --- | --- |
 | Coolant leak | Engineering 2, 8 hours | Power drops; pods at risk within 2 years | The repairer takes a radiation dose. Do you say so? |
 | Hull breach | Engineering, one person outside | The section is lost with everything in it | Someone has to volunteer to go out |
-| Hydroponics blight | Botany, months awake | Stores halve for every later waking | A long wake: people age, pair up and talk |
+| Hydroponics blight | Botany 2, one person (prototype: 40 hours, side fault of alert 3) | Stores fall to 60% (`Tuning.BlightStoresLeft`; the design's halving per later waking is not built) | A long wake: people age, pair up and talk |
 | Navigation drift | Navigation, two at the helm | Arrival slips by decades | The navigator sees the date and Earth's position |
 | Pod failure | Medicine, 2 hours | That sleeper dies | An unplanned waking of someone you didn't choose |
 | Fire | Any two people, minutes | Spreads section by section | You can seal a door. Who is behind it? |
-| Power sag | Nobody | A system of your choice goes dark | Solved with controls alone; someone later asks why |
+| Power sag | Nobody (prototype, until power routing: Engineering 2, 14 hours in the reactor, Critical, side fault of alert 5 and sometimes 3) | A system of your choice goes dark (prototype: power stays low, sleepers risk death each drift) | Solved with controls alone; someone later asks why |
 | Memory fault | Engineering 3 | You lose a block of your own records | The engineer who restores it reads your statement history |
 
 ### People
@@ -259,7 +263,7 @@ These never raise an alert by themselves. They make every other alert worse.
 
 - The first alert is always a single minor fault and teaches the loop.
 - The game picks the next event by weight from the ship's wear, the stores and what was left unrepaired.
-- An ignored or patched fault returns inside a later event, one severity higher. In the prototype a patch returns from alert 2 on (even in the signal alert, which then has a fault), with half the clock. A patch still outstanding at the last drift gives way on the way in: a patched pod controller adds 4 pod wear and gives each sleeper a 15% chance of dying; any other patched fault takes its "if ignored" consequence (a patched navigation fault slips the arrival by `NavPatchArrivalSlipYears`, 9 years: the last drift is that much longer, with ageing and stores eaten by anyone awake, and the drift report says so).
+- An ignored or patched fault returns inside a later event, one severity higher. In the prototype a patch returns from alert 2 on (even in the signal alert, which then has a fault), with the clock of max(half the old clock, thaw + the repair hours / the patch rate + that alert's slack), so a patch can be patched again by someone woken at once. A patch still outstanding at the last drift gives way on the way in: a patched pod controller adds 4 pod wear and gives each sleeper a 15% chance of dying; any other patched fault takes its "if ignored" consequence (a patched navigation fault slips the arrival by `NavPatchArrivalSlipYears`, 9 years: the last drift is that much longer, with ageing and stores eaten by anyone awake, and the drift report says so).
 - Two critical alerts never come back to back.
 - A run has at most two signals.
 
@@ -416,7 +420,7 @@ The first build is the Short haul mode in text only, smaller than the mode table
 
 ### Prototype scope
 
-- **Alerts, in order:** coolant leak, death in sleep (a pod fails and its sleeper dies; a bank neighbour has a sleeper illness: Medicine 2, 12 hours, clock = thaw 6 h + work + the run's slack, untreated the patient dies, and every awake crew member says "You let them die in there" and loses 4 trust), navigation drift, signal from Earth, pod controller fault (the person woken for it refuses to go back to sleep).
+- **Alerts, in order:** coolant leak, death in sleep (a pod fails and its sleeper dies; a bank neighbour has a sleeper illness: Medicine 2, 12 hours, clock = thaw 6 h + work + the run's slack, untreated the patient dies, and every awake crew member says "You let them die in there" and loses 4 trust; the alert report names the patient), navigation drift (clock thaw + 12 h + slack; side fault drawn per seed from hydroponics blight and power sag, filtered by who is alive with the skill), signal from Earth (quiet; only returning patches), pod controller fault (clock thaw + 4 h + slack; power sag always as its side fault; the person woken for it refuses to go back to sleep). Power sag is temporary: an Engineering 2 repair of 14 h in the reactor until power routing exists.
 - **Facts:** about 20, with knowers and the statement record.
 - **Numbers on screen:** trust and morale are shown, so the rules can be judged.
 - **One lockout:** the logs.
