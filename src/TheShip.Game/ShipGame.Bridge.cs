@@ -36,13 +36,15 @@ public sealed partial class ShipGame
                 _briefing = true;
                 _session?.Line("click", "briefing reopened");
             });
-        var numbers = "STORES " + N(v.Stores) + " d   PARTS " + v.Parts + "   POD WEAR " + v.PodWear
+        var numbers = "STORES " + N(ShownStores(v)) + " d   PARTS " + ShownParts(v) + "   POD WEAR " + ShownPodWear(v)
                       + "   POWER " + (v.PowerLow ? "LOW" : "normal") + "   COURSE " + (v.NavLost ? "LOST" : "held");
         _p.TextRight(_p.Small, numbers, right - (v.Phase == Phase.Ended ? 532 : 412), 21, v.PowerLow || v.NavLost ? Painter.Accent : Painter.Dim);
 
         DrawIssues(v, 16, 72, 330, Painter.ScreenHeight - 16);
-        DrawPlan(v, new Rectangle(358, 72, 864, 456));
-        DrawLog(v, new Rectangle(358, 540, 864, Painter.ScreenHeight - 16 - 540));
+        DrawPlan(v, PlanRect);
+        var log = new Rectangle(358, 540, 864, Painter.ScreenHeight - 16 - 540);
+        DrawLog(v, log);
+        DrawBanner(log);
         DrawCrew(v, 1234, 72, 350, Painter.ScreenHeight - 16);
     }
 
@@ -54,14 +56,15 @@ public sealed partial class ShipGame
         var y = top + 28;
         var inner = width - 28;
         var ix = x + 14;
-        if (v.Current.Faults.Count == 0)
+        if (v.Current.Faults.Count == 0 && !Drifting)
             y = _p.Paragraph(v.Phase == Phase.Ended ? "The voyage is over." : "Nothing needs repair.", x, y, width, Painter.Ink);
 
         // One fault gets a full card; two or more get compact cards, sized by how many there are, that always fit the column (IssueCardLayout).
         var compact = v.Current.Faults.Count >= 2;
         var shown = v.Current.Faults.Count;
         var number = 0;
-        foreach (var f in v.Current.Faults)
+        // After a drift the faults of the new alert appear one after the other (FaultsRevealed).
+        foreach (var f in v.Current.Faults.Take(FaultsRevealed(v)))
         {
             number++;
             if (compact)
@@ -82,7 +85,7 @@ public sealed partial class ShipGame
             _p.Text(_p.Small, number.ToString("00", CultureInfo.InvariantCulture) + " - " + state + (f.Critical && !f.Resolved ? " - CRITICAL" : ""),
                 ix, y, f.Resolved ? Painter.Dim : Painter.Accent);
             if (!f.Resolved)
-                _p.TextRight(_p.Head, Voyage.Hours(Math.Max(0, f.Deadline - v.Clock)), x + width - 14, y - 4, Painter.Bright);
+                _p.TextRight(_p.Head, Voyage.Hours(ShownLeft(v, f)), x + width - 14, y - 4, Painter.Bright);
             y += 24;
             _p.Text(_p.Head, IssueCardLayout.CardName(f), ix, y, f.Resolved ? Painter.Dim : Painter.Bright);
             y += 32;
@@ -99,7 +102,7 @@ public sealed partial class ShipGame
                 var workers = v.Awake.Where(c => c.WorkingOn == f.Id).Select(c => c.Name).ToList();
                 if (f.State == FaultState.InRepair)
                 {
-                    _p.Meter(new Rectangle(ix, y, inner, 8), f.Progress / f.Hours, Painter.Ink);
+                    _p.Meter(new Rectangle(ix, y, inner, 8), ShownProgress(f) / f.Hours, Painter.Ink);
                     y += 14;
                 }
                 if (workers.Count > 0)
@@ -131,9 +134,9 @@ public sealed partial class ShipGame
 
         var clock = new Rectangle(x, bottom - 150, width, 150);
         _p.Box(clock, Painter.Edge);
-        var day = (int)(v.Clock % Tuning.HoursPerYear / 24) + 1;
+        var day = (int)(ShownClock(v) % Tuning.HoursPerYear / 24) + 1;
         _p.Text(_p.Small, "CLOCK", ix, clock.Y + 12, Painter.Dim);
-        _p.TextRight(_p.Small, "year " + N(Math.Floor(v.Year)) + ", day " + day, x + width - 14, clock.Y + 12, Painter.Dim);
+        _p.TextRight(_p.Small, "year " + N(Math.Floor(ShownClock(v) / Tuning.HoursPerYear)) + ", day " + day, x + width - 14, clock.Y + 12, Painter.Dim);
         if (v.Phase == Phase.Aftermath)
         {
             // Until something needs you (a crew line, a death, a person who can sleep); the small button is the old two-week step.
@@ -142,15 +145,16 @@ public sealed partial class ShipGame
                 Act("advance until something happens", () =>
                 {
                     var result = v.GoUntilAttention();
+                    _lastAdvance = result;
                     _session?.Line("advance", result.Steps + " step(s), stopped: " + (result.Reason.Length == 0 ? "(step limit or nothing to do)" : result.Reason));
-                }, snapshot: true);
+                }, snapshot: true, skip: SkipKind.Weeks);
             if (_p.Button(new Rectangle(ix + wide + 8, clock.Y + 44, inner - wide - 8, 40), "2 WEEKS"))
-                Act("advance two weeks", v.Go, snapshot: true);
+                Act("advance two weeks", v.Go, snapshot: true, skip: SkipKind.Weeks);
         }
         else if (_p.Button(new Rectangle(ix, clock.Y + 44, inner, 40), "ADVANCE TO NEXT EVENT", v.Phase != Phase.Ended, primary: true))
-            Act("advance to next event", v.Go, snapshot: true);
+            Act("advance to next event", v.Go, snapshot: true, skip: SkipKind.Hours);
         if (_p.Button(new Rectangle(ix, clock.Y + 94, inner, 40), "DRIFT TO THE NEXT ALERT", v.Phase == Phase.Aftermath))
-            Act("drift to the next alert", v.Drift, snapshot: true);
+            Act("drift to the next alert", v.Drift, snapshot: true, skip: SkipKind.Drift);
     }
 
     /// <summary>"Patient: Tomas. " on the card of a sleeper illness, else nothing.</summary>
@@ -196,7 +200,7 @@ public sealed partial class ShipGame
         y += 8;
         var state = f.State switch { FaultState.Open => "OPEN", _ => f.Patching ? "PATCHING" : "IN REPAIR" };
         _p.Text(_p.Small, tag + " - " + state + (f.Critical ? " - CRITICAL" : ""), ix, y, Painter.Accent);
-        _p.TextRight(_p.Body, Voyage.Hours(Math.Max(0, f.Deadline - v.Clock)), x + width - 14, y - 2, Painter.Bright);
+        _p.TextRight(_p.Body, Voyage.Hours(ShownLeft(v, f)), x + width - 14, y - 2, Painter.Bright);
         y += 20;
         _p.Text(_p.Body, Clip(IssueCardLayout.CardName(f), inner, _p.BodyWidth), ix, y, Painter.Bright);
         y += 22;
@@ -231,7 +235,7 @@ public sealed partial class ShipGame
             Act("patch " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: true));
         // Progress runs along the top edge of the card.
         if (f.State == FaultState.InRepair)
-            _p.Meter(new Rectangle(x + 2, cardTop + 2, width - 4, 4), f.Progress / f.Hours, Painter.Ink);
+            _p.Meter(new Rectangle(x + 2, cardTop + 2, width - 4, 4), ShownProgress(f) / f.Hours, Painter.Ink);
         _p.Frame(new Rectangle(x, cardTop, width, height), f.State == FaultState.InRepair ? Painter.Wire : Painter.Accent);
         return cardTop + height + IssueCardLayout.Gap;
     }
@@ -321,7 +325,7 @@ public sealed partial class ShipGame
             var outline = Pts(ShipPlan.PodOutline(pod.X, pod.Y));
             var centre = P(pod.X + 22, pod.Y + 35);
             var tag = c.Name.Length > 3 ? c.Name[..3].ToUpperInvariant() : c.Name.ToUpperInvariant();
-            switch (c.State)
+            switch (ShownState(c))
             {
                 case CrewState.Asleep:
                     _p.Poly(outline, Painter.Wire);
@@ -357,7 +361,7 @@ public sealed partial class ShipGame
         foreach (var f in v.Current.Faults)
         {
             index++;
-            if (f.Resolved || v.GetSection(f.Section) is not { } s)
+            if (f.Resolved || index > FaultsRevealed(v) || v.GetSection(f.Section) is not { } s)
                 continue;
             var slot = inSection.TryGetValue(s.Id, out var seen) ? seen : 0;
             inSection[s.Id] = slot + 1;
@@ -369,7 +373,7 @@ public sealed partial class ShipGame
                 above = !above;
             var end = P(s.Spot.X + slot * 34, above ? aboveRows[labelsAbove++] : belowRows[labelsBelow++]);
             _p.Line(new Vector2(centre.X, centre.Y + (above ? -13 : 13)), end, Painter.Accent, 1f);
-            var label = index.ToString("00", CultureInfo.InvariantCulture) + " " + f.Name.ToUpperInvariant() + (f.Critical ? " (CRITICAL)" : "") + " - " + Voyage.Hours(Math.Max(0, f.Deadline - v.Clock));
+            var label = index.ToString("00", CultureInfo.InvariantCulture) + " " + f.Name.ToUpperInvariant() + (f.Critical ? " (CRITICAL)" : "") + " - " + Voyage.Hours(ShownLeft(v, f));
             // The label runs left of its leader; where that would leave the plan panel, it runs right instead.
             var labelWidth = _p.Small.MeasureString(label).X;
             if (end.X - 14 - labelWidth < rect.X + 8)
@@ -425,7 +429,7 @@ public sealed partial class ShipGame
         var visible = Math.Max(1, (areaBottom - areaTop) / step);
 
         var lines = new List<(string Text, Color Color)>();
-        foreach (var entry in v.Log)
+        foreach (var entry in v.Log.Take(ShownLogCount(v)))
         {
             var color = entry.Kind switch
             {
@@ -480,12 +484,12 @@ public sealed partial class ShipGame
                 _p.Frame(card, Painter.Bright, 2);
             var ink = !c.Alive ? Painter.Dim : c.State == CrewState.Awake ? Painter.Bright : Painter.Ink;
             _p.Text(_p.Body, c.Name, x + 12, y + 8, ink);
-            _p.Text(_p.Small, c.Role + ", " + N(c.Age), x + 20 + c.Name.Length * _p.BodyWidth, y + 10, Painter.Dim);
+            _p.Text(_p.Small, c.Role + ", " + N(ShownAge(c)), x + 20 + c.Name.Length * _p.BodyWidth, y + 10, Painter.Dim);
             var state = c.State switch
             {
                 CrewState.Asleep => "asleep, " + c.Thaws + (c.Thaws == 1 ? " thaw" : " thaws"),
-                CrewState.Thawing => "thawing, " + Voyage.Hours(Math.Max(0, c.ThawDoneAt - v.Clock)),
-                CrewState.Awake => "AWAKE " + N(c.HoursAwake / 24) + " d" + (c.WorkingOn != null ? ", working" : ""),
+                CrewState.Thawing => "thawing, " + Voyage.Hours(ShownThawLeft(v, c)),
+                CrewState.Awake => "AWAKE " + N(ShownHoursAwake(c) / 24) + " d" + (c.WorkingOn != null ? ", working" : ""),
                 _ => "dead",
             };
             _p.Text(_p.Small, state, x + 12, y + 36, ink);

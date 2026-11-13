@@ -197,13 +197,20 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     /// While a said line is still being read the click waits for it (<see cref="ShipMind.AfterReading"/>), so the line
     /// counts at the moment it was said: before a Sleep, an Advance or a Repair clicked right after it.
     /// </summary>
-    private void Act(string what, Action action, bool snapshot = false) => Do(() =>
+    private void Act(string what, Action action, bool snapshot = false, SkipKind? skip = null) => Do(() =>
     {
         void Run()
         {
             _held.Remove(what);
             _session?.Line("click", what);
+            // A clock move is shown as a transition from what the screen showed before it (ShipGame.Transitions.cs).
+            Before? before = null;
+            if (skip is not null && _voyage is not null)
+                before = Snapshot(_voyage);
+            _lastAdvance = null;
             action();
+            if (before is not null && skip is { } kind)
+                BeginTransition(kind, before);
             if (snapshot && _voyage is not null)
             {
                 _session?.Follow(_voyage);
@@ -275,6 +282,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
 
         if (_actions.Count > 0)
         {
+            _banner = null; // the stop banner stays until the next click
             var actions = _actions.ToList();
             _actions.Clear();
             foreach (var action in actions)
@@ -353,7 +361,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
                 _input.Append(ch);
         }
 
-        if (_voyage is { Phase: Phase.Ended, Ending: { } ending } && !_endingShown)
+        StepTransition();
+        // The ending waits for the last drift's report to be closed.
+        if (_voyage is { Phase: Phase.Ended, Ending: { } ending } && !_endingShown && _transition is null)
         {
             _endingShown = true;
             _screen = Screen.Ending;
@@ -494,7 +504,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _p.Text(_p.Head, title, x, 16, Painter.Bright);
         x += (int)_p.Head.MeasureString(title).X + 32;
         _p.Text(_p.Small, "YEAR", x, 21, Painter.Dim);
-        _p.Text(_p.Head, Math.Floor(v.Year).ToString("0"), x + 44, 16, Painter.Bright);
+        _p.Text(_p.Head, Math.Floor(ShownClock(v) / Tuning.HoursPerYear).ToString("0"), x + 44, 16, Painter.Bright);
         _p.Text(_p.Small, "/ " + Scenario.ArrivalYear, x + 76, 21, Painter.Dim);
         var phase = v.Phase switch
         {
@@ -502,7 +512,10 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             Phase.Aftermath => "AFTERMATH OF ALERT " + v.Current.Number + ": " + v.Current.Title.ToUpperInvariant(),
             _ => v.Ending?.Title.ToUpperInvariant() ?? "ARRIVED",
         };
-        if (v.Phase == Phase.Ended && _screen != Screen.Ending)
+        // While the years roll and the drift report is up, the header does not give the new alert (or the ending) away.
+        if (Drifting)
+            phase = "DRIFT";
+        if (v.Phase == Phase.Ended && _screen != Screen.Ending && !Drifting)
         {
             // The ending screen can always be opened again.
             var edge = Painter.ScreenWidth - 16;
@@ -510,7 +523,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
                 Do(() => _screen = Screen.Ending);
         }
         var chip = new Rectangle(x + 124, 14, (int)(phase.Length * _p.SmallWidth) + 20, 28);
-        _p.Frame(chip, v.Phase == Phase.Alert ? Painter.Accent : Painter.Wire);
-        _p.Text(_p.Small, phase, chip.X + 10, chip.Y + 6, v.Phase == Phase.Alert ? Painter.Accent : Painter.Ink);
+        var alert = v.Phase == Phase.Alert && !Drifting;
+        _p.Frame(chip, alert ? Painter.Accent : Painter.Wire);
+        _p.Text(_p.Small, phase, chip.X + 10, chip.Y + 6, alert ? Painter.Accent : Painter.Ink);
     }
 }

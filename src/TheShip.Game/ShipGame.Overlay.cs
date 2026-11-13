@@ -8,13 +8,15 @@ namespace TheShip.Game;
 /// </summary>
 public sealed partial class ShipGame
 {
-    private bool OverlayUp => _briefing;
+    private bool OverlayUp => _briefing || _transition is not null;
 
     /// <summary>Enter or Esc while an overlay is up.</summary>
     private void OverlayKey(bool enter)
     {
         if (_briefing)
             CloseBriefing();
+        else if (_transition is not null)
+            SkipTransition();
     }
 
     /// <summary>Draws whatever overlay is up, with the real mouse and click.</summary>
@@ -22,5 +24,7 @@ public sealed partial class ShipGame
     {
         if (_briefing)
             DrawBriefing(v);
+        else if (_transition is not null)
+            DrawTransition(v);
     }
 }
