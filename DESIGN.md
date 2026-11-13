@@ -692,3 +692,8 @@ identical to the work-terms ones but for the new rows. The Liar now admits each 
 
 Per run: Liar 7.77 lies told, 7.14 caught, 6.79 accusations opened and admitted, end trust 25.0; Corrector 8.29 lies told, 3.84 caught, 3.81 corrections, 3.32 accusations
 opened and admitted, end trust 43.3. The guard `Correcting_a_lie_is_not_a_winning_strategy` fails if the Corrector beats Honest by more than 6 points.
+
+After the accusation validation fixes (fix/accusation-validation, 600 seeds): every bot that never lies is byte-identical; only the Liar and the Corrector move,
+through the admission keeping what they saw (the audit rule pays nothing to bots that admit). Liar 10.7% -> 11.7% Landfall (survivors 1.58 -> 1.68, Adrift 66.5% -> 64.3%,
+end trust 25.0 -> 26.3, 7.72 lies told / 7.11 caught, 6.81 accusations, 6.80 admitted); Corrector 37.7% -> 40.2% (survivors 3.22 -> 3.33, Adrift 18.2% -> 16.7%,
+end trust 43.3 -> 44.3, 8.21 lies told / 3.70 caught, 3.81 corrections, 3.27 accusations), 3.0 points under Honest. A Liar that ignores every accusation (`SHIP_LIAR_IGNORES=1`): 2.0% -> 2.2% Landfall, 82.3% Adrift.
