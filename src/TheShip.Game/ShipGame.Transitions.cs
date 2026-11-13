@@ -127,7 +127,29 @@ public sealed partial class ShipGame
         _sounds.Alert();
     }
 
-    /// <summary>A click, Enter or Esc during a transition: on to its next beat, or to its end.</summary>
+    /// <summary>The drift report is up: it waits for the player and takes every click and key (<see cref="OverlayUp"/>).</summary>
+    private bool ReportUp => _transition is { Kind: SkipKind.Drift, Beat: 1 };
+
+    /// <summary>
+    /// The transition's own box, which takes a click on it: the year while it rolls, the alert's title while it shows.
+    /// Anywhere else a click skips the transition and goes through to the bridge.
+    /// </summary>
+    private Rectangle? TransitionBlock(Voyage v)
+    {
+        if (_transition is not { Kind: SkipKind.Drift } t)
+            return null;
+        var centre = PlanRect.X + PlanRect.Width / 2;
+        if (t.Beat == 0)
+            return new Rectangle(centre - 150, PlanRect.Y + PlanRect.Height / 2 - 62, 300, 124);
+        if (t.Beat == 2 && (float)(_now - t.Start) < Motion.Seconds(Motion.AlertTitle))
+        {
+            var width = Math.Max(360, (int)(v.Current.Title.Length * _p.HeadWidth) + 64);
+            return new Rectangle(centre - width / 2, PlanRect.Y + PlanRect.Height / 2 - 48, width, 96);
+        }
+        return null;
+    }
+
+    /// <summary>A click on the transition's box, Enter or Esc on the report: on to its next beat, or to its end.</summary>
     private void SkipTransition()
     {
         if (_transition is not { } t)
@@ -274,12 +296,17 @@ public sealed partial class ShipGame
     {
         if (_transition is not { } t)
             return;
-        if (t.Kind != SkipKind.Drift)
+        // A click on the transition's box moves it on a beat; a click anywhere else ends it, and the screen below had it
+        // too (DrawScene): it goes through. The end is queued first, so a clock move clicked now starts a transition of its own.
+        if (_p.Click && !ReportUp)
         {
-            if (_p.Click)
+            if (TransitionBlock(v) is { } block && _p.Over(block))
                 Do(SkipTransition);
-            return;
+            else
+                _actions.Insert(0, EndTransition);
         }
+        if (t.Kind != SkipKind.Drift)
+            return;
 
         // The side columns and the log step back; the plan stays lit.
         var dim = t.Beat switch
@@ -311,14 +338,12 @@ public sealed partial class ShipGame
                 if (x2 > x1)
                     _p.Line(new Vector2(x1, y), new Vector2(x2, y), Painter.Fade(Painter.Wire, 0.55f * strength), 1f);
             }
-            var box = new Rectangle(centre - 150, plan.Y + plan.Height / 2 - 62, 300, 124);
+            var box = TransitionBlock(v)!.Value;
             _p.Fill(box, Painter.Fade(Painter.Ground, 0.9f));
             _p.Frame(box, Painter.Wire);
             _p.TextCentre(_p.Small, "DRIFTING - YEAR", centre, box.Y + 16, Painter.Dim);
             _p.TextCentre(_p.Big, Math.Floor(ShownClock(v) / Tuning.HoursPerYear).ToString("0", CultureInfo.InvariantCulture), centre, box.Y + 42, Painter.Bright);
             _p.TextCentre(_p.Small, "of " + Scenario.ArrivalYear, centre, box.Y + 90, Painter.Dim);
-            if (_p.Click)
-                Do(SkipTransition);
         }
         else if (t.Beat == 1)
         {
@@ -353,18 +378,14 @@ public sealed partial class ShipGame
         else
         {
             // The new alert: its title first, then the faults appear on the plan and in the issue list.
-            if ((float)(_now - t.Start) < Motion.Seconds(Motion.AlertTitle))
+            if (TransitionBlock(v) is { } box)
             {
                 var title = v.Current.Title.ToUpperInvariant();
-                var width = Math.Max(360, (int)(title.Length * _p.HeadWidth) + 64);
-                var box = new Rectangle(centre - width / 2, plan.Y + plan.Height / 2 - 48, width, 96);
                 _p.Fill(box, Painter.Fade(Painter.Ground, 0.92f));
                 _p.Frame(box, Painter.Accent, 2);
                 _p.TextCentre(_p.Small, "ALERT " + v.Current.Number + " OF " + v.Alerts.Count, centre, box.Y + 16, Painter.Accent);
                 _p.TextCentre(_p.Head, title, centre, box.Y + 46, Painter.Bright);
             }
-            if (_p.Click)
-                Do(SkipTransition);
         }
     }
 }

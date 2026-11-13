@@ -82,7 +82,7 @@ public sealed partial class ShipGame
         yield return 0;
         while (calm < 6 && DateTime.UtcNow < until)
         {
-            calm = _actions.Count == 0 && !OverlayUp && _mind is { Busy: false, Holding: false } ? calm + 1 : 0;
+            calm = _actions.Count == 0 && !OverlayUp && _transition is null && _mind is { Busy: false, Holding: false } ? calm + 1 : 0;
             yield return 0;
         }
     }

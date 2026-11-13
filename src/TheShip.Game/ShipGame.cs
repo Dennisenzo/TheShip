@@ -342,6 +342,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
                 Exit();
             if (OverlayUp)
                 OverlayKey(enter: false);
+            else if (_transition is not null)
+                EndTransition();
             else if (_screen == Screen.Record && _voyage is { Phase: Phase.Ended })
                 _screen = Screen.Ending;
             else if (_screen != Screen.Bridge)
@@ -356,11 +358,13 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             var ch = _typed.Dequeue();
             if (OverlayUp)
             {
-                // Nothing is typed into the voice line while a popup or a transition is up; Enter confirms it.
+                // Nothing is typed into the voice line while a popup is up; Enter confirms it.
                 if (ch == '\r' || ch == '\n')
                     OverlayKey(enter: true);
                 continue;
             }
+            // A key skips a running transition and still reaches the voice line.
+            EndTransition();
             if (_screen != Screen.Bridge)
                 continue;
             if (ch == '\b')
@@ -467,10 +471,13 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _p.Click = _click;
         _p.BeginFrame();
         // Under an overlay the screen is drawn as if the mouse were elsewhere; the overlay then gets the real mouse and click.
+        // Under a running transition only its own box (the year, the alert title) keeps the mouse from the screen.
         var overlay = _voyage is not null && OverlayUp;
+        // A running transition (not the report) lets the screen have the mouse, except over its own box.
+        var playing = _voyage is not null && !overlay && _transition is not null && _screen == Screen.Bridge;
         var mouse = _p.Mouse;
         var down = _p.Down;
-        if (overlay)
+        if (overlay || playing && TransitionBlock(_voyage!) is { } block && _p.Over(block))
         {
             _p.Click = false;
             _p.Down = false;
@@ -511,12 +518,15 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             if (cover > 0f)
                 _p.Fill(new Rectangle(0, 57, Painter.ScreenWidth, Painter.ScreenHeight - 57), Painter.Fade(Painter.Ground, cover));
         }
-        if (overlay)
+        if (overlay || playing)
         {
             _p.Click = _click;
             _p.Down = down;
             _p.Mouse = mouse;
-            DrawOverlay(_voyage!);
+            if (overlay)
+                DrawOverlay(_voyage!);
+            else
+                DrawTransition(_voyage!);
         }
         _p.EndFrame();
         _batch.End();
