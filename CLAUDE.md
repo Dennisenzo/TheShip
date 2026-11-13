@@ -170,6 +170,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 
 ### Built
 
+- 2026-11-13: cold-sleep bay takeover, "Landfall without you" (feature/bay-takeover, roadmap 1.8). `Lockouts` (Core) holds `Logs` (`Voyage.LogsLocked` now wraps it) and `Bay`; `Voyage.Lockouts.cs`: at the end of each aftermath beat two or more awake people in the Against band (trust < 15) with Engineering summing to 2+ warn (`takeover_warning` line, "Waiting on you" item, header chip), and take the bay at the next beat if the condition still holds (else cancelled). While taken `Wake`/`AskSleep` are refused with the reason, the crew sleep whoever can sleep each beat and wake the best-qualified for the open faults at each alert start (no deadlock; `GoUntilAttention` keeps stepping), a promise kept to a taker at trust >= 30 returns the bay (`bay_returned`). Landfall with the bay taken at arrival is "Landfall without you". `Tuning.BayTakers/BayEngineering/BayReturnTrust`. UI: WAKE/SLEEP show "BAY TAKEN" greyed, header chip, session log state. 10 tests (`BayTakeoverTests`). Balance (200 seeds), bay warned / taken (% of runs) and Landfall: Honest 0.0 / 0.0, 67.5%; Careless 0.0 / 0.0, 61.5%; Liar 1.0 / 1.0, 14.5%; Thrifty 0.0 / 0.0, 52.5%; Silent 0.0 / 0.0, 61.5%. "Landfall without you" 0.0% for every bot (the one liar takeover did not end in Landfall): the trigger is rare because two Against people must be awake together. Other results unchanged from before.
+
 Written on 2026-11-12 in sessions without a compiler. The first version builds and runs; changes after it are marked in Status.
 
 - **Core** (`src/TheShip.Core`): `Voyage` and its partial files hold the whole loop.
@@ -201,7 +203,7 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
 - Shorter wakings are all or nothing: the three-month minimum is waived as soon as the stores can't feed everyone up through a
   person's remaining three months (`Voyage.CanSleepNow`); there is no rationing. Once the stores are empty, whoever stays awake dies
   after `Tuning.StarveDays` (60 days).
-- "Landfall without you" can't happen: the logs are the only lockout.
+- "Landfall without you" happens only through the cold-sleep bay takeover (two awake Against people with Engineering 2 between them); muting you is not built.
 - Terminal notes and paper notes are not in. The drift report is complete because no sensors are lost yet.
 - Doors: only locking has an effect. Open and closed look different and behave the same. Nobody reacts to being locked in.
 - The design canvas shows things the game does not simulate: a section without sensors, a "next event" line on the clock, crew notes in the drift report.

@@ -34,7 +34,7 @@ public sealed partial class Voyage
     public int PodWear { get; internal set; }
     public bool PowerLow { get; private set; }
     public bool NavLost { get; private set; }
-    public bool LogsLocked { get; private set; }
+    public bool LogsLocked { get => Lockouts.Logs; private set => Lockouts.Logs = value; }
     public Ending? Ending { get; private set; }
 
     /// <summary>A crew line was added; its text is the template and the model may reword it.</summary>
@@ -331,6 +331,7 @@ public sealed partial class Voyage
             Ship($"Fault: {FaultTitle(f)}. Needs {f.Skill.ToString().ToLowerInvariant()} {f.Level}"
                  + (f.People > 1 ? $", {f.People} people" : "")
                  + $", {f.Hours:0} hours of work. Clock: {Hours(f.ClockHours)}. If ignored: {f.IfIgnored}.");
+        CrewWakeRule();
         if (alert.Faults.Count == 0)
         {
             Phase = Phase.Aftermath;

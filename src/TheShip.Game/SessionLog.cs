@@ -91,7 +91,7 @@ public sealed class SessionLog : IDisposable
         sb.Append("year ").Append(v.Year.ToString("0.00", Inv)).Append(", ").Append(v.Phase).Append(" of alert ").Append(v.Current.Number)
             .Append(" (").Append(v.Current.Title).Append("), stores ").Append(v.Stores.ToString("0", Inv))
             .Append(", parts ").Append(v.Parts).Append(", pod wear ").Append(v.PodWear)
-            .Append(v.PowerLow ? ", POWER LOW" : "").Append(v.NavLost ? ", NAV LOST" : "").Append(v.LogsLocked ? ", LOGS LOCKED" : "");
+            .Append(v.PowerLow ? ", POWER LOW" : "").Append(v.NavLost ? ", NAV LOST" : "").Append(v.LogsLocked ? ", LOGS LOCKED" : "").Append(v.Lockouts.Bay ? ", BAY TAKEN" : v.Lockouts.BayWarned.Count > 0 ? ", BAY WARNED" : "");
         foreach (var f in v.Current.Faults)
             sb.Append("\nfault ").Append(f.Name).Append(": ").Append(f.State).Append(f.Patching ? " (patch)" : "")
                 .Append(", progress ").Append(f.Progress.ToString("0.0", Inv)).Append('/').Append(f.Hours.ToString("0", Inv)).Append(" h")

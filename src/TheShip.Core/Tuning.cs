@@ -89,6 +89,13 @@ public static class Tuning
     public const double PatchRate = 2;
     public const double EngineerSpotsAlteredLog = 0.6;
 
+    // Bay takeover (Short haul: 6 crew)
+    /// <summary>Awake people in the Against band (trust under 15) it takes, and the Engineering they need between them.</summary>
+    public const int BayTakers = 2;
+    public const int BayEngineering = 2;
+    /// <summary>A kept promise to a taker whose trust is at least this hands the bay back.</summary>
+    public const double BayReturnTrust = 30;
+
     // Ending (Short haul: 6 crew)
     public const int LandfallAlive = 3;
     public const int LandfallWorkingAge = 2;

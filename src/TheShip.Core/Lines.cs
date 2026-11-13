@@ -58,6 +58,8 @@ public static class Lines
             "small" => Pick(rng, "Mm.", "It's strange, hearing a voice and seeing nobody.", "Thanks. It helps to talk."),
             "answer" => Pick(rng, "You have the sensors. You tell me.", "I know what you've told me, and what I've seen. That's all."),
             "left_behind" => Pick(rng, "You let " + detail + " die in there.", "We could have saved " + detail + ". You let the clock run out."),
+            "takeover_warning" => Pick(rng, "We've talked. We're taking the sleepers out of your hands. Fix this before the next shift, or we do it.", "You decide who wakes and who sleeps, and we don't trust you with that any more. We take the bay soon."),
+            "bay_returned" => "You kept your word. The bay is yours again. Don't make me regret it.",
             "order" => "Tell me which fault and I'll look at it.",
             _ => "...",
         };

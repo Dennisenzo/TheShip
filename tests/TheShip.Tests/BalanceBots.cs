@@ -10,7 +10,8 @@ public enum BotKind { Honest, Careless, Liar, Thrifty, Silent }
 public sealed record RunResult(
     int Seed, string Ending, int Alive, int Dead, int DeadUnscripted, List<string> Causes, List<double> AgesAtArrival,
     double MeanTrust, int CaughtLies, int LiesTold, int Thaws, int PodWear, double Stores, int Parts, bool Ended,
-    int FaultsLost = 0, int Patches = 0, List<int>? ThawsPerAlert = null, string Signature = "", int AskedAgain = 0, int Refusals = 0);
+    int FaultsLost = 0, int Patches = 0, List<int>? ThawsPerAlert = null, string Signature = "", int AskedAgain = 0, int Refusals = 0,
+    int BayWarnings = 0, int BayTakeovers = 0);
 
 /// <summary>
 /// Bots that play a whole voyage through the public <see cref="Voyage"/> API only. They measure the game; they do not
@@ -45,9 +46,10 @@ public sealed class BalanceBot
     public static RunResult Play(int seed, BotKind kind) => Summarise(seed, PlayVoyage(seed, kind));
 
     /// <summary>The finished voyage itself, for looking at its log.</summary>
-    public static Voyage PlayVoyage(int seed, BotKind kind)
+    public static Voyage PlayVoyage(int seed, BotKind kind, Action<Voyage>? setup = null)
     {
         var v = new Voyage(seed, Variation.Draw(seed));
+        setup?.Invoke(v);
         var bot = new BalanceBot(v, kind);
         bot.Run();
         Marks.Add(v, bot._thawMarks);
@@ -272,6 +274,7 @@ public sealed class BalanceBot
             v.Crew.Sum(c => c.Thaws), v.PodWear, v.Stores, v.Parts, v.Phase == Phase.Ended,
             allFaults.Count(f => f.State == FaultState.Lost), allFaults.Count(f => f.State == FaultState.Patched), perAlert, signature,
             v.Log.Count(e => e.Kind == LogKind.Crew && e.Intent?.Kind == "ask_again"),
-            v.Log.Count(e => e.Kind == LogKind.Crew && e.Intent?.Kind is "refuse_answer" or "refuse_trust" or "refuse_danger"));
+            v.Log.Count(e => e.Kind == LogKind.Crew && e.Intent?.Kind is "refuse_answer" or "refuse_trust" or "refuse_danger"),
+            v.Lockouts.BayWarnings, v.Lockouts.BayTakeovers);
     }
 }

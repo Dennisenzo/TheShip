@@ -10,6 +10,11 @@ public sealed partial class Voyage
     {
         if (Phase == Phase.Ended)
             return;
+        if (Lockouts.Bay && !_crewActing)
+        {
+            Ship("The cold-sleep bay is not yours to open: " + BayLockReason);
+            return;
+        }
         if (c.State != CrewState.Asleep)
         {
             Ship(c.Name + " is not asleep.");
@@ -574,6 +579,11 @@ public sealed partial class Voyage
     {
         if (Phase == Phase.Ended)
             return;
+        if (Lockouts.Bay)
+        {
+            Ship("The cold-sleep bay is not yours to close: " + BayLockReason);
+            return;
+        }
         if (c.State != CrewState.Awake)
         {
             Ship(c.Name + " is not awake.");
@@ -679,6 +689,8 @@ public sealed partial class Voyage
             Speak(c, "promise_broken", "The ship broke a promise it made you: " + PromiseText(s.PromiseKey) + ".", PromiseText(s.PromiseKey));
         }
         Clamp(c);
+        if (kept)
+            MaybeReturnBay(c);
     }
 
     public static string PromiseText(string? key) => key switch

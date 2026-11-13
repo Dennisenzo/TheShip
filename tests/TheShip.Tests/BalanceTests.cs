@@ -56,6 +56,8 @@ public class BalanceTests
             foreach (var g in r.GroupBy(x => x.Ending).OrderByDescending(g => g.Count()))
                 sb.AppendLine($"  {g.Key,-14} {g.Count(),4}  {P(g.Count())}");
             sb.AppendLine($"  Landfall rate           {P(r.Count(x => x.Ending == "Landfall"))}");
+            sb.AppendLine($"  Bay warned / taken      {P(r.Count(x => x.BayWarnings > 0))} / {P(r.Count(x => x.BayTakeovers > 0))} of runs");
+            sb.AppendLine($"  Landfall without you    {P(r.Count(x => x.Ending == "Landfall without you"))}   (Landfall incl. without you {P(r.Count(x => x.Ending.StartsWith("Landfall", StringComparison.Ordinal)))})");
             sb.AppendLine($"  Survivors (mean)        {N(r.Average(x => x.Alive))} of 6");
             sb.AppendLine($"  Deaths incl. scripted   {N(r.Average(x => x.Dead))}");
             sb.AppendLine($"  Deaths excl. scripted   {N(r.Average(x => x.DeadUnscripted))}   (runs with any: {P(r.Count(x => x.DeadUnscripted > 0))})");

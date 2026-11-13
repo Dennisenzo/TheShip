@@ -194,7 +194,7 @@ public static class Prompts
         "dodge" or "gap" or "locked" when band is TrustBand.WantsReasons => "uneasy, wanting a straight answer",
         "comply" or "work_done" or "accept" or "confirmed" or "promise_kept" or "request_granted" => "steady, a little relief",
         "work_patched" or "work_failed" or "work_no_parts" or "injured" or "refuse_danger" or "ask_danger" => "tense and wary",
-        "caught" or "left_behind" or "refuse_trust" or "altered" or "gap" or "locked" or "promise_broken" or "dodge" => "angry, hurt or suspicious",
+        "caught" or "left_behind" or "takeover_warning" or "refuse_trust" or "altered" or "gap" or "locked" or "promise_broken" or "dodge" => "angry, hurt or suspicious",
         "hard_truth" or "found" or "noticed_dose" => "shaken",
         "ask_again" => "impatient, wanting an answer",
         "sleep_yes" or "sleep_no" or "sleep_no_pod" or "refuse_answer" => "weary, with the pod on your mind",

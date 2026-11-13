@@ -40,7 +40,7 @@ public sealed partial class Voyage
                 break;
             }
             // Three months awake, or stores too low to last that long (CanSleepNow): waiting on would only starve them.
-            if (up.All(CanSleepNow))
+            if (up.All(CanSleepNow) && !Lockouts.Bay)
             {
                 if (steps == 0)
                     Ship("Everyone awake can go back to sleep. Nothing more will happen until you ask them to sleep or drift.");
