@@ -582,13 +582,14 @@ public sealed partial class ShipGame
         for (var i = 0; i < v.Log.Count; i++)
         {
             var e = v.Log[i];
-            var text = e.Kind switch
+            // The length of what DrawLog shows ("SHIP - ...", "Mara - ..."), counted without building the string every update.
+            var length = e.Kind switch
             {
-                LogKind.Ship => "SHIP - " + e.Text,
-                LogKind.Crew => e.Speaker + " - " + e.Text,
-                _ => "",
+                LogKind.Ship => "SHIP - ".Length + e.Text.Length,
+                LogKind.Crew => (e.Speaker?.Length ?? 0) + " - ".Length + e.Text.Length,
+                _ => 0,
             };
-            _revealItems[i] = new RevealItem(e.Kind == LogKind.Crew, e.Pending, text.Length, Own: e.Kind == LogKind.You);
+            _revealItems[i] = new RevealItem(e.Kind == LogKind.Crew, e.Pending, length, Own: e.Kind == LogKind.You);
         }
         _reveal.Update(_revealItems, ShownLogCount(v), dt, skip, Motion.Still);
     }
