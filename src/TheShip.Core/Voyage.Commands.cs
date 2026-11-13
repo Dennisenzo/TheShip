@@ -34,8 +34,9 @@ public sealed partial class Voyage
                  + "The pod can take " + c.Name + " back early.");
         else if (StoresTooLowFor(c))
         {
-            var mouths = Crew.Count(x => x.State is CrewState.Awake or CrewState.Thawing);
-            Ship(FormattableString.Invariant($"The stores ({Stores:0} person-days) feed the {mouths} awake about {Stores / mouths:0} days, short of a three-month waking. ")
+            var up = Up().ToList();
+            Ship(FormattableString.Invariant($"The stores ({Stores:0} person-days) feed the {up.Count} awake about {Stores / NetDailyNeed(up):0} days")
+                 + (PairsAwake(up) > 0 ? " with the garden" : "") + ", short of a three-month waking. "
                  + "The pod can take " + c.Name + " back early.");
         }
         // A promise to wake someone is kept the moment the thaw starts.
@@ -49,10 +50,16 @@ public sealed partial class Voyage
     /// </summary>
     private bool StoresTooLowFor(CrewMember c)
     {
-        var mouths = Math.Max(1, Crew.Count(x => x.State is CrewState.Awake or CrewState.Thawing));
+        // Who is up or thawing eats; a partner pair among them grows part of it (a thawing partner is up within hours).
+        var net = NetDailyNeed(Up().ToList());
+        if (net <= 0)
+            return false;
         var left = Tuning.MinAwakeHours - (c.State == CrewState.Awake ? c.HoursAwake : 0);
-        return Stores * 24 / mouths < left;
+        return Stores * 24 / net < left;
     }
+
+    /// <summary>Everyone awake or thawing: the mouths the stores feed through a waking.</summary>
+    private IEnumerable<CrewMember> Up() => Crew.Where(x => x.State is CrewState.Awake or CrewState.Thawing);
 
     /// <summary>Whether the pod can take this person now: three months awake, or stores too low to last that long.</summary>
     public bool CanSleepNow(CrewMember c) =>
@@ -204,7 +211,6 @@ public sealed partial class Voyage
     {
         var start = Clock;
         var awake = Awake.ToList();
-        Stores += PairsAwake(awake) * Tuning.PairGardenPerDay * hours / 24;
         var (storesOut, starved) = Eat(awake, hours);
         // A worker who starves in this span works only until they die.
         foreach (var f in Current.Faults.Where(f => f.State == FaultState.InRepair && Staffed(f)))
@@ -220,7 +226,8 @@ public sealed partial class Voyage
         {
             Attend("the stores ran out");
             Ship($"The stores ran out in year {Math.Floor((start + outAt) / Tuning.HoursPerYear):0}. Whoever is awake now goes hungry: "
-                 + $"{Tuning.StarveDays:0} days without food kills. The pods can take them back early.");
+                 + $"{Tuning.StarveDays:0} days without food kills"
+                 + (PairsAwake(Awake.ToList()) > 0 ? ", and the garden's part rations only slow it" : "") + ". The pods can take them back early.");
         }
         // Two can starve in one step: only those still alive at its end say what they saw.
         var held = HoldSpeech();
@@ -236,7 +243,7 @@ public sealed partial class Voyage
         }
     }
 
-    /// <summary>Partner pairs awake together (each pair once).</summary>
+    /// <summary>Partner pairs among these people (each pair once): awake together, they tend the hydroponics.</summary>
     private int PairsAwake(IReadOnlyList<CrewMember> awake) =>
         awake.Count(c => c.PartnerId is { } p && string.CompareOrdinal(c.Id, p) < 0 && awake.Any(o => o.Id == p));
 
@@ -260,37 +267,58 @@ public sealed partial class Voyage
     }
 
     /// <summary>
-    /// The awake eat for <paramref name="hours"/>: one person-day of stores each per day. Once the stores are empty they go
-    /// hungry, and <see cref="Tuning.StarveDays"/> hungry days kill. Returns when (hours from now) the stores ran out, if they did
-    /// in this span, and who starved and when. Does not kill anyone: the caller does, in time order.
+    /// The awake eat for <paramref name="hours"/>: one person-day of stores each per day, less what a partner pair awake together grows
+    /// (<see cref="Tuning.PairGardenPerDay"/>), day by day through the span. Once the stores are empty they go hungry: the garden's
+    /// harvest is shared out, so hunger counts at the share of a ration it does not cover, and <see cref="Tuning.StarveDays"/> hungry days
+    /// kill (a pair alone on empty stores lasts 60 / 0.4 = 150 days). Returns when (hours from now) the stores ran out, if they had any at
+    /// the start of the span, and who starved and when. Does not kill anyone: the caller does, in time order; a death within the span
+    /// (and the garden it ends) changes the rate for the rest.
     /// </summary>
     private (double? StoresOut, Dictionary<CrewMember, double> Starved) Eat(IReadOnlyList<CrewMember> awake, double hours)
     {
         var starved = new Dictionary<CrewMember, double>();
-        if (awake.Count == 0 || hours <= 0)
-            return (null, starved);
-        var fedHours = Stores * 24 / awake.Count;
-        if (fedHours >= hours)
+        double? storesOut = null;
+        var eating = awake.ToList();
+        var t = 0.0;
+        while (eating.Count > 0 && t < hours)
         {
-            Stores -= hours / 24 * awake.Count;
-            return (null, starved);
-        }
-        double? storesOut = Stores > 0 ? fedHours : null;
-        var hungryFrom = fedHours;
-        Stores = 0;
-        foreach (var c in awake)
-        {
-            var left = Math.Max(0, Tuning.StarveDays * 24 - c.HoursHungry);
-            if (hungryFrom + left <= hours)
+            var net = NetDailyNeed(eating);
+            if (net <= 0)
             {
-                c.HoursHungry += left;
-                starved[c] = hungryFrom + left;
+                Stores -= (hours - t) / 24 * net;
+                break;
             }
-            else
-                c.HoursHungry += hours - hungryFrom;
+            if (Stores > 0)
+            {
+                var fed = Stores * 24 / net;
+                if (t + fed >= hours)
+                {
+                    Stores -= (hours - t) / 24 * net;
+                    break;
+                }
+                t += fed;
+                Stores = 0;
+                storesOut ??= t;
+                continue;
+            }
+            // Hungry: each misses the share of a ration the garden does not cover.
+            var share = net / eating.Count;
+            var next = eating.Min(c => t + Math.Max(0, Tuning.StarveDays * 24 - c.HoursHungry) / share);
+            var end = Math.Min(hours, next);
+            foreach (var c in eating)
+                c.HoursHungry += (end - t) * share;
+            t = end;
+            foreach (var c in eating.Where(c => c.HoursHungry >= Tuning.StarveDays * 24 - 1e-6).ToList())
+            {
+                starved[c] = t;
+                eating.Remove(c);
+            }
         }
         return (storesOut, starved);
     }
+
+    /// <summary>Person-days of stores these people use a day: one each, less what each partner pair among them grows.</summary>
+    private double NetDailyNeed(IReadOnlyList<CrewMember> people) => people.Count - PairsAwake(people) * Tuning.PairGardenPerDay;
 
     private void FinishThaws()
     {
@@ -736,11 +764,13 @@ public sealed partial class Voyage
             ? people[0].Name
             : string.Join(", ", people.Take(people.Count - 1).Select(c => c.Name)) + " and " + people[^1].Name;
         var names = And(up);
-        var lasts = Stores / up.Count / 365;
+        // The same sums as the drift's Eat: who goes hungry for how long, and who dies of it before the drift ends
+        // (a partner pair among them grows part of it, and part rations slow the hunger).
+        var net = Math.Max(0.001, NetDailyNeed(up));
+        var lasts = Stores / net / 365;
         var one = up.Count == 1;
-        // The same sums as the drift's Eat: who goes hungry for how long, and who dies of it before the drift ends.
-        var hungryHours = years * Tuning.HoursPerYear - Stores * 24 / up.Count;
-        var starve = up.Where(c => hungryHours >= Tuning.StarveDays * 24 - c.HoursHungry).ToList();
+        var hungryHours = years * Tuning.HoursPerYear - Stores * 24 / net;
+        var starve = up.Where(c => hungryHours * net / up.Count >= Tuning.StarveDays * 24 - c.HoursHungry).ToList();
         string outlook;
         if (hungryHours <= 0)
             outlook = "last that long.";
