@@ -9,13 +9,13 @@ using TheShip.Core;
 namespace TheShip.Game;
 
 /// <summary>
-/// The window. Three screens in the wireframe look of the interface design: the bridge (ship plan, issues, crew, log),
-/// a crew dossier, and the record with the ship logs. Every control is a button or a click; the input line is only
+/// The window. Four screens in the wireframe look of the interface design: the bridge (ship plan, issues, crew, log),
+/// a crew dossier, the record with the ship logs, and the ending. Every control is a button or a click; the input line is only
 /// for speaking. A typed line is read by the model, shown as it will be recorded, and said once the player confirms it.
 /// </summary>
 public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
 {
-    private enum Screen { Bridge, Dossier, Record }
+    private enum Screen { Bridge, Dossier, Record, Ending }
 
     private readonly GraphicsDeviceManager _graphics;
     private readonly Options _options;
@@ -307,7 +307,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             if (_fatal)
                 Exit();
-            if (_screen != Screen.Bridge)
+            if (_screen == Screen.Record && _voyage is { Phase: Phase.Ended })
+                _screen = Screen.Ending;
+            else if (_screen != Screen.Bridge)
                 _screen = Screen.Bridge;
             else
                 _input.Clear();
@@ -333,12 +335,14 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         if (_voyage is { Phase: Phase.Ended, Ending: { } ending } && !_endingShown)
         {
             _endingShown = true;
-            _screen = Screen.Bridge;
+            _screen = Screen.Ending;
+            _scroll = int.MaxValue / 2;
             ShowEnding(ending);
             _session?.Follow(_voyage);
             _session?.Ending(ending);
             _session?.Snapshot(_voyage);
         }
+        StepTour();
         base.Update(gameTime);
     }
 
@@ -377,39 +381,28 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _ => "plain talk (nothing recorded)",
     };
 
-    private void ShowEnding(Ending ending)
-    {
-        Note("");
-        Note("=== " + ending.Title.ToUpperInvariant() + " ===");
-        Note(ending.Summary);
-        Note("");
-        Note("The crew:");
-        foreach (var line in ending.Crew)
-            Note("  " + line);
-        Note("");
-        Note("What they believe about you:");
-        foreach (var line in ending.Beliefs)
-            Note("  " + line);
-        Note("");
-        Note("The record of what you said:");
-        if (ending.Record.Count == 0)
-            Note("  You said nothing that was recorded.");
-        foreach (var line in ending.Record)
-            Note("  " + line);
-        Note("");
-        Note("PageUp and the mouse wheel scroll.");
-    }
+    private void ShowEnding(Ending ending) =>
+        Note("The voyage is over: " + ending.Title + ". The ending screen shows the crew, what they believe and the record.");
 
     protected override void UnloadContent()
     {
         _mind?.Dispose();
         _session?.Line("quit", _voyage?.Phase == Phase.Ended ? "after the ending" : "before the end of the voyage");
         _session?.Dispose();
+        _tourTarget?.Dispose();
         _fonts?.Dispose();
         base.UnloadContent();
     }
 
     protected override void Draw(GameTime gameTime)
+    {
+        DrawScene();
+        _click = false;
+        base.Draw(gameTime);
+    }
+
+    /// <summary>One frame of the current screen into whatever render target (or the back buffer) is set.</summary>
+    private void DrawScene()
     {
         GraphicsDevice.Clear(Painter.Ground);
         var view = View();
@@ -425,6 +418,10 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             DrawDossier(_voyage, _dossier);
         }
+        else if (_screen == Screen.Ending && _voyage.Ending is { } ending)
+        {
+            DrawEnding(_voyage, ending);
+        }
         else if (_screen == Screen.Record)
         {
             DrawRecord(_voyage);
@@ -434,8 +431,6 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             DrawBridge(_voyage);
         }
         _batch.End();
-        _click = false;
-        base.Draw(gameTime);
     }
 
     /// <summary>The bar on top of every screen: where you are, the year, and the phase of the voyage.</summary>
@@ -459,8 +454,15 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             Phase.Alert => "ALERT " + v.Current.Number + " OF " + v.Alerts.Count + ": " + v.Current.Title.ToUpperInvariant(),
             Phase.Aftermath => "AFTERMATH OF ALERT " + v.Current.Number + ": " + v.Current.Title.ToUpperInvariant(),
-            _ => "ARRIVED",
+            _ => v.Ending?.Title.ToUpperInvariant() ?? "ARRIVED",
         };
+        if (v.Phase == Phase.Ended && _screen != Screen.Ending)
+        {
+            // The ending screen can always be opened again.
+            var edge = Painter.ScreenWidth - 16;
+            if (_p.Button(new Rectangle(title == "THE SHIP" ? edge - 410 : edge - 110, 8, 110, 40), "ENDING"))
+                Do(() => _screen = Screen.Ending);
+        }
         var chip = new Rectangle(x + 124, 14, (int)(phase.Length * _p.SmallWidth) + 20, 28);
         _p.Frame(chip, v.Phase == Phase.Alert ? Painter.Accent : Painter.Wire);
         _p.Text(_p.Small, phase, chip.X + 10, chip.Y + 6, v.Phase == Phase.Alert ? Painter.Accent : Painter.Ink);
