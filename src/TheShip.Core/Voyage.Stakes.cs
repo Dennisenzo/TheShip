@@ -25,8 +25,10 @@ public enum Relief
 /// <param name="Checks">Where they can find the answer for themselves.</param>
 /// <param name="HoursSlower">Hours (to the half hour) the fault they would work on (<c>WorkFor</c>) takes longer if the truth costs them morale (work speed, <see cref="Voyage.MoraleRate(double)"/>); 0 when none.</param>
 /// <param name="HoursFaster">Hours it takes less if a believed good answer lifts their morale; 0 when none.</param>
+/// <param name="TruthBriefs">The true answer is the danger of the work they would start: they would take precautions (less harm, no trust lost if hurt).</param>
+/// <remarks>The hours count the work terms each answer would give them (<see cref="Voyage.TermsIfBelieved"/>): told the danger, they work slower with precautions.</remarks>
 public sealed record AnswerStakes(string Question, int TruthHurts, int OddsLost, int TruthEarns, Relief Relief,
-    bool BlocksWork, bool BlocksSleep, bool TruthStopsRepair, string Checks, double HoursSlower = 0, double HoursFaster = 0);
+    bool BlocksWork, bool BlocksSleep, bool TruthStopsRepair, string Checks, double HoursSlower = 0, double HoursFaster = 0, bool TruthBriefs = false);
 
 public sealed partial class Voyage
 {
@@ -112,19 +114,30 @@ public sealed partial class Voyage
 
         // The work speed effect, in hours on the fault they would work on: the one they are on, else the most urgent open fault
         // they qualify for, done by the team that would do it (those on it and them). None when they would work on nothing.
+        // Each answer also sets the terms they would start on (told the danger: precautions, slower), so the hours use those terms.
         var slower = 0.0;
         var faster = 0.0;
+        var briefs = false;
         if (working && WorkFor(c) is { } job)
         {
             var team = Workers(job).Where(w => w != c).ToList();
             var left = Math.Max(0, job.Hours - (job.State == FaultState.InRepair ? job.Progress : 0));
             var skilled = c.SkillOf(job.Skill) >= job.Level || team.Any(w => w.SkillOf(job.Skill) >= job.Level);
             var baseHours = left / (skilled ? 1 : Tuning.UnskilledRate) / (job.Patching && job.State == FaultState.InRepair ? Tuning.PatchRate : 1);
-            var factor = (team.Sum(w => TermsOf(w, job).Speed) + TermsOf(c, job).Speed) / (team.Count + 1);
-            double Hours(double morale) => baseHours / (MoraleRate((team.Sum(w => w.Morale) + morale) / (team.Count + 1)) * factor);
-            var now = Hours(c.Morale);
-            slower = hurts > 0 ? Hours(c.Morale - hurts) - now : 0;
-            faster = relief != Relief.None ? now - Hours(c.Morale + Tuning.ReliefMorale) : 0;
+            var others = team.Sum(w => TermsOf(w, job).Speed);
+            double Hours(double morale, WorkTerms terms) =>
+                baseHours / (MoraleRate((team.Sum(w => w.Morale) + morale) / (team.Count + 1)) * ((others + terms.Speed) / (team.Count + 1)));
+            var current = TermsOf(c, job);
+            var now = Hours(c.Morale, current);
+            var told = TermsIfBelieved(c, job, key, f.Truth);
+            var afterTruth = Hours(c.Morale - hurts, told);
+            slower = afterTruth > now ? afterTruth - now : 0;
+            briefs = told.RiskBriefed && !current.RiskBriefed;
+            if (relief != Relief.None)
+            {
+                var good = relief == Relief.FromTruth ? f.Truth : f.Values.First(v => f.HardnessOf(v) == 0);
+                faster = Math.Max(0, now - Hours(c.Morale + Tuning.ReliefMorale, TermsIfBelieved(c, job, key, good)));
+            }
         }
 
         var dangerous = working && Current.Faults.Any(x => !x.Resolved && x.DangerFact == key);
@@ -139,7 +152,8 @@ public sealed partial class Voyage
             TruthStopsRepair: dangerous && f.HardnessOf(f.Truth) > 0 && c.Trust < 40 && !c.Has(Trait.Obedient) && !c.Has(Trait.Steady),
             Checks: CheckWays(f, new[] { c.Id }),
             HoursSlower: Math.Round(slower * 2) / 2,
-            HoursFaster: Math.Round(faster * 2) / 2);
+            HoursFaster: Math.Round(faster * 2) / 2,
+            TruthBriefs: briefs);
     }
 
     /// <summary>
@@ -153,9 +167,16 @@ public sealed partial class Voyage
         if (StakesOf(c) is not { } s)
             return "";
         var parts = new List<string> { c.Name + " asked: " + s.Question };
+        // With the precautions beside it the hours are short ("1.5 h slower"), so the stakes keep to the rows "Waiting on you" has.
+        var slower = s.HoursSlower > 0 ? (s.TruthBriefs ? "" : "work about ") + s.HoursSlower.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " h slower" : "";
+        // Told the danger, they take precautions: the slower work above includes them.
+        var briefs = s.TruthBriefs ? HarmShareText() + " dose, no trust lost if hurt" : "";
+        var aside = string.Join("; ", new[] { slower, briefs }.Where(x => x.Length > 0));
         if (s.TruthHurts > 0)
-            parts.Add("The truth costs " + s.TruthHurts + " morale" + (s.HoursSlower > 0 ? " (work about " + s.HoursSlower.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " h slower)" : "")
+            parts.Add("The truth costs " + s.TruthHurts + " morale" + (aside.Length > 0 ? " (" + aside + ")" : "")
                       + (s.TruthEarns > 0 ? " and earns " + s.TruthEarns + " trust at the next drift." : "."));
+        else if (aside.Length > 0)
+            parts.Add("The truth: " + aside + ".");
         if (s.Relief == Relief.FromTruth)
             parts.Add("The truth is a relief: morale +" + Tuning.ReliefMorale.ToString("0") + Faster(s) + ".");
         else if (s.Relief == Relief.FromLie)

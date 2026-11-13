@@ -55,10 +55,10 @@ public sealed partial class Voyage
     /// The terms in two rows of "Waiting on you" (about 90 characters): "Mara, unbriefed: full dose, hurt costs trust; cause untold (+8% odds)."
     /// The long form (<see cref="TermsText"/>) is its tooltip. From belief and fault only, like the long form. Empty when there are no terms.
     /// </summary>
-    public string TermsShort(CrewMember c, Fault f)
+    public string TermsShort(CrewMember c, Fault f, bool withRisk = true)
     {
         var t = TermsOf(c, f);
-        var risk = t.Risk switch
+        var risk = !withRisk ? null : t.Risk switch
         {
             RiskKnowledge.Briefed => "briefed: " + Num((1 - Tuning.PrecautionRate) * 100) + "% slower, " + HarmShareText() + " dose, no trust lost if hurt",
             RiskKnowledge.Reassured => "expects no harm: full dose",
@@ -74,9 +74,14 @@ public sealed partial class Voyage
 
     /// <summary>
     /// The terms item for "Waiting on you": the selected idle person's likely job, when it has a risk or a cause, as the short form shown
-    /// and the full text for its tooltip; null otherwise.
+    /// and the full text for its tooltip; null otherwise. While their open question is that job's danger, the stakes of the answer already
+    /// say the precautions (<see cref="AnswerStakes.TruthBriefs"/>), so the short form keeps only the cause and takes one row.
     /// </summary>
-    public (string Short, string Full)? TermsItem(CrewMember c) =>
-        c.State == CrewState.Awake && Phase == Phase.Alert && c.WorkingOn is null && WorkFor(c) is { } job && TermsText(c, job) is { Length: > 0 } text
-            ? (TermsShort(c, job), text) : null;
+    public (string Short, string Full)? TermsItem(CrewMember c)
+    {
+        if (c.State != CrewState.Awake || Phase != Phase.Alert || c.WorkingOn is not null || WorkFor(c) is not { } job || TermsText(c, job) is not { Length: > 0 } text)
+            return null;
+        var risk = !(c.PendingQuestion != null && c.PendingQuestion == job.DangerFact && StakesOf(c) is { TruthBriefs: true });
+        return TermsShort(c, job, risk) is { Length: > 0 } shortText ? (shortText, text) : null;
+    }
 }

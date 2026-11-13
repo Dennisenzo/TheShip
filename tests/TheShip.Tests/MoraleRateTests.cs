@@ -90,10 +90,17 @@ public class MoraleRateTests
         Assert.True(s.HoursSlower > 0 && s.HoursFaster > 0);
         var text = v.StakesText(mara);
         Assert.Contains(" h faster)", text);
-        Assert.Contains(" h slower)", text);
+        Assert.Contains(" h slower; ", text);
+        Assert.Contains("no trust lost if hurt)", text);
+        // With the terms item under it (one row while the stakes say the precautions) it fits the panel: 158 px, 19 a row, 4 between.
+        var item = v.TermsItem(mara)!.Value.Short;
+        Assert.Equal(1, TermsTextTests.WaitingRows(item));
+        Assert.DoesNotContain("dose", item);
+        Assert.True(TermsTextTests.WaitingRows(text) * 19 + 4 + TermsTextTests.WaitingRows(item) * 19 <= 158,
+            TermsTextTests.WaitingRows(text) + " rows: " + text);
         Assert.DoesNotContain("repair odds", text);
         Assert.DoesNotContain("true)", text);
         Assert.DoesNotContain("false", text);
-        Assert.Contains(" h faster)", text);Assert.True(text.Length < 330, text.Length + ": " + text);
+        Assert.True(text.Length < 330, text.Length + ": " + text);
     }
 }

@@ -44,15 +44,25 @@ public sealed partial class Voyage
     public WorkTermStats TermStats { get; } = new();
 
     /// <summary>The terms <paramref name="c"/> would work <paramref name="f"/> on, from what they believe now.</summary>
-    public WorkTerms TermsFor(CrewMember c, Fault f)
+    public WorkTerms TermsFor(CrewMember c, Fault f) => TermsFor(c, f, null, null);
+
+    /// <summary>
+    /// The terms <paramref name="c"/> would work <paramref name="f"/> on if they believed <paramref name="value"/> of <paramref name="key"/>
+    /// (what an answer would change; the stakes of a question). Terms already fixed on this fault stay as they are.
+    /// </summary>
+    public WorkTerms TermsIfBelieved(CrewMember c, Fault f, string key, string value) =>
+        c.WorkingOn == f.Id && c.Terms is { } t && t.FaultId == f.Id ? t : TermsFor(c, f, key, value);
+
+    private WorkTerms TermsFor(CrewMember c, Fault f, string? key, string? value)
     {
+        string? Believed(string fact) => fact == key ? value : c.Beliefs.TryGetValue(fact, out var b) ? b.Value : null;
         var risk = RiskKnowledge.NoRisk;
         if (f.DangerFact is { } danger)
-            risk = !c.Beliefs.TryGetValue(danger, out var b) ? RiskKnowledge.Unaware
-                : _facts[danger].HardnessOf(b.Value) > 0 ? RiskKnowledge.Briefed : RiskKnowledge.Reassured;
+            risk = Believed(danger) is not { } held ? RiskKnowledge.Unaware
+                : _facts[danger].HardnessOf(held) > 0 ? RiskKnowledge.Briefed : RiskKnowledge.Reassured;
         var briefed = risk == RiskKnowledge.Briefed;
         // Any belief about the cause, true or false, counts: the ship's word is all they have.
-        var cause = f.CauseFact is { } cf && c.Beliefs.ContainsKey(cf);
+        var cause = f.CauseFact is { } cf && Believed(cf) != null;
         return new WorkTerms(f.Id, risk, briefed ? Tuning.PrecautionRate : 1, briefed ? Tuning.PrecautionHarm : 1, cause, cause ? Tuning.CauseOddsBonus : 0, cause ? Tuning.CauseRate : 1);
     }
 
