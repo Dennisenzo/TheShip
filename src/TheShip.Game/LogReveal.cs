@@ -16,11 +16,6 @@ public readonly record struct RevealItem(bool Spoken, bool Pending, int Length, 
 /// </summary>
 public sealed class LogReveal
 {
-    public const double CharsPerSecond = 90;
-    /// <summary>Each waiting line behind the current one adds this share to the typing speed.</summary>
-    public const double BacklogSpeedUp = 1.0;
-    /// <summary>With this many lines waiting behind the current one, everything is shown at once.</summary>
-    public const int BacklogInstant = 6;
 
     private double _typed;
     private readonly List<int> _early = new();
@@ -83,13 +78,13 @@ public sealed class LogReveal
                 return;
             }
             var waiting = limit - Shown - 1;
-            if (!item.Spoken || instant || skip || waiting >= BacklogInstant)
+            if (!item.Spoken || instant || skip || waiting >= Motion.BacklogInstant)
             {
                 Finish();
                 continue;
             }
             HeadVisible = true;
-            var speed = CharsPerSecond * (1 + BacklogSpeedUp * waiting);
+            var speed = Motion.CharsPerSecond * (1 + Motion.BacklogSpeedUp * waiting);
             _typed += speed * budget;
             budget = 0;
             if (_typed >= item.Length)
