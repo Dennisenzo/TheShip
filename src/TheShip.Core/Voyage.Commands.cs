@@ -435,7 +435,7 @@ public sealed partial class Voyage
         }
         else
         {
-            var chance = Math.Clamp(Tuning.RepairBaseChance + Tuning.RepairPerSkill * (lead.SkillOf(f.Skill) - f.Level) + (lead.Morale - 50) / 200, 0.35, 0.97);
+            var chance = RepairChance(lead, f, lead.Morale);
             if (_rng.NextDouble() > chance)
             {
                 f.Progress = f.Hours * 0.5;

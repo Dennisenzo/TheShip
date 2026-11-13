@@ -81,10 +81,19 @@ public static class Tuning
     /// <summary>The patient of the sleeper illness is treated: a small lift for whoever treated them.</summary>
     public const double IllnessTreatedMorale = 4;
     public const double DoubtThreshold = 55;
+    /// <summary>
+    /// Morale gained on hearing, and believing, the good answer to a question they asked or that matters to them. A true good answer
+    /// earns it; a lie borrows it (the hard truth's morale is paid when the lie is found out).
+    /// </summary>
+    public const double ReliefMorale = 6;
 
     // Repairs
     public const double RepairBaseChance = 0.85;
     public const double RepairPerSkill = 0.12;
+    /// <summary>Morale moves the repair chance by (morale - 50) / this.</summary>
+    public const double RepairMoraleSpan = 200;
+    public const double RepairChanceMin = 0.35;
+    public const double RepairChanceMax = 0.97;
     public const double RepairInjuryChance = 0.15;
     public const double RepairInjury = 20;
     public const double DangerDose = 15;
