@@ -130,6 +130,18 @@ public sealed partial class Voyage
     }
 
     /// <summary>
+    /// At the end of every step that can meet or lapse a condition (a line, a wake, a clock step, a log opened): drops the prices that
+    /// no longer stand, then starts the work of everyone whose last condition is now met, whatever met it (the partner woken instead of
+    /// promised, a question settled by what they saw, the logs opened, the bay taken).
+    /// </summary>
+    private void SettleJobs()
+    {
+        LapseBargains();
+        foreach (var c in Crew.Where(c => c.Job != null).ToList())
+            ResumeJob(c);
+    }
+
+    /// <summary>
     /// After a line, or a promise: when the last of this person's conditions is met the work starts by itself (the gates are run again:
     /// door, parts, trust, danger). Also brings up the danger question once the one in front of it is answered.
     /// </summary>

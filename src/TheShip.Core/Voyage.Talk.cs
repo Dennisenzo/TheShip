@@ -26,10 +26,8 @@ public sealed partial class Voyage
         Apply(text, reading, listeners);
         foreach (var l in listeners)
             Clamp(l);
-        LapseBargains();
         // The last condition of a job met by this line: the work starts by itself.
-        foreach (var l in listeners)
-            ResumeJob(l);
+        SettleJobs();
         return true;
     }
 

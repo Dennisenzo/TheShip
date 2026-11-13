@@ -120,6 +120,40 @@ public class ConditionsTests
         Assert.Contains("SLEEP", line);
     }
 
+    [Fact]
+    public void Waking_the_partner_instead_of_promising_starts_the_work()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, "alive:idris");
+        Tell(v, mara, f.DangerFact!);
+        Assert.Equal("your word to wake Idris", v.JobLeft(mara));
+        // The price lapses when the ship does what she asked without a word: the last condition is met, so the work starts.
+        v.Wake(v.Find("idris")!);
+        Assert.Null(v.BargainOf(mara));
+        Assert.Equal(f.Id, mara.WorkingOn);
+        Assert.Null(mara.Job);
+        Assert.Empty(v.JobChecklist(mara));
+    }
+
+    [Fact]
+    public void A_question_settled_by_what_she_sees_starts_the_work_on_the_clock_step()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, f.DangerFact!);
+        v.Wake(v.Find("idris")!);
+        // Still waiting on how Idris is: nobody told her.
+        Assert.Equal("alive:idris", mara.PendingQuestion);
+        Assert.NotEqual(f.Id, mara.WorkingOn);
+        // The thaw ends and she sees him: the question is settled by evidence, and the work starts without another click.
+        while (v.Find("idris")!.State == CrewState.Thawing && v.Phase == Phase.Alert)
+            v.Go();
+        Assert.Null(mara.PendingQuestion);
+        Assert.Equal(f.Id, mara.WorkingOn);
+        Assert.Null(mara.Job);
+    }
+
     /// <summary>An obedient person short of trusting, woken for the coolant leak, asked to repair: Asha at trust 45.</summary>
     private static (Voyage v, CrewMember asha, Fault f) ObedientWary()
     {
