@@ -201,7 +201,6 @@ public static class Prompts
         _ => "",
     };
 
-    /// <summary>The turn for a crew line: the last few lines of the log (this person's and the ship's) and what the game decided now.</summary>
     /// <summary>
     /// The last few lines this person saw, oldest first: their own lines and the ship's lines they heard (awake and spoken to);
     /// lines said to others or while they slept are not theirs.
@@ -211,6 +210,7 @@ public static class Prompts
                 && ((e.Kind == LogKind.Crew && e.CrewId == speaker.Id) || (e.Kind == LogKind.You && e.Hearers?.Contains(speaker.Id) == true)))
             .TakeLast(RecentLines).ToList();
 
+    /// <summary>The turn for a crew line: the last few lines of the log (this person's and the ship's) and what the game decided now.</summary>
     public static string CrewUser(CrewIntent intent, CrewMember? speaker = null, Voyage? voyage = null, LogEntry? current = null)
     {
         var sb = new StringBuilder();

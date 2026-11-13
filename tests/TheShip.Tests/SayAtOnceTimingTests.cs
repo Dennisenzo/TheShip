@@ -208,6 +208,126 @@ public class SayAtOnceTimingTests
         Assert.All(t2, t => Assert.Equal(me, t));
     }
 
+    /// <summary>
+    /// Validator finding: the timeout counted from Enter, so lines typed together behind a slow one ran out before their
+    /// own model call started and became plain talk. It now counts from when each line's call starts.
+    /// </summary>
+    [Fact]
+    public async Task Lines_typed_together_each_get_their_own_read_time()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        var main = new MainThreadQueue();
+        var llm = new SlowLlm(TimeSpan.FromMilliseconds(150), Dose);
+        using var mind = new ShipMind(v, llm, main) { ReadTimeout = TimeSpan.FromMilliseconds(200) };
+        var seen = new List<(string Text, bool Failed)>();
+        mind.LineRead += (text, _, failed) => seen.Add((text, failed));
+        mind.SayAtOnce("a", new List<CrewMember> { mara });
+        mind.SayAtOnce("b", new List<CrewMember> { mara });
+        mind.SayAtOnce("c", new List<CrewMember> { mara });
+        await Until(main, () => seen.Count == 3);
+        Assert.Equal(new[] { ("a", false), ("b", false), ("c", false) }, seen);
+    }
+
+    /// <summary>Validator finding: a timed-out call kept the worker busy, so the lines behind it timed out too. It is now cancelled.</summary>
+    [Fact]
+    public async Task A_timed_out_read_is_cancelled_and_frees_the_model_for_the_next_line()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        var main = new MainThreadQueue();
+        var llm = new FirstHangsLlm(Dose);
+        using var mind = new ShipMind(v, llm, main) { ReadTimeout = TimeSpan.FromMilliseconds(150) };
+        var seen = new List<(string Text, bool Failed)>();
+        mind.LineRead += (text, _, failed) => seen.Add((text, failed));
+        mind.SayAtOnce("a", new List<CrewMember> { mara });
+        mind.SayAtOnce("b", new List<CrewMember> { mara });
+        await Until(main, () => seen.Count == 2);
+        Assert.Equal(new[] { ("a", true), ("b", false) }, seen);
+        Assert.True(llm.FirstCancelled);
+    }
+
+    /// <summary>Validator finding: a held click that threw left the clicks behind it waiting for good.</summary>
+    [Fact]
+    public async Task A_held_click_that_throws_does_not_stop_the_ones_behind_it()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        var main = new MainThreadQueue();
+        using var mind = new ShipMind(v, new FakeLlm(), main);
+        mind.SayAtOnce("Hello.", new List<CrewMember> { mara });
+        mind.AfterReading(() => throw new InvalidOperationException("boom"));
+        var ran = false;
+        mind.AfterReading(() => ran = true);
+        Exception? thrown = null;
+        for (var i = 0; i < 300 && mind.Holding; i++)
+        {
+            try { main.Drain(); }
+            catch (InvalidOperationException e) { thrown = e; }
+            await Task.Delay(10);
+        }
+        Assert.False(mind.Holding);
+        Assert.True(ran);
+        Assert.Equal("boom", thrown?.Message); // still reported
+    }
+
+    /// <summary>A model that takes a fixed time per reading and stops when cancelled.</summary>
+    private sealed class SlowLlm(TimeSpan delay, string answer) : ILlmProvider
+    {
+        public string Name => "slow (unit tests)";
+        public string Backend => "none";
+        public event Action<LlmCallStats>? CallCompleted;
+
+        public async Task<string> ChatAsync(string system, IReadOnlyList<ChatTurn> turns, LlmOptions options,
+            Action<string>? onToken = null, CancellationToken cancellationToken = default)
+        {
+            await Task.Delay(delay, cancellationToken);
+            CallCompleted?.Invoke(new LlmCallStats(options.Kind, 0, 0, delay, delay));
+            return options.Kind == "read" ? answer : "";
+        }
+
+        public void Dispose() { }
+    }
+
+    /// <summary>A model whose first reading hangs until it is cancelled; the others answer at once.</summary>
+    private sealed class FirstHangsLlm(string answer) : ILlmProvider
+    {
+        private int _calls;
+        public bool FirstCancelled { get; private set; }
+        public string Name => "first hangs (unit tests)";
+        public string Backend => "none";
+        public event Action<LlmCallStats>? CallCompleted;
+
+        public async Task<string> ChatAsync(string system, IReadOnlyList<ChatTurn> turns, LlmOptions options,
+            Action<string>? onToken = null, CancellationToken cancellationToken = default)
+        {
+            if (options.Kind != "read")
+                return "";
+            if (Interlocked.Increment(ref _calls) == 1)
+            {
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    FirstCancelled = true;
+                    throw;
+                }
+            }
+            CallCompleted?.Invoke(new LlmCallStats(options.Kind, 0, 0, TimeSpan.Zero, TimeSpan.Zero));
+            return answer;
+        }
+
+        public void Dispose() { }
+    }
+
     /// <summary>A model whose reading only comes when the test releases it; it remembers the last read prompt.</summary>
     private sealed class HangingLlm : ILlmProvider
     {

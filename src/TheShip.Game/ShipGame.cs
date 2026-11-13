@@ -157,6 +157,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         llm.CallCompleted += s => _session.Line("llm", s.Kind + ": " + s.PromptTokens + " prompt tokens, " + s.GeneratedTokens
                                                        + " generated, first token " + s.FirstToken.TotalSeconds.ToString("0.00") + " s, total "
                                                        + s.Total.TotalSeconds.ToString("0.00") + " s" + (s.TrimmedTurns > 0 ? ", trimmed " + s.TrimmedTurns : ""));
+        _held.Clear();
         _mind = new ShipMind(_voyage, llm, _main) { ReadTimeout = TimeSpan.FromSeconds(ReadHoldSeconds) };
         _mind.LineDropped += text => _session.Line("read", "dropped by the game (nobody who heard it is awake, or the voyage had ended): " + text);
         _mind.Trace += text => _session.Line("model", text);
@@ -179,8 +180,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     }
 
     /// <summary>
-    /// The longest a click that changes the game waits for the reading of a line said before it (a hanging model);
-    /// after that the line is applied as plain talk. Readings take about 0.4 s.
+    /// The longest the model may take over the reading of a said line, counted from when it starts on it (a hanging model);
+    /// after that the call is stopped and the line is applied as plain talk. Readings take about 0.4 s.
     /// </summary>
     private const double ReadHoldSeconds = 5;
 
@@ -193,6 +194,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     {
         void Run()
         {
+            _held.Remove(what);
             _session?.Line("click", what);
             action();
             if (snapshot && _voyage is not null)
@@ -201,11 +203,38 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
                 _session?.Snapshot(_voyage);
             }
         }
-        if (_mind is not null)
-            _mind.AfterReading(Run);
-        else
+        if (_mind is null)
+        {
             Run();
+            return;
+        }
+        if (_mind.Holding)
+        {
+            // A clock move clicked twice while a line is read would move the clock twice once it lands: the second is ignored.
+            if (snapshot && !_held.Add(what))
+            {
+                _session?.Line("click", what + " (ignored: the same click is already waiting for the reading)");
+                return;
+            }
+        }
+        _mind.AfterReading(Run);
     });
+
+    /// <summary>Clock moves waiting for a said line to be read (<see cref="Act"/>), so a second identical click is ignored.</summary>
+    private readonly HashSet<string> _held = new();
+
+    /// <summary>
+    /// While a said line is being read the clicks that change the game wait for it: a small note at the right of the
+    /// input line says so, so a held Advance does not look like a dead button.
+    /// </summary>
+    private void DrawHoldNote(Rectangle inputLine)
+    {
+        if (_mind is not { Holding: true })
+            return;
+        var dots = new string('.', 1 + (int)(DateTime.UtcNow.TimeOfDay.TotalMilliseconds / 400 % 3));
+        var text = (_held.Count > 0 ? "reading your line, your click waits" : "reading your line") + dots.PadRight(3);
+        _p.TextRight(_p.Small, text, inputLine.Right - 14, inputLine.Y + 14, Painter.Dim);
+    }
 
     /// <summary>How the 1600 x 900 layout sits in the window: its scale and its top-left corner.</summary>
     private (float Scale, float X, float Y) View()

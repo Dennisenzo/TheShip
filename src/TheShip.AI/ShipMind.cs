@@ -46,10 +46,17 @@ public sealed class ShipMind : IDisposable
     public static readonly TimeSpan DefaultReadTimeout = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// How long a said line waits for its reading before it is applied as plain talk, so a hanging model never holds
-    /// the player's clicks for long. Taken when the line is typed.
+    /// How long the model may take to read a said line, counted from when its model call starts (not from Enter: a line
+    /// typed right behind another waits its turn first). After that the call is cancelled and the line is applied as
+    /// plain talk, so a hanging model never holds the player's clicks for long. Taken when the line is typed.
     /// </summary>
     public TimeSpan ReadTimeout { get; set; } = DefaultReadTimeout;
+
+    /// <summary>
+    /// The backstop counted from Enter, in read timeouts per line still waiting ahead plus this many: a line whose model
+    /// call never starts (a crew line hanging on the worker) is applied as plain talk all the same.
+    /// </summary>
+    private const int QueueSlackTimeouts = 2;
 
     /// <summary>
     /// One thing waiting its turn on the game thread: a said line until its reading is applied, or a click that changes
@@ -63,6 +70,8 @@ public sealed class ShipMind : IDisposable
         public List<CrewMember> Hearers = new();
         public bool Ready;
         public Reading? Reading;
+        /// <summary>Cancels the line's model call once it has timed out (or skips it if it never started).</summary>
+        public readonly CancellationTokenSource Cancel = new();
     }
 
     /// <summary>Lines and held clicks in the order they came; touched on the game thread only.</summary>
@@ -88,10 +97,16 @@ public sealed class ShipMind : IDisposable
         var entry = _voyage.BeginSay(text, heard);
         var prompt = BuildReadPrompt(text, heard);
         var step = new Step { Entry = entry, Text = text, Hearers = heard };
+        var ahead = _steps.Count(s => s.Action is null);
         _steps.Enqueue(step);
-        _ = ReadStep(step, prompt);
-        _ = ExpireStep(step, ReadTimeout);
+        var timeout = ReadTimeout;
+        // The timeout runs from when the model starts on this line; the backstop from now, in case it never does.
+        _ = ReadStep(step, prompt, () => _ = ExpireStep(step, timeout, "after " + Seconds(timeout) + " s of reading"));
+        var backstop = timeout * (ahead + QueueSlackTimeouts);
+        _ = ExpireStep(step, backstop, "waiting " + Seconds(backstop) + " s for the model to start on it");
     }
+
+    private static string Seconds(TimeSpan t) => t.TotalSeconds.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>
     /// A click that changes the game (game thread): it runs now when no said line is waiting for its reading, otherwise
@@ -105,9 +120,9 @@ public sealed class ShipMind : IDisposable
             _steps.Enqueue(new Step { Action = action });
     }
 
-    private async Task ReadStep(Step step, ReadPrompt prompt)
+    private async Task ReadStep(Step step, ReadPrompt prompt, Action started)
     {
-        var raw = await Ask(prompt);
+        var raw = await Ask(prompt, step.Cancel.Token, started);
         _main.Post(() =>
         {
             if (step.Ready)
@@ -118,41 +133,57 @@ public sealed class ShipMind : IDisposable
         });
     }
 
-    private async Task ExpireStep(Step step, TimeSpan timeout)
+    private async Task ExpireStep(Step step, TimeSpan timeout, string why)
     {
         await Task.Delay(timeout);
         _main.Post(() =>
         {
             if (step.Ready)
                 return;
-            Trace?.Invoke("read \"" + step.Text + "\" timed out after " + timeout.TotalSeconds.ToString("0.#") + " s; applied as plain talk");
+            Trace?.Invoke("read \"" + step.Text + "\" timed out " + why + "; applied as plain talk");
             step.Ready = true;
+            // Frees the worker for the lines behind it: the running call stops, a queued one is skipped.
+            step.Cancel.Cancel();
             Pump();
         });
     }
 
-    /// <summary>Applies the lines whose reading is in and runs the clicks held behind them, in order, up to the first line still being read.</summary>
+    /// <summary>
+    /// Applies the lines whose reading is in and runs the clicks held behind them, in order, up to the first line still
+    /// being read. A step that throws does not stop the ones behind it; the first exception is rethrown afterwards.
+    /// </summary>
     private void Pump()
     {
+        Exception? failed = null;
         while (_steps.TryPeek(out var step) && (step.Action is not null || step.Ready))
         {
             _steps.Dequeue();
-            if (step.Action is not null)
+            try
             {
-                step.Action();
-                continue;
+                if (step.Action is not null)
+                {
+                    step.Action();
+                    continue;
+                }
+                var applied = step.Reading ?? Reading.Plain;
+                if (!_voyage.Say(step.Text, applied, step.Hearers, step.Entry))
+                    LineDropped?.Invoke(step.Text);
+                LineRead?.Invoke(step.Text, applied, step.Reading is null);
             }
-            var applied = step.Reading ?? Reading.Plain;
-            if (!_voyage.Say(step.Text, applied, step.Hearers, step.Entry))
-                LineDropped?.Invoke(step.Text);
-            LineRead?.Invoke(step.Text, applied, step.Reading is null);
+            catch (Exception e)
+            {
+                Trace?.Invoke("a held step failed: " + e.GetType().Name + ": " + e.Message);
+                failed ??= e;
+            }
         }
+        if (failed is not null)
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failed).Throw();
     }
 
     /// <summary>The model's reading of one line; nothing reaches the voyage here. Null when the model's answer could not be used.</summary>
     internal async Task<Reading?> Read(string text, IReadOnlyList<CrewMember> hearers)
     {
-        var raw = await Ask(BuildReadPrompt(text, hearers));
+        var raw = await Ask(BuildReadPrompt(text, hearers), CancellationToken.None, null);
         return await _main.Run(() => ParseCounted(raw));
     }
 
@@ -162,14 +193,25 @@ public sealed class ShipMind : IDisposable
         new LlmOptions("read", MaxTokens: 80, Temperature: 0f,
             Grammar: Grammars.ReadingFor(_voyage.FactList.Select(f => f.Key)), Dialogue: false));
 
-    /// <summary>Asks the model for a reading; touches no voyage state. Empty when the call failed.</summary>
-    private async Task<string> Ask(ReadPrompt prompt)
+    /// <summary>
+    /// Asks the model for a reading; touches no voyage state. Empty when the call failed or was cancelled.
+    /// <paramref name="started"/> runs (on the worker) when the model call starts.
+    /// </summary>
+    private async Task<string> Ask(ReadPrompt prompt, CancellationToken cancel, Action? started)
     {
         var raw = "";
         try
         {
-            raw = await _worker.Enqueue(LlmPriority.Reading,
-                (llm, ct) => llm.ChatAsync(prompt.System, new[] { new ChatTurn("user", prompt.User) }, prompt.Options, null, ct));
+            raw = await _worker.Enqueue(LlmPriority.Reading, (llm, ct) =>
+            {
+                started?.Invoke();
+                return llm.ChatAsync(prompt.System, new[] { new ChatTurn("user", prompt.User) }, prompt.Options, null, ct);
+            }, cancel);
+        }
+        catch (OperationCanceledException)
+        {
+            Trace?.Invoke("read \"" + prompt.Text + "\" cancelled");
+            return raw;
         }
         catch (Exception e)
         {
@@ -298,14 +340,19 @@ public sealed class ShipMind : IDisposable
         if (string.IsNullOrWhiteSpace(text) || text == "..." || text.Length > Prompts.CrewLineMaxChars)
             return false;
         var stated = string.Join(" ", SentenceEnd.Split(text).Where(s => !s.TrimEnd().EndsWith('?')));
-        var claims = RuleReader.Claims(stated, _voyage.FactList);
+        var claims = RuleReader.Claims(stated, _voyage.FactList).Select(c => new PersonClaim(c.Fact, c.Value, false)).ToList();
         if (context != null)
-            claims.AddRange(RuleReader.PersonClaims(stated, context, _voyage.Crew, _voyage.FactList));
-        foreach (var (fact, value) in claims)
+            // The whole text, so "Asha? She is dead." still knows who "she" is; questions are skipped inside.
+            claims.AddRange(RuleReader.PersonReferences(text, context, _voyage.Crew, _voyage.FactList));
+        foreach (var (fact, value, weak) in claims)
         {
-            if (beliefs.TryGetValue(fact.Key, out var held) && fact.Same(held.Value, value))
+            var holds = beliefs.TryGetValue(fact.Key, out var held);
+            if (holds && fact.Same(held!.Value, value))
                 continue;
             if (decision.Contains(fact.Say(value), StringComparison.OrdinalIgnoreCase))
+                continue;
+            // A pronoun only guessed from the recent lines ("she's holding" may be the pump): wrong only against what the speaker believes.
+            if (weak && !holds)
                 continue;
             return false;
         }

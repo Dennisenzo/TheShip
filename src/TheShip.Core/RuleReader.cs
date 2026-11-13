@@ -78,17 +78,47 @@ public static class RuleReader
     /// </summary>
     public static List<(Fact Fact, string Value)> Claims(string text, IEnumerable<Fact> facts)
     {
-        var line = " " + text.ToLowerInvariant().Trim() + " ";
         var claims = new List<(Fact Fact, string Value)>();
-        foreach (var fact in facts)
+        var factList = facts.ToList();
+        // Sentence by sentence, so "If Idris is dead, ..." can be skipped without hiding a plain claim next to it.
+        foreach (var sentence in SentenceSplit.Split(text.ToLowerInvariant().Replace('’', '\'')))
         {
-            if (fact.Numeric || !fact.Cues.Any(line.Contains))
+            var line = " " + sentence.Trim() + " ";
+            if (line.Trim().Length == 0)
                 continue;
-            var value = ValueIn(line, fact);
-            if (value != null)
-                claims.Add((fact, value));
+            foreach (var fact in factList)
+            {
+                if (fact.Numeric || claims.Any(c => c.Fact == fact))
+                    continue;
+                var cue = fact.Cues.Select(c => line.IndexOf(c, StringComparison.Ordinal)).Where(i => i >= 0).DefaultIfEmpty(-1).Min();
+                if (cue < 0 || Hedged(line[..cue]))
+                    continue;
+                var value = ValueIn(line, fact);
+                if (value != null)
+                    claims.Add((fact, value));
+            }
         }
         return claims;
+    }
+
+    private static readonly Regex SentenceSplit = new(@"(?<=[.!?;])\s+", RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Words that make what follows them in a sentence not a statement of fact: a condition ("if he's dead"), a denial
+    /// asked for ("don't tell me he's dead"), a belief or a guess ("I think", "maybe"), a counterfactual ("could have
+    /// killed him", "nearly"). A crew line may voice a fear it doesn't know to be true.
+    /// </summary>
+    private static readonly Regex Hedge = new(
+        @"\b(?:if|unless|whether|in case|suppose|supposing|what if|i think|i thought|i fear|i guess|i suppose|i bet|i doubt|i hope|"
+        + @"maybe|perhaps|probably|possibly|might|may|could|would|couldn't|wouldn't|could've|would've|might've|should have|should've|"
+        + @"nearly|almost|don't tell me|do not tell me|don't say|do not say|afraid that|scared that|worried that)\b",
+        RegexOptions.CultureInvariant);
+
+    /// <summary>Whether the text of a sentence before a claim makes the claim a condition, a guess or a counterfactual.</summary>
+    private static bool Hedged(string before)
+    {
+        var start = before.LastIndexOfAny(new[] { '.', '!', '?', ';' }) + 1;
+        return Hedge.IsMatch(before[start..]);
     }
 
     // ---- references to people in a crew line ("he's fine", "my partner is dead") ----
@@ -96,7 +126,7 @@ public static class RuleReader
     /// <summary>A subject that may stand for a crew member: a pronoun, or "my/our/the" and a relation word.</summary>
     private static readonly Regex PersonSubject = new(@"\b(?:(?<pro>he|she|they)|(?:my|our|the)\s+(?<rel>[a-z]+))(?=['\s])", RegexOptions.CultureInvariant);
 
-    /// <summary>"killed him", "lost her": a death said about the object of the verb.</summary>
+    /// <summary>"killed him", "lost her": a death said about the object of the verb ("lost her trust" is told apart in code).</summary>
     private static readonly Regex DeathOfObject = new(@"\b(?:killed|lost|buried)\s+(?<pro>him|her|them)\b", RegexOptions.CultureInvariant);
 
     /// <summary>Where a clause ends: what follows is no longer said about the subject.</summary>
@@ -132,9 +162,18 @@ public static class RuleReader
     /// speaker's bonds and the crew's roles. When a tier holds several people the claim is returned for each of them, so a
     /// line that would be wrong for any of them is rejected (DESIGN.md, "Keeping the model inside the facts").
     /// </summary>
-    public static List<(Fact Fact, string Value)> PersonClaims(string text, LineContext context, IReadOnlyList<CrewMember> crew, IEnumerable<Fact> facts)
+    public static List<(Fact Fact, string Value)> PersonClaims(string text, LineContext context, IReadOnlyList<CrewMember> crew, IEnumerable<Fact> facts) =>
+        PersonReferences(text, context, crew, facts).Select(c => (c.Fact, c.Value)).ToList();
+
+    /// <summary>
+    /// <see cref="PersonClaims"/> with how sure the resolution is. A weak one (the pronoun went to the last person named in
+    /// the recent lines) may well mean a machine ("she's holding" about the pump), so it only counts against the line when
+    /// the speaker believes the opposite; a strong one (named in the line, the decision, the pending question, the partner,
+    /// a relation word) must be known.
+    /// </summary>
+    public static List<PersonClaim> PersonReferences(string text, LineContext context, IReadOnlyList<CrewMember> crew, IEnumerable<Fact> facts)
     {
-        var claims = new List<(Fact Fact, string Value)>();
+        var claims = new List<PersonClaim>();
         var alive = facts.Where(f => f.Key.StartsWith("alive:", StringComparison.Ordinal) && f.SubjectId != null)
             .ToDictionary(f => f.SubjectId!, StringComparer.Ordinal);
         if (alive.Count == 0)
@@ -143,63 +182,109 @@ public static class RuleReader
         var line = " " + text.ToLowerInvariant().Replace('’', '\'').Trim() + " ";
         var speaker = crew.FirstOrDefault(c => c.Id == context.SpeakerId);
 
-        void Add(IEnumerable<CrewMember> people, string value)
+        void Add(IEnumerable<CrewMember> people, string value, bool weak)
         {
             foreach (var p in people)
                 if (alive.TryGetValue(p.Id, out var fact))
-                    claims.Add((fact, value));
+                    claims.Add(new PersonClaim(fact, value, weak));
         }
 
         foreach (Match m in PersonSubject.Matches(line))
         {
+            if (InQuestion(line, m.Index))
+                continue;
             var after = line[(m.Index + m.Length)..];
             var end = ClauseEnd.Match(after);
             var words = (end.Success ? after[..end.Index] : after).Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (words.Length == 0 || !(words[0].StartsWith('\'') || LinkWords.Contains(words[0])))
                 continue;
-            var value = ValueIn(" " + string.Join(' ', words.Take(5)) + " ", anyLife);
+            var said = " " + string.Join(' ', words.Take(5)) + " ";
+            var value = ValueIn(said, anyLife);
             if (value is null)
                 continue;
-            Add(m.Groups["pro"].Success
-                ? ByPronoun(m.Groups["pro"].Value, line[..m.Index], context, speaker, crew)
-                : ByRelation(m.Groups["rel"].Value, speaker, crew), value);
+            // "If he's dead", "I think he's gone", "he might be dead": a fear or a guess, not a statement.
+            if (Hedged(line[..m.Index]) || Hedge.IsMatch(said))
+                continue;
+            if (m.Groups["pro"].Success)
+            {
+                var (people, weak) = ByPronoun(m.Groups["pro"].Value, line[..m.Index], context, speaker, crew);
+                Add(people, value, weak);
+            }
+            else
+                Add(ByRelation(m.Groups["rel"].Value, speaker, crew), value, false);
         }
         foreach (Match m in DeathOfObject.Matches(line))
         {
+            if (InQuestion(line, m.Index))
+                continue;
+            // "lost her trust": "her" is a possessive when a word other than a small linking word follows.
+            if (m.Groups["pro"].Value == "her" && PossessiveNext(line[(m.Index + m.Length)..]))
+                continue;
+            // "could have killed him", "nearly killed her": it did not happen.
+            if (Hedged(line[..m.Index]))
+                continue;
             var pronoun = m.Groups["pro"].Value switch { "him" => "he", "her" => "she", _ => "they" };
-            Add(ByPronoun(pronoun, line[..m.Index], context, speaker, crew), "dead");
+            var (people, weak) = ByPronoun(pronoun, line[..m.Index], context, speaker, crew);
+            Add(people, "dead", weak);
         }
         return claims;
     }
 
-    /// <summary>The people a pronoun most likely means (the first tier that has anyone); empty when nobody fits.</summary>
-    private static List<CrewMember> ByPronoun(string pronoun, string before, LineContext context, CrewMember? speaker, IReadOnlyList<CrewMember> crew)
+    /// <summary>Whether the sentence around <paramref name="at"/> is a question ("He's fine, isn't he?"): it states nothing.</summary>
+    private static bool InQuestion(string line, int at)
+    {
+        var end = line.IndexOfAny(new[] { '.', '!', '?' }, at);
+        return end >= 0 && line[end] == '?';
+    }
+
+    /// <summary>Words that may follow an object pronoun ("lost her in the dark", "killed him too"); any other word makes "her" a possessive.</summary>
+    private static readonly HashSet<string> AfterObject = new(StringComparer.Ordinal)
+    {
+        "in", "on", "at", "to", "with", "for", "from", "by", "into", "out", "off", "up", "down", "over", "under", "and", "but", "or", "so",
+        "too", "as", "then", "now", "there", "here", "already", "again", "back", "all", "both", "when", "while", "because", "after",
+        "before", "during", "just", "yesterday", "today", "last", "years", "months", "weeks", "days", "ago", "once", "twice", "myself",
+        "yourself", "ourselves", "themselves", "himself", "herself", "instead", "anyway", "first", "finally", "either", "neither",
+        "you", "i", "we", "he", "she", "they", "it", "that", "this", "the", "a", "an",
+    };
+
+    private static bool PossessiveNext(string after)
+    {
+        var m = Regex.Match(after, @"^\s+(?<w>[a-z']+)", RegexOptions.CultureInvariant);
+        return m.Success && !AfterObject.Contains(m.Groups["w"].Value);
+    }
+
+    /// <summary>
+    /// The people a pronoun most likely means (the first tier that has anyone); empty when nobody fits. Weak when it only
+    /// comes from the recent lines.
+    /// </summary>
+    private static (List<CrewMember> People, bool Weak) ByPronoun(string pronoun, string before, LineContext context, CrewMember? speaker, IReadOnlyList<CrewMember> crew)
     {
         var others = crew.Where(c => c.Id != context.SpeakerId && (pronoun == "they" || c.Pronoun is null || c.Pronoun == pronoun)).ToList();
         if (others.Count == 0)
-            return others;
+            return (others, false);
 
         // Someone named earlier in the same line: "Idris? He's fine."
         if (LastNamed(before, others) is { } inLine)
-            return new List<CrewMember> { inLine };
+            return (new List<CrewMember> { inLine }, false);
 
         // The person this turn is about: named in the decision, or the one the speaker asked after.
         var subject = others.Where(c => NameIn(context.Decision.ToLowerInvariant(), c) >= 0).ToList();
         if (context.PendingQuestion is { } q && q.StartsWith("alive:", StringComparison.Ordinal))
             subject.AddRange(others.Where(c => c.Id == q["alive:".Length..] && !subject.Contains(c)));
         if (subject.Count > 0)
-            return subject;
+            return (subject, false);
         // "They" is often the pods, the stores or Earth: only a person this turn is about stands for it.
         if (pronoun == "they")
-            return new List<CrewMember>();
+            return (new List<CrewMember>(), false);
 
         // The last person named in what was just said.
         for (var i = context.RecentLines.Count - 1; i >= 0; i--)
             if (LastNamed(context.RecentLines[i].ToLowerInvariant(), others) is { } recent)
-                return new List<CrewMember> { recent };
+                return (new List<CrewMember> { recent }, true);
 
-        // With nothing else to go on, "he" from Mara means Idris.
-        return others.Where(c => c.Id == speaker?.PartnerId).ToList();
+        // With nothing else to go on, "he" from Mara means Idris. Kept strict: "He's fine, I assume." from Mara, who knew
+        // nothing of Idris, is the line this check was written for.
+        return (others.Where(c => c.Id == speaker?.PartnerId).ToList(), false);
     }
 
     /// <summary>The people "my partner", "our navigator" or "the commander" names: the speaker's bonds that use the word, else the role.</summary>
@@ -225,6 +310,12 @@ public static class RuleReader
         return m.Success ? m.Index : -1;
     }
 
+    /// <summary>"Gone back to sleep" is not "gone": phrases where a value cue means something else.</summary>
+    private static readonly string[] Idioms = { "gone back to sleep", "gone to sleep", "gone back under", "gone to bed", "gone back to bed" };
+
+    private static bool NotACue(string line, int at, string cue) =>
+        Idioms.Any(i => i.StartsWith(cue, StringComparison.Ordinal) && string.CompareOrdinal(line, at, i, 0, i.Length) == 0);
+
     /// <summary>The value of <paramref name="fact"/> the line names, or null.</summary>
     private static string? ValueIn(string line, Fact fact)
     {
@@ -236,7 +327,7 @@ public static class RuleReader
         // Longest cue first, so "not dead" and "no word" are not read through their shorter parts.
         var best = fact.ValueCues
             .SelectMany(kv => kv.Value.Select(cue => (Value: kv.Key, Cue: cue, At: line.IndexOf(cue, StringComparison.Ordinal))))
-            .Where(hit => hit.At >= 0)
+            .Where(hit => hit.At >= 0 && !NotACue(line, hit.At, hit.Cue))
             .OrderByDescending(hit => hit.Cue.Length)
             .FirstOrDefault();
         if (best.Cue is null)
@@ -255,3 +346,6 @@ public static class RuleReader
 /// (oldest first). A snapshot, so the check can run off the main thread.
 /// </summary>
 public sealed record LineContext(string SpeakerId, string Decision, string? PendingQuestion, IReadOnlyList<string> RecentLines);
+
+/// <summary>A life claim a crew line makes through a reference (<see cref="RuleReader.PersonReferences"/>); weak when the reference was a guess from the recent lines.</summary>
+public sealed record PersonClaim(Fact Fact, string Value, bool Weak);

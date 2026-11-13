@@ -105,6 +105,22 @@ public class CrewLineReferenceTests
     [InlineData("The ship is fine. My hands are not.")]
     [InlineData("I'll do it for him, and for the others.")]
     [InlineData("Right. Thirty years of fixing other people's leaks and now it is mine. Give me a minute with the valve.")]
+    // Validator findings (fix/read-timeout-and-pronoun-false-rejects): a possessive or a counterfactual is no death,
+    // "she" for a machine is no crewmate, and a fear, a condition or a guess states nothing.
+    [InlineData("That dose could have killed him.")]
+    [InlineData("You nearly killed her with that order.")]
+    [InlineData("You lost her trust a long time ago.")]
+    [InlineData("She's fine now. The pump will hold.")]
+    [InlineData("She's holding.")]
+    [InlineData("She's well within tolerance.")]
+    [InlineData("She has gone quiet on me.")]
+    [InlineData("She is still asleep, leave her.")]
+    [InlineData("If he's dead, I want to hear it from you.")]
+    [InlineData("I think he's dead and you won't say it.")]
+    [InlineData("Don't tell me he's dead.")]
+    [InlineData("He's gone back to sleep, then. Good.")]
+    [InlineData("If Idris is dead, I want to hear it from you.")]
+    [InlineData("Maybe Asha is gone. Don't tell me Jonah is dead.")]
     public void Ordinary_lines_are_not_rejected_by_the_reference_check(string line)
     {
         var v = new Voyage(1);
@@ -112,5 +128,26 @@ public class CrewLineReferenceTests
         foreach (var speaker in new[] { "mara", "lin", "tomas" })
             Assert.True(mind.Acceptable(line, Nothing, "You agree to take on the coolant leak.",
                 Context(speaker, "You agree to take on the coolant leak.", null, "Idris is in his pod.", "Stay calm, Asha is here.")), speaker + ": " + line);
+    }
+
+    /// <summary>The loosened checks still catch a plain claim the speaker can't make.</summary>
+    [Fact]
+    public void Plain_claims_are_still_rejected()
+    {
+        var v = new Voyage(1);
+        using var mind = new ShipMind(v, new FakeLlm(), new MainThreadQueue { Immediate = true });
+        const string decision = "You agree to take on the coolant leak.";
+        var recent = Context("lin", decision, null, "Stay calm, Asha is here.");
+        // Named: a plain statement, and a hedge in another sentence doesn't cover it.
+        Assert.False(mind.Acceptable("Idris is dead.", Nothing, decision, recent));
+        Assert.False(mind.Acceptable("I think so. Idris is dead.", Nothing, decision, recent));
+        // Strong references keep the strict check.
+        Assert.False(mind.Acceptable("We lost him.", Nothing, decision, Context("mara", decision)));
+        Assert.False(mind.Acceptable("Asha? She is dead.", Nothing, decision, recent));
+        Assert.False(mind.Acceptable("She is dead.", Nothing, "You hear what happened to Asha.", Context("lin", "You hear what happened to Asha.")));
+        // A pronoun guessed from the recent lines is wrong when the speaker believes the opposite.
+        Assert.False(mind.Acceptable("She is dead.", Holds("alive:asha", "alive"), decision, recent));
+        Assert.True(mind.Acceptable("She is fine.", Holds("alive:asha", "alive"), decision, recent));
+        Assert.True(mind.Acceptable("She is fine.", Nothing, decision, recent));
     }
 }
