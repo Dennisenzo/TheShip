@@ -135,6 +135,7 @@ public static class Scenario
 
         // The coolant bay is hot from the start: the repair always gives a dose.
         facts.First(f => f.Key == "dose").Truth = "dosed";
+        facts.First(f => f.Key == "dose").Noun = "radiation dose";
 
         foreach (var c in crew)
         {
@@ -179,9 +180,9 @@ public static class Scenario
     {
         ("coolant", "coolant leak", "", "worn seal", "cracked line", "the coolant leak is a worn seal", "the coolant leak is a cracked line the builders knew about",
             new[] { "seal", "gasket", "coolant line" }, new[] { "worn", "old seal", "wear", "gasket" }, new[] { "cracked", "crack", "builders knew", "design flaw" }, 8),
-        ("pod", "pod failure", "", "one-off", "bank wear", "the pod failure was a one-off fault in a single pod", "the pod failure is wear in the whole bank, and the other pods will follow",
+        ("pod", "pod failure", "", "one-off", "bank wear", "the pod failure was a one-off fault in a single pod", "the pod failure is wear in the whole bank; other pods will follow",
             new[] { "failed pod", "pod failure", "one pod" }, new[] { "one-off", "single pod", "isolated" }, new[] { "whole bank", "every pod", "all the pods", "will follow" }, 8),
-        ("illness", "sleeper illness", "", "infection", "bad feed", "the sleeper illness is a common infection", "the sleeper illness comes from a contaminated feed that could spread through the bank",
+        ("illness", "sleeper illness", "", "infection", "bad feed", "the sleeper illness is a common infection", "the sleeper illness comes from a bad feed that can spread in the bank",
             new[] { "illness", "sickness", "infection", "fever" }, new[] { "infection", "common", "ordinary" }, new[] { "contaminated", "spread", "spreads", "feed" }, 8),
         ("nav", "navigation drift", "", "gyro drift", "bent mount", "the navigation drift is a drifting gyro", "the navigation drift is a tracker mount bent by a hull strike",
             new[] { "tracker", "star tracker", "gyro" }, new[] { "gyro", "recalibrate", "calibration" }, new[] { "bent", "hull strike", "struck", "mount" }, 8),

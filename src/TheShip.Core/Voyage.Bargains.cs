@@ -262,7 +262,9 @@ public sealed partial class Voyage
         }
         _idleWarned = false;
         var terms = c.WorkingOn == f.Id && c.Terms is { } kept && kept.FaultId == f.Id ? kept : TermsFor(c, f);
-        if (c.WorkingOn != f.Id)
+        // The terms are fixed now, on the first start; another click for someone already on the fault keeps them.
+        var fixing = c.WorkingOn != f.Id;
+        if (fixing)
         {
             TermStats.Starts++;
             if (terms.CauseBriefed)
@@ -280,9 +282,10 @@ public sealed partial class Voyage
         var task = TaskText(f, patch);
         var knowing = terms.RiskBriefed ? " You know the danger, so you take precautions and work slower." : "";
         Speak(c, kind, (decision ?? "You agree to take on " + task + ".") + knowing, task);
-        if (terms.RiskBriefed)
-            Recorded(c.Name + " starts " + TaskText(f, patch) + " knowing " + _facts[f.DangerFact!].Say(c.Beliefs[f.DangerFact!].Value)
-                     + ": precautions, work " + (int)Math.Round((1 - terms.RateFactor) * 100) + "% slower, dose and injury chance halved.");
+        if (fixing && terms.RiskBriefed)
+            Recorded("Recorded: " + c.Name + " starts " + TaskText(f, patch) + " believing that " + _facts[f.DangerFact!].Say(c.Beliefs[f.DangerFact!].Value)
+                     + ": precautions, work " + (int)Math.Round((1 - terms.RateFactor) * 100) + "% slower, dose and injury chance "
+                     + (Math.Abs(terms.HarmShare - 0.5) < 1e-9 ? "halved." : "cut to " + Num(terms.HarmShare * 100) + "%."));
         if (!Staffed(f))
             Ship(f.Name + " needs " + f.People + " people before the work can start.");
     }

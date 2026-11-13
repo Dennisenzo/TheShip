@@ -118,7 +118,7 @@ public sealed partial class ShipGame
                 if (f.DangerFact is { } danger)
                     y = _p.Paragraph("Known to you: " + v.GetFact(danger).Say(v.GetFact(danger).Truth) + ".", ix, y, inner, Painter.Dim);
                 if (v.CauseKnown(f) is { } cause)
-                    y = _p.Paragraph("Cause: " + cause, ix, y, inner, Painter.Dim);
+                    y = _p.Paragraph("Cause: " + cause + ".", ix, y, inner, Painter.Dim);
                 if (f.ExposureFact is { } seen)
                     y = _p.Paragraph("Whoever works here learns " + v.GetFact(seen).Label + ".", ix, y, inner, Painter.Dim);
                 y += 8;
@@ -239,7 +239,8 @@ public sealed partial class ShipGame
         var words = text.Split(' ').ToList();
         while (words.Count > 1 && _p.Lines(string.Join(' ', words) + "..", width) > maxLines)
             words.RemoveAt(words.Count - 1);
-        return string.Join(' ', words) + "..";
+        // No punctuation before the cut mark ("seal,.." or "seal..."): the mark ends the words.
+        return string.Join(' ', words).TrimEnd('.', ',', ';', ':') + "..";
     }
 
     /// <summary>The text cut to fit one line of <paramref name="width"/> pixels in a font whose characters are <paramref name="charWidth"/> wide.</summary>
@@ -278,7 +279,7 @@ public sealed partial class ShipGame
         var where = v.GetSection(f.Section)?.Name ?? "";
         var needs = SectionName(where) + ". " + Patient(v, f) + f.Skill + Nb + f.Level + (f.People > 1 ? ", " + f.People + Nb + "people" : "") + ", " + N(f.Hours) + Nb + "h.";
         var extra = f.DangerFact is { } danger ? "Known: " + v.GetFact(danger).Say(v.GetFact(danger).Truth) + "."
-            : v.CauseKnown(f) is { } cause ? "Cause: " + cause
+            : v.CauseKnown(f) is { } cause ? "Cause: " + cause + "."
             : f.ExposureFact is { } seen ? "Whoever works here learns " + v.GetFact(seen).Label + "." : "";
         var workers = v.Awake.Where(c => c.WorkingOn == f.Id).Select(c => c.Name).ToList();
         var split = IssueCardLayout.Split(shown, _p.Lines(needs, inner), extra.Length == 0 ? 0 : _p.Lines(extra, inner), workers.Count > 0);
@@ -766,6 +767,8 @@ public sealed partial class ShipGame
             _p.TextRight(_p.Small, "select a person for stakes", x + width - 12, waiting.Y + 10, Painter.Dim);
         var wy = waiting.Y + 36;
         var limit = waiting.Bottom - 22;
+        // The terms item is shown short (two rows); its full text is the tooltip.
+        var terms = _target != null ? v.TermsItem(_target) : null;
         foreach (var (who, item) in Waiting(v, _target))
         {
             // An item that doesn't fit is left out; a shorter one after it may still fit.
@@ -785,6 +788,8 @@ public sealed partial class ShipGame
                     Do(() => _target = person);
                 }
             }
+            if (terms is { } t && who == _target && item == t.Short)
+                _p.Tip(row, t.Full);
             wy = _p.Paragraph(item, x + 12, wy, width - 24, Painter.Ink) + 4;
         }
     }
@@ -824,9 +829,10 @@ public sealed partial class ShipGame
                 ? " The crew hold the logs too: no promise to them can be kept now."
                 : " Promise one of them to open the logs, have every log open when it falls due, and win their trust above "
                   + Tuning.BayReturnTrust.ToString("0") + " to get it back."));
-        // The terms the selected idle person would work their likely job on (dropped when it doesn't fit).
+        // The terms the selected idle person would work their likely job on, in two rows (the full text is the row's tooltip), so they
+        // still fit under a six-row stakes item or a four-row bargain.
         if (selected != null && v.TermsItem(selected) is { } terms)
-            yield return (selected, terms);
+            yield return (selected, terms.Short);
         var owed = v.Ledger().Where(e => e.State == "open").ToList();
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {

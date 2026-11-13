@@ -23,20 +23,22 @@ public class WorkTermsTests
         return (v, mara, v.FindFault("")!);
     }
 
-    /// <summary>Starts the repair and runs it until it holds; null when it failed (the seed does not suit).</summary>
-    private static (Voyage V, CrewMember Mara, Fault Fault)? Repaired(int seed, string? dose)
+    /// <summary>Starts the repair and runs it until it holds; null when it failed (the seed does not suit). <paramref name="later"/> is told after the start.</summary>
+    private static (Voyage V, CrewMember Mara, Fault Fault)? Repaired(int seed, string? dose, string? later = null)
     {
         var (v, mara, f) = Ready(seed, dose);
         v.AssignDeal(mara, f, patch: false);
+        if (later != null)
+            Tell(v, mara, "dose", later);
         for (var i = 0; i < 6 && !f.Resolved; i++)
             v.Go();
         return f.State == FaultState.Repaired && mara.Alive ? (v, mara, f) : null;
     }
 
-    private static (Voyage V, CrewMember Mara, Fault Fault) FirstRepaired(string? dose)
+    private static (Voyage V, CrewMember Mara, Fault Fault) FirstRepaired(string? dose, string? later = null)
     {
         for (var seed = 1; seed < 60; seed++)
-            if (Repaired(seed, dose) is { } r)
+            if (Repaired(seed, dose, later) is { } r)
                 return r;
         throw new Xunit.Sdk.XunitException("no seed repaired the coolant leak");
     }
@@ -78,13 +80,18 @@ public class WorkTermsTests
         var (v, mara, f) = Ready(1, "dosed");
         v.AssignDeal(mara, f, patch: false);
         Assert.True(mara.Terms!.RiskBriefed);
-        var line = v.Log.Single(e => e.Kind == LogKind.Recorded && e.Text.StartsWith("Mara starts")).Text;
+        var line = v.Log.Single(e => e.Kind == LogKind.Recorded && e.Text.StartsWith("Recorded: Mara starts")).Text;
         Assert.Contains("precautions", line);
         Assert.Contains("10% slower", line);
+        Assert.Contains("believing that working in the coolant bay gives a radiation dose:", line);
+        Assert.EndsWith(Tuning.PrecautionHarm == 0.5 ? "halved." : "%.", line);
+        // Another Repair click for someone already on the fault keeps the terms and records nothing new.
+        v.AssignDeal(mara, f, patch: false);
+        Assert.Single(v.Log, e => e.Kind == LogKind.Recorded && e.Text.Contains("Mara starts"));
         // A lie gets the same terms as the truth would: here the other way round, nothing is recorded.
         var (v2, m2, f2) = Ready(1, "safe");
         v2.AssignDeal(m2, f2, patch: false);
-        Assert.DoesNotContain(v2.Log, e => e.Kind == LogKind.Recorded && e.Text.StartsWith("Mara starts"));
+        Assert.DoesNotContain(v2.Log, e => e.Kind == LogKind.Recorded && e.Text.Contains("Mara starts"));
     }
 
     [Fact]
@@ -115,6 +122,27 @@ public class WorkTermsTests
         Assert.Equal(RiskKnowledge.Unaware, mara.Terms!.Risk);
         Assert.Equal(RiskKnowledge.Unaware, v.TermsOf(mara, f).Risk);
         Assert.Equal(RiskKnowledge.Briefed, v.TermsFor(mara, f).Risk);
+        // The speed, the dose and the hurt rule all keep the start's terms to the end of the work.
+        var (_, late, _) = FirstRepaired(null, later: "dosed");
+        Assert.Equal(100 - Tuning.DangerDose, late.Health, 3);
+        Assert.Contains("dose", late.HurtUnbriefed);
+    }
+
+    [Fact]
+    public void A_briefing_after_the_start_changes_neither_the_dose_nor_the_hurt_rule()
+    {
+        // Assigned unbriefed, told the danger mid-work: full dose, and the hurt still counts against the ship at the notice beat.
+        var (v, mara, _) = FirstRepaired(null, later: "dosed");
+        Assert.Equal(100 - Tuning.DangerDose, mara.Health, 3);
+        var before = mara.Trust;
+        v.Go();
+        v.Go();
+        Assert.Contains(v.Log, e => e.Intent?.Kind == "noticed_dose");
+        Assert.True(mara.Trust < before);
+        // Assigned briefed, told "safe" mid-work: the precautions taken at the start still halve the dose.
+        var (_, kept, _) = FirstRepaired("dosed", later: "safe");
+        Assert.Equal(100 - Tuning.DangerDose * Tuning.PrecautionHarm, kept.Health, 3);
+        Assert.DoesNotContain("dose", kept.HurtUnbriefed);
     }
 
     [Fact]

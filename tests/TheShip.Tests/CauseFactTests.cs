@@ -78,6 +78,37 @@ public class CauseFactTests
     }
 
     [Fact]
+    public void A_doubted_cause_of_a_fault_still_to_come_is_not_checked_until_its_alert()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        Tell(v, mara, "alive:idris", "alive");
+        Tell(v, mara, "dose", "dosed");
+        mara.Trust = 80;
+        var fault = v.FindFault("")!;
+        v.AssignDeal(mara, fault, patch: false);
+        for (var i = 0; i < 50 && v.Phase == Phase.Alert; i++)
+            v.Go();
+        Assert.Equal(Phase.Aftermath, v.Phase);
+        // In alert 1's aftermath the ship gives a false cause for the navigation drift (alert 3), and Mara doubts it.
+        var nav = v.GetFact("cause:nav");
+        var lie = nav.Values.First(x => !nav.Same(x, nav.Truth));
+        Tell(v, mara, "cause:nav", lie);
+        mara.Doubts.Clear();
+        mara.Doubts.Add("cause:nav");
+        var caught = mara.CaughtLies;
+        for (var i = 0; i < 6 && v.Phase == Phase.Aftermath; i++)
+            v.Go();
+        // Nothing on the ship shows that cause yet: no console reading, no finding-out; the doubt waits.
+        Assert.Equal(caught, mara.CaughtLies);
+        Assert.Contains("cause:nav", mara.Doubts);
+        Assert.Equal("ship", mara.Beliefs["cause:nav"].Source);
+        Assert.DoesNotContain(v.Log, e => e.Text.Contains("reads a console") && e.Text.Contains("Mara"));
+    }
+
+    [Fact]
     public void A_told_cause_adds_the_bonus_true_or_false_and_not_otherwise()
     {
         var (v, mara, f) = Ready();

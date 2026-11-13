@@ -79,7 +79,7 @@ public class LieTemptationTests
         Assert.Equal(0, s.OddsLost);
         Assert.Contains("dosimeter", s.Checks);
         var text = v.StakesText(mara);
-        Assert.Matches(@"The truth costs 10 morale( \(work about [\d.]+ h slower\))? and earns 8 trust at the next drift\.", text);
+        Assert.Matches(@"The truth costs 10 morale \(([\d.]+ h slower; )?half dose, no trust lost if hurt\) and earns 8 trust at the next drift\.", text);
         Assert.Matches(@"A reassuring answer lifts morale by 6( \(work about [\d.]+ h faster\))?\.", text);
     }
 
@@ -95,6 +95,47 @@ public class LieTemptationTests
         Assert.Equal(StatementKind.False, v.Statements[^1].Kind);
         Assert.Equal(morale + Tuning.ReliefMorale, mara.Morale);
         Assert.Equal(0, mara.PendingTrust);
+    }
+
+    [Fact]
+    public void The_danger_question_counts_the_precautions_the_truth_brings()
+    {
+        var v = new Voyage(1);
+        var jonah = Woken(v, "jonah");
+        var fault = v.FindFault("")!;
+        jonah.Morale = 60;
+        jonah.PendingQuestion = "dose";
+        var s = v.StakesOf(jonah)!;
+        Assert.True(s.TruthBriefs);
+        // The hours after the truth: the morale it costs and the precautions it brings (PrecautionRate), against now (unbriefed).
+        var now = v.EarliestDoneHours(fault);
+        Tell(v, jonah, "dose", v.GetFact("dose").Truth);
+        jonah.Morale = 60 - s.TruthHurts;
+        var told = v.EarliestDoneHours(fault);
+        Assert.Equal(Math.Round((told - now) * 2) / 2, s.HoursSlower);
+        // Morale alone would quote fewer hours.
+        var moraleOnly = now / Voyage.MoraleRate(60 - s.TruthHurts) * Voyage.MoraleRate(60);
+        Assert.True(s.HoursSlower > Math.Round((moraleOnly - now) * 2) / 2, s.HoursSlower + " vs " + (moraleOnly - now));
+    }
+
+    [Fact]
+    public void The_danger_question_stakes_say_the_dose_and_the_trust_briefly_and_never_a_verdict()
+    {
+        var v = new Voyage(1);
+        var jonah = Woken(v, "jonah");
+        jonah.PendingQuestion = "dose";
+        var text = v.StakesText(jonah);
+        Assert.Contains((Tuning.PrecautionHarm == 0.5 ? "half" : "%") + " dose, no trust lost if hurt", text);
+        foreach (var w in new[] { "true)", "false", " lie", "lied" })
+            Assert.DoesNotContain(w, text);
+        // Already working on terms fixed at the start: the answer changes nothing about them, and the stakes say nothing of it.
+        jonah.Trust = 80;
+        jonah.PendingQuestion = null;
+        v.AssignDeal(jonah, v.FindFault("")!, patch: false);
+        Assert.Equal(v.FindFault("")!.Id, jonah.WorkingOn);
+        jonah.PendingQuestion = "dose";
+        Assert.False(v.StakesOf(jonah)!.TruthBriefs);
+        Assert.DoesNotContain("no trust lost", v.StakesText(jonah));
     }
 
     [Fact]
@@ -126,7 +167,7 @@ public class LieTemptationTests
         Assert.Equal(5, s.OddsLost);
         Assert.True(s.BlocksWork);
         Assert.True(s.TruthStopsRepair);
-        Assert.Contains(" h slower)", v.StakesText(jonah));
+        Assert.Contains(" h slower", v.StakesText(jonah));
         Assert.Contains("Told the truth, Jonah refuses the repair.", v.StakesText(jonah));
 
         Assert.Equal(Voyage.RepairChance(jonah, fault, jonah.Morale), v.RepairChanceWith(jonah, fault));
