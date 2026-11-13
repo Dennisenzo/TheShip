@@ -811,6 +811,8 @@ public sealed partial class Voyage
         var years = Math.Max(0, target - Year);
         var deaths = new List<string>();
         var events = new List<string>();
+        // Trust earned by hard truths arrives in this drift; the report says whose, and for what (DESIGN.md, "Trust").
+        var credits = new List<(CrewMember Who, double Earned, string What)>();
         var start = Clock;
         // A patch still holding at the last drift gives way on the way in (DESIGN.md, "How alerts are scheduled").
         var patchFailed = false;
@@ -850,6 +852,7 @@ public sealed partial class Voyage
                 events.Add($"{c.Name} starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}.");
                 c.Trust += c.PendingTrust;
                 c.PendingTrust = 0;
+                c.PendingTruths.Clear();
                 c.Age += at / Tuning.HoursPerYear;
                 c.HoursAwake += at;
                 Clamp(c);
@@ -859,8 +862,11 @@ public sealed partial class Voyage
             foreach (var c in Crew.Where(c => c.Alive).ToList())
             {
                 string? sleepCause = null;
+                if (c.PendingTrust > 0 && c.PendingTruths.Count > 0)
+                    credits.Add((c, c.PendingTrust, string.Join("; ", c.PendingTruths.Distinct())));
                 c.Trust += c.PendingTrust;
                 c.PendingTrust = 0;
+                c.PendingTruths.Clear();
                 if (c.State == CrewState.Awake)
                 {
                     // Someone who would not sleep ages, eats and reads everything, for as long as they live.
@@ -904,6 +910,8 @@ public sealed partial class Voyage
                  + string.Concat(events.Select(e => e + " "))
                  + $"Stores {Stores:0} person-days, spare parts {Parts}, pod wear {PodWear}. "
                  + (deaths.Count == 0 ? "No deaths." : "Deaths: " + string.Join(", ", deaths) + "."));
+            foreach (var (who, earned, what) in credits.Where(x => x.Who.Alive))
+                Ship($"{who.Name} thinks better of you for the hard truth told straight ({what}): trust +{earned:0}.");
         }
         finally
         {

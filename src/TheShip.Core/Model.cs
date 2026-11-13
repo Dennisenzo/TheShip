@@ -54,6 +54,8 @@ public sealed class CrewMember
     public int CaughtLies { get; set; }
     /// <summary>Trust earned by a hard truth; it arrives at the next drift ("raises trust later").</summary>
     public double PendingTrust { get; set; }
+    /// <summary>The hard truths that earned <see cref="PendingTrust"/>, as sentences; the drift names them when the trust arrives.</summary>
+    public List<string> PendingTruths { get; } = new();
 
     public Dictionary<string, Belief> Beliefs { get; } = new();
     /// <summary>Fact keys this person doubts and will check when they get the chance.</summary>
