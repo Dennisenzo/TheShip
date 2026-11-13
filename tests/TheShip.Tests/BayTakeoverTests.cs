@@ -120,6 +120,52 @@ public class BayTakeoverTests
         Assert.Contains(v.Crew, c => c.State is CrewState.Thawing or CrewState.Awake);
     }
 
+    /// <summary>Mara and Jonah take the bay and put everyone under; the voyage waits to drift to alert 2.</summary>
+    private static Voyage TakenAndAsleep(Voyage v)
+    {
+        VoyageTests.HonestFirstAlert(v);
+        v.Wake(v.Find("jonah")!);
+        v.Go();
+        Hostile(v, "mara", "jonah");
+        v.Go();
+        Hostile(v, "mara", "jonah");
+        for (var i = 0; i < 12 && v.Awake.Any(); i++)
+        {
+            v.Go();
+            Hostile(v, "mara", "jonah");
+        }
+        Assert.True(v.Lockouts.Bay);
+        Assert.Empty(v.Awake);
+        return v;
+    }
+
+    [Fact]
+    public void The_crew_wake_nobody_for_a_fault_no_sleeper_can_fix()
+    {
+        // Validator finding: with every Medicine holder dead, the crew thawed Tomas (the patient) and Asha for the medical faults.
+        var v = TakenAndAsleep(new Voyage(1));
+        foreach (var id in new[] { "lin", "idris", "jonah" })
+            v.Find(id)!.State = CrewState.Dead;
+        v.Drift();
+        Assert.Equal(2, v.Current.Number);
+        Assert.All(v.Crew.Where(c => c.State is CrewState.Thawing or CrewState.Awake),
+            c => Assert.Contains(v.Current.Faults, f => !f.Resolved && c.SkillOf(f.Skill) >= f.Level && f.SubjectId != c.Id));
+        Assert.Contains(v.Current.Faults, f => !f.Resolved && f.Skill == Skill.Medicine);
+        // Somebody unqualified was left asleep (the drift's pod deaths don't empty the bank).
+        Assert.Contains(v.Crew, c => c.State == CrewState.Asleep && c.SkillOf(Skill.Medicine) == 0);
+    }
+
+    [Fact]
+    public void The_crew_never_wake_a_patient_to_treat_their_own_illness()
+    {
+        // Lin, the one medic who could treat the illness, is the patient (the victim is in her bank).
+        var v = TakenAndAsleep(new Voyage(1, Variation.Classic with { Alert2Victim = "asha", Alert2Patient = "lin" }));
+        v.Drift();
+        Assert.Equal(2, v.Current.Number);
+        Assert.Contains(v.Current.Faults, f => f.Kind == "illness" && f.SubjectId == "lin");
+        Assert.Equal(CrewState.Asleep, v.Find("lin")!.State);
+    }
+
     [Fact]
     public void Advance_until_attention_does_not_stall_when_everyone_can_sleep_and_the_bay_is_taken()
     {

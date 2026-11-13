@@ -71,11 +71,16 @@ public sealed partial class Voyage
         }
     }
 
-    /// <summary>The crew's own rule for waking: the best-qualified sleepers for each open fault, up to the limit.</summary>
+    /// <summary>
+    /// The crew's own rule for waking: the best-qualified sleepers for each open fault, up to the limit. Only people who
+    /// can do the work are thawed (a fault nobody asleep can fix is left), and never an open fault's patient.
+    /// </summary>
     private void CrewWakeRule()
     {
         if (!Lockouts.Bay)
             return;
+        // A sick sleeper is a patient, not a worker: thawing them cures nothing.
+        var patients = Current.Faults.Where(f => !f.Resolved && f.SubjectId != null).Select(f => f.SubjectId).ToHashSet();
         foreach (var f in Current.Faults.Where(f => !f.Resolved).OrderByDescending(f => f.Critical).ThenBy(f => f.ClockHours))
         {
             var have = Crew.Count(c => c.State is CrewState.Awake or CrewState.Thawing && c.SkillOf(f.Skill) >= f.Level);
@@ -83,11 +88,11 @@ public sealed partial class Voyage
             {
                 if (Crew.Count(x => x.State is CrewState.Awake or CrewState.Thawing) >= Tuning.MaxAwake)
                     return;
-                var pick = Crew.Where(c => c.State == CrewState.Asleep)
-                    .OrderByDescending(c => c.SkillOf(f.Skill) >= f.Level).ThenByDescending(c => c.SkillOf(f.Skill)).ThenByDescending(c => c.Trust)
+                var pick = Crew.Where(c => c.State == CrewState.Asleep && !patients.Contains(c.Id) && c.SkillOf(f.Skill) >= f.Level)
+                    .OrderByDescending(c => c.SkillOf(f.Skill)).ThenByDescending(c => c.Trust)
                     .FirstOrDefault();
                 if (pick is null)
-                    return;
+                    break;
                 _crewActing = true;
                 try { Wake(pick); }
                 finally { _crewActing = false; }
