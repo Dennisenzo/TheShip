@@ -457,7 +457,9 @@ public sealed partial class Voyage
         }
         else
         {
-            var bonus = TermsOf(lead, f).OddsBonus;
+            // The terms fixed when the lead started: read before anything below can take them off the fault.
+            var leadTerms = TermsOf(lead, f);
+            var bonus = leadTerms.OddsBonus;
             var chance = RepairChance(lead, f, lead.Morale, bonus);
             var roll = _rng.NextDouble();
             if (bonus > 0)
@@ -481,7 +483,7 @@ public sealed partial class Voyage
                         : " failed, and no spare parts are left for a second try.") + " You stop work: it can only be patched now.");
                 else
                     Speak(lead, "work_failed", "The repair of the " + name + " failed and you have to redo half of it.", "the " + name);
-                var terms = TermsOf(lead, f);
+                var terms = leadTerms;
                 if (_rng.NextDouble() < Tuning.RepairInjuryChance * terms.HarmShare)
                 {
                     lead.Health -= Tuning.RepairInjury;
@@ -524,11 +526,12 @@ public sealed partial class Voyage
 
         foreach (var w in workers)
         {
+            // The terms fixed at the start, read before WorkingOn is cleared (after it TermsOf would fall back to current beliefs).
+            var terms = TermsOf(w, f);
             w.WorkingOn = null;
             w.Morale += 3;
             if (f.DangerFact is { } danger)
             {
-                var terms = TermsOf(w, f);
                 w.Health -= Tuning.DangerDose * terms.HarmShare;
                 if (terms.RiskBriefed)
                     TermStats.DosesBriefed++;
