@@ -116,7 +116,7 @@ Each of the 24 crew is a small sheet of game state, and the two numbers that mat
 
 Trust rises on a kept promise, a granted request and a hard truth told early. It falls on a broken promise and on an order that got someone hurt. It falls furthest on a discovered lie. A hard truth lowers morale at once and raises trust later. Morale also sets how fast people work: a team's work speed is 1 + (average morale - 70) / 150, between 0.8 and 1.15, so a team at 70 works at the plain rate, a shaken one is slower and a relieved one faster. This is what makes relief (and a hard truth's cost) matter: a few hours on a fault's clock.
 
-A hard truth earns trust once per person and fact: told again after a lie about the same thing, it earns nothing more until the truth itself changes. The trust a hard truth earns arrives at the next drift, unannounced: the trust number just moves. No line names the credit or the statement, because only a true statement earns it, and what the player sees never says whether a statement was true (decided 2026-11-13; this rule wins over showing the reward).
+A hard truth earns trust once per person and fact: told again after a lie about the same thing, it earns nothing more until the truth itself changes. The trust a hard truth earns arrives at the next drift, unannounced: the trust number just moves. No line names the credit or the statement, because only a true statement earns it, and what the player sees never says whether a statement was true (decided 2026-11-13; this rule wins over showing the reward). **Scope of that rule (decided by the user, 2026-11-13):** it holds for the log (including the "Recorded" lines), the crew-facing lines and the Waiting, terms and stakes texts. The Record screen and the crew dossier are the ship's own record of what it said, and they do show it: every statement is tagged TRUE or LIE, with the header count of lines, lies and lies found out, and a lie says who found it out and how.
 
 A good answer is a relief. When a fact has a hard answer (is my partner alive, is it safe in there, are the pods sound, any word from Earth), and the person asked about it or it matters to them (their partner, themselves, or word from Earth for someone waiting on it), and they hear the good one from the ship, as news, and believes it, their morale rises by 6. News means they had no answer yet or held the hard one: going from one good answer to another ("no word from Earth" to "good news") is no relief, so switching back and forth gains nothing. A true good answer earns this; a lie borrows it, and the morale of the hard truth is paid when the lie is found out. Someone who doubts the answer gets no relief.
 
@@ -681,6 +681,9 @@ Thrifty 43.5 -> 44.4, Careless 31.3 -> 30.5, Silent 32.0 -> 31.3, Liar 11.3 -> 1
 (the expectation was up a bit), because the bots wake the best-qualified person for each fault, who nearly always has the skill, so nearly every cause lie is still caught at completion;
 the Corrector gains about 3 points (its lies to unskilled workers are never caught and it corrects them anyway). Honest moves within noise. The Corrector guard now allows 10 points at 200
 seeds (it swung by 8 between 200 and 600 seeds with no change to the rule) and stays at 6 at 600 or more.
+
+Table after the three code steps of this branch (600 seeds, WorkingAge 65): Honest 43.3% (survivors 3.35, Adrift 20.7%), Breaker 44.2% (3.47, 20.2%), Thrifty 43.0% (3.45, 21.2%),
+Corrector 49.0% (3.49, 18.7%), Careless 34.8% (3.22, 15.3%), Silent 31.8% (3.17, 21.0%), Liar 9.7% (1.60, 67.5%).
 
 ### Broken promises open an accusation, and the Breaker (2026-11-13, 600 seeds, WorkingAge 65)
 
