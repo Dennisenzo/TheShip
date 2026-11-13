@@ -14,7 +14,7 @@ Five rules the design never breaks:
 
 - **Voice only.** Everything physical is done by a person you woke and persuaded.
 - **The game owns the truth.** Every state and outcome is simulated. The language model only gives people their words.
-- **Waking is the currency.** Every thaw ages that person by 1 to 2 years (Short haul, tuned 2026-11-13), and every day awake costs the ship food and air.
+- **Waking is the currency.** Every thaw ages that person by 3 to 5 years, and every day awake costs the ship food and air.
 - **What you say stays said.** Every statement is recorded with who heard it, and a false one can be found out decades later.
 - **Honesty is viable but harder.** A player who never lies can reach arrival. The truth costs morale now and earns trust later. The balance target is Landfall for one honest run in two.
 
@@ -49,7 +49,7 @@ The player acts in steps 2 to 7. Steps 1 and 8 belong to the game.
 
 | Resource | Spent by | Runs out as |
 | --- | --- | --- |
-| Crew years | Every thaw, 1 to 2 years each; every ten years asleep, 1 year | People too old, or dead, before arrival |
+| Crew years | Every thaw, 3 to 5 years each; every ten years asleep, 1 year | People too old, or dead, before arrival |
 | Stores | Every person-day awake, at least three months per thaw | Shorter wakings, then hunger |
 | Spare parts | Each repair, successful or failed (the Short haul starts with 2) | Repairs that can only be patched |
 | Pod health | Each thaw | Thaws that injure or kill (30% of failed thaws are fatal); sleepers die in worn pods over long drifts |
@@ -97,7 +97,7 @@ Each of the 24 crew is a small sheet of game state, and the two numbers that mat
 | Part | Detail |
 | --- | --- |
 | Role and skills | Engineering, medicine, botany, navigation, command; each 0 to 3 |
-| Age and health | Each thaw adds 1 to 2 years to their age, on top of the time spent awake; each thaw also carries a small, rising risk; sleep slows ageing to one year per ten, so a full voyage asleep adds 20 years |
+| Age and health | Each thaw adds 3 to 5 years to their age, on top of the time spent awake; each thaw also carries a small, rising risk; sleep slows ageing to one year per ten, so a full voyage asleep adds 20 years |
 | Bonds | Partner, friend, rival, parent or child of other crew |
 | Want | One main thing they will ask for: wake someone, know the date, hear from Earth, see the logs, stay awake |
 | Temperament | Two traits, such as steady or anxious, obedient or sceptical |
@@ -298,7 +298,7 @@ Arrival is graded on four things: who is alive and how old they are, what they b
 
 | Ending | Condition |
 | --- | --- |
-| Landfall | At least 12 alive, enough of working age, and you still have a voice (Short haul with 6 crew: at least 4 alive and 3 under age 50) |
+| Landfall | At least 12 alive, enough of working age, and you still have a voice (Short haul with 6 crew: at least 4 alive and 3 under age 64) |
 | Landfall without you | They arrive after muting you or taking the bay |
 | The quiet ship | The ship arrives with nobody able to land it |
 | Turned back | The Return faction took the helm |
@@ -440,8 +440,8 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 | How often should an honest run reach Landfall? | One run in two |
 | How much of the years between alerts does the player see? | A short report, limited to working sensors |
 | Should altering a log be allowed? | Yes; it counts as a lie and an engineer can detect it |
-| When does Short haul reach Landfall? | At least 4 of 6 alive and 3 under age 50 (2026-11-12) |
-| How many spare parts does Short haul start with? | 5; a failed repair spends a part too (2 until the balance pass of 2026-11-13) |
+| When does Short haul reach Landfall? | At least 4 of 6 alive and 3 under age 64 (user chose 50 on 2026-11-12; raised to 64 on 2026-11-13 because second faults raised the thaws per run from about 6 to about 9.5 and 3 to 5 years a thaw makes "under 50" unreachable; 63 gave the honest bot 37%; review) |
+| How many spare parts does Short haul start with? | 2; a failed repair spends a part too (2026-11-12) |
 | How was Short haul balanced? | See "Balance" below |
 | What does a navigation fault still patched at arrival cost? | Arrival slips by years; Adrift only when a navigation fault's clock runs out unrepaired, including a returned patch (2026-11-13) |
 
@@ -454,19 +454,15 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 
 ## Balance (Short haul, 2026-11-13)
 
-Measured with the harness (`dotnet test --filter Category=Balance`, 200 seeds, five bots). With the new Landfall rule (4 of 6 alive, 3 under age 50)
-and the old numbers an honest run almost never landed, so the numbers were moved, each for a reason:
+Measured with the harness (`dotnet test --filter Category=Balance`, 200 seeds, five bots). Fixed by the user and the pillars: 3 to 5 years of ageing a thaw,
+2 starting parts, a failed repair spends a part, Landfall = at least 4 alive and 3 of working age. The one bent parameter is the working age:
 
-- **Ageing per thaw 3-5 to 1-2 years.** Under a limit of 50 and 9 to 10 thaws a run, 4 years a thaw left only the two youngest crew eligible;
-  the rule was a wall. At 1-2 the choice of who to wake still shows in the ages, and waking still costs more than staying asleep.
-  (2-3 years gave 1% Landfall for the honest bot: the rate falls off a cliff, so this number is the main lever.)
-- **Spare parts 2 to 5.** The honest bot repairs every fault, so it ran out of parts by alert 3 and patched the rest; patches come back
-  and give way at the last drift. Parts are the resource that rewards honest, thorough repair. Thrifty (one repair per alert) needs few.
-- **Power-low sleeper death 10% to 8%, patch-failure sleeper death 15% to 10%.** Both were killing sleepers faster than a good run could replace them.
-- **Thaw risk per pod wear 0.012 to 0.008.** Thaw deaths fell from 0.4 to 0.1 per run, so a wake is a risk, not a coin flip.
-- **A lost or still-patched failed pod adds 6 pod wear (was 3), a pod controller 8 (was 4).** Leaving faults alone is the thrifty way, and it has to
-  cost: this brought Thrifty down 5 points while the honest bot, which fixes them, did not move.
-- **Repair base chance 0.8 to 0.85** (small effect: most repairs already succeed).
+- **Working age 50 to 64.** An honest run thaws about 9.5 times at 3 to 5 years each, so under 50 was unreachable (0% at 50). Landfall for the honest bot
+  by working age: 55 = 9%, 60 = 19%, 62 = 27%, 63 = 37%, 64 = 48%, 65 = 50%. 64 is the lowest value in the 45-55% band.
+- **Power-low sleeper death 10% to 5%, patch-failure sleeper death 15% to 10%, thaw risk per pod wear 0.012 to 0.008.** Fewer sleepers lost to the
+  chain of faults: the 4-alive condition is the other wall (3.6 survivors before).
+- **A lost or still-patched failed pod adds 6 pod wear (was 3), a pod controller 8 (was 4).** Leaving faults alone is the thrifty way, and it has to cost.
+- **Repair base chance 0.8 to 0.85** (small effect). **Lie trust cost 25 to 22:** at 25 the liar bot was left adrift in 71% of runs (nobody repaired anything once lies were caught) and
+  Landfall was 12%; lying should be tempting and costly, not hopeless.
 
-Result: Honest 46.5%, Thrifty 52.5% (a valid second strategy, not dominant), Liar 31% (tempting: a lie gets the dangerous repair done
-and costs trust only when caught), Careless 17.5%, Silent 15%.
+Result: Honest 48%, Thrifty 35% (a valid second strategy, within reach), Liar 20%, Silent 25%, Careless 18.5%.

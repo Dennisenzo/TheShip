@@ -12,14 +12,14 @@ public static class Tuning
     /// <summary>Most two-week steps one "advance until something happens" takes.</summary>
     public const int AdvanceMaxSteps = 8;
 
-    public const int ThawAgeMin = 1;
-    public const int ThawAgeMax = 2;
+    public const int ThawAgeMin = 3;
+    public const int ThawAgeMax = 5;
     /// <summary>One year of ageing per ten years asleep.</summary>
     public const double SleepAgeing = 0.1;
-    public const double WorkingAge = 50;
+    public const double WorkingAge = 64;
 
     public const double StartStores = 1500;     // person-days
-    public const int StartParts = 5;
+    public const int StartParts = 2;
     /// <summary>Run variation: extra clock hours per alert, and the most years an alert moves either way.</summary>
     public const int AlertSlackMin = 1;
     public const int AlertSlackMax = 6;
@@ -42,7 +42,7 @@ public static class Tuning
     public const double ThawFatalShare = 0.3;
     /// <summary>A sleeper's death chance in a drift is pod wear x years x this.</summary>
     public const double SleepDeathPerWearYear = 0.0001;
-    public const double PowerLowDeathChance = 0.08;
+    public const double PowerLowDeathChance = 0.05;
     /// <summary>Pod wear a lost failed-pod or pod-controller fault adds.</summary>
     public const int PodLostWear = 6;
     public const int ControllerLostWear = 8;
@@ -56,7 +56,7 @@ public static class Tuning
     public const double NumberTolerance = 1;
 
     // Trust
-    public const double LieTrust = 25;
+    public const double LieTrust = 22;
     public const double LieMattersExtra = 10;
     public const double AlteredLogTrust = 30;
     public const double HardTruthTrust = 8;

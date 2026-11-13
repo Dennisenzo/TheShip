@@ -13,10 +13,10 @@ public class PartsAndPatchesTests
     }
 
     [Fact]
-    public void The_voyage_starts_with_the_tuned_spare_parts()
+    public void The_voyage_starts_with_two_spare_parts()
     {
         Assert.Equal(Tuning.StartParts, new Voyage(1).Parts);
-        Assert.Equal(5, Tuning.StartParts);
+        Assert.Equal(2, Tuning.StartParts);
     }
 
     [Fact]
