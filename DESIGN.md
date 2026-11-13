@@ -116,6 +116,8 @@ Each of the 24 crew is a small sheet of game state, and the two numbers that mat
 
 Trust rises on a kept promise, a granted request and a hard truth told early. It falls on a broken promise and on an order that got someone hurt. It falls furthest on a discovered lie. A hard truth lowers morale at once and raises trust later.
 
+An unanswered question costs trust. A person who asked and got no answer asks again after the next two weeks (and loses 2 trust each time, at most twice); after the second repeat they doubt the fact and check it themselves. Going back to sleep with a question still open costs 4. A dodge is not an answer: it costs 3 trust once per question, makes them doubt the fact, and leaves the question open. Someone who will not work until the ship answers keeps refusing until a statement, true or false, answers the question.
+
 The full game shows which band a person is in, never the number. The prototype shows the number.
 
 ### Knowledge and statements

@@ -196,6 +196,7 @@ public static class Prompts
         "work_patched" or "work_failed" or "work_no_parts" or "injured" or "refuse_danger" or "ask_danger" => "tense and wary",
         "caught" or "left_behind" or "refuse_trust" or "altered" or "gap" or "locked" or "promise_broken" or "dodge" => "angry, hurt or suspicious",
         "hard_truth" or "found" or "noticed_dose" => "shaken",
+        "ask_again" => "impatient, wanting an answer",
         "sleep_yes" or "sleep_no" or "sleep_no_pod" or "refuse_answer" => "weary, with the pod on your mind",
         "wake_question" or "request_partner" or "request_logs" => "anxious to know",
         _ => "",
