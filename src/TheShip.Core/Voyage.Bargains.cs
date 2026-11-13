@@ -356,6 +356,22 @@ public sealed partial class Voyage
         return text;
     }
 
+    /// <summary>
+    /// The price in a few words, for the sub-line under the checklist that holds it ("kept +10, broken -15 trust; without it about
+    /// 63% she starts, -5 trust"); <see cref="BargainText"/> is its tooltip. The push is named only once the price is all that is left.
+    /// </summary>
+    public string? BargainShort(CrewMember c)
+    {
+        if (BargainOf(c) is null)
+            return null;
+        var text = FormattableString.Invariant($"kept +{Tuning.PromiseKept:0}, broken -{Tuning.PromiseBroken:0} trust");
+        if (c.BargainDeclined)
+            return text + "; no start without it";
+        return OnlyPriceLeft(c)
+            ? text + FormattableString.Invariant($"; without it about {PushChance(c) * 100:0}% {StartsText(c)}, -{Tuning.BargainPushedTrust:0} trust")
+            : text;
+    }
+
     /// <summary>"she starts", "he starts", or "they start" when the sheet has no pronoun.</summary>
     public static string StartsText(CrewMember c) => c.Pronoun is { } p ? p + " starts" : "they start";
 

@@ -198,6 +198,36 @@ public sealed partial class Voyage
         return c.Name + " starts " + TaskText(f, j.Patch) + " when: " + string.Join("  ", list.Select(i => (i.Done ? "[x] " : "[ ] ") + i.Text));
     }
 
+    /// <summary>The person's open question is an unticked item of their checklist (the stakes of the answer can go under it).</summary>
+    public bool JobHoldsQuestion(CrewMember c) =>
+        c.PendingQuestion is { } q && _facts.TryGetValue(q, out var f)
+        && JobChecklist(c).Any(i => !i.Done && i.Text.EndsWith(f.Question, StringComparison.Ordinal));
+
+    /// <summary>
+    /// The checklist item for "Waiting on you" (<see cref="JobText"/>, about 3 rows of 45 columns) with short sub-lines (1-2 rows each):
+    /// the stakes of the open question when it is on the list and <paramref name="withStakes"/> (the person whose stakes are shown),
+    /// and the price of their work. Their full texts (<see cref="StakesText"/>, <see cref="BargainText"/>) are the tooltip. 3 + 2 + 2 rows
+    /// fit the 8 the box has with every crew card shown; the full stakes alone took 7 and pushed the checklist out. Null with no checklist.
+    /// </summary>
+    public (string Text, string? Tip)? JobItem(CrewMember c, bool withStakes)
+    {
+        if (JobText(c) is not { } text)
+            return null;
+        var tips = new List<string>();
+        if (withStakes && JobHoldsQuestion(c))
+        {
+            if (StakesShort(c) is { } stakes)
+                text += "\nAnswer: " + stakes + ".";
+            tips.Add(StakesText(c));
+        }
+        if (BargainShort(c) is { } price)
+        {
+            text += "\nYour word: " + price + ".";
+            tips.Add(BargainText(c)!);
+        }
+        return (text, tips.Count > 0 ? string.Join("\n\n", tips) : null);
+    }
+
     /// <summary>What is still left on someone's checklist, for the next-step line ("answer: How is Idris?; your word to wake Idris"), or null.</summary>
     public string? JobLeft(CrewMember c)
     {

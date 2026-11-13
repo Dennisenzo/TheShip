@@ -202,6 +202,51 @@ public class ConditionsTests
         Assert.DoesNotContain(v.Log.Skip(from), e => e.Kind == LogKind.Help);
     }
 
+    [Fact]
+    public void The_checklist_carries_the_stakes_and_the_price_as_short_sub_lines_and_fits_the_waiting_box()
+    {
+        var seen = 0;
+        for (var seed = 0; seed < 30; seed++)
+        {
+            var v = new Voyage(seed, Variation.Draw(seed));
+            var mara = v.Find("mara")!;
+            v.Wake(mara);
+            v.Go();
+            if (v.Current.Faults.FirstOrDefault(f => f.Skill == Skill.Engineering && !f.Resolved) is not { } f)
+                continue;
+            v.Assign(mara, f, patch: false);
+            seen++;
+            Assert.True(v.JobHoldsQuestion(mara));
+            var (text, tip) = v.JobItem(mara, withStakes: true)!.Value;
+            Assert.StartsWith("Mara starts", text);
+            Assert.Contains("\nAnswer: ", text);
+            Assert.Contains("\nYour word: ", text);
+            // The push is not offered while questions are open.
+            Assert.DoesNotContain("without it", text);
+            Assert.Contains(v.StakesText(mara), tip);
+            Assert.Contains(v.BargainText(mara)!, tip);
+            // 8 rows of 45 columns are what "Waiting on you" has with every crew card shown.
+            var rows = text.Split('\n').Sum(TermsTextTests.WaitingRows);
+            Assert.True(rows <= 8, seed + ": " + rows + " rows: " + text);
+            // Without the stakes (another person's are shown) there is no Answer sub-line.
+            Assert.DoesNotContain("Answer:", v.JobItem(mara, withStakes: false)!.Value.Text);
+        }
+        Assert.True(seen >= 20);
+    }
+
+    [Fact]
+    public void The_price_sub_line_names_the_push_once_only_the_price_is_left()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, "alive:idris");
+        Tell(v, mara, f.DangerFact!);
+        Assert.False(v.JobHoldsQuestion(mara));
+        var (text, _) = v.JobItem(mara, withStakes: true)!.Value;
+        Assert.Contains("without it about", text);
+        Assert.True(text.Split('\n').Sum(TermsTextTests.WaitingRows) <= 8);
+    }
+
     /// <summary>An obedient person short of trusting, woken for the coolant leak, asked to repair: Asha at trust 45.</summary>
     private static (Voyage v, CrewMember asha, Fault f) ObedientWary()
     {
