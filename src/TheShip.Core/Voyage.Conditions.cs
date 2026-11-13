@@ -182,7 +182,7 @@ public sealed partial class Voyage
         if (list.Count == 0 || c.Job is not { } j)
             return null;
         var f = Current.Faults.First(x => x.Id == j.FaultId);
-        return c.Name + " starts " + TaskText(f, j.Patch) + " when: " + string.Join("  ", list.Select(i => (i.Done ? "[x] " : "[ ] ") + i.Text));
+        return c.Name + " starts " + TaskText(f, j.Patch) + " when: " + string.Join("  ", list.Select(i => (i.Done ? "[x] " : "[ ] ") + i.Text));
     }
 
     /// <summary>What is still left on someone's checklist, for the next-step line ("answer: How is Idris?; your word to wake Idris"), or null.</summary>

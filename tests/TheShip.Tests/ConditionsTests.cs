@@ -90,6 +90,21 @@ public class ConditionsTests
     }
 
     [Fact]
+    public void Waiting_on_you_shows_the_checklist_with_ticks_and_the_next_line_what_is_left()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, "alive:idris");
+        var text = v.JobText(mara)!;
+        Assert.StartsWith("Mara starts the coolant leak when: [x]", text);
+        Assert.Contains("answer: How is Idris?", text);
+        Assert.Contains("your word to wake Idris", text);
+        Assert.Contains("[x] answer: How is Idris?", text);
+        Assert.Contains("[ ] answer: Is it safe", text);
+        Assert.StartsWith("answer: Is it safe", v.JobLeft(mara));
+    }
+
+    [Fact]
     public void The_drift_refusal_says_what_to_do()
     {
         var v = new Voyage(1);
