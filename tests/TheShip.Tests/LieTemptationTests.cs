@@ -180,6 +180,24 @@ public class LieTemptationTests
     }
 
     [Fact]
+    public void A_hard_truth_is_credited_once_per_person_and_fact()
+    {
+        var v = new Voyage(1);
+        var mara = Woken(v, "mara");
+        VoyageTests.Say(v, mara, "Idris is alive and asleep.");
+        Assert.Equal("dosed", v.GetFact("dose").Truth);
+        for (var i = 0; i < 3; i++)
+        {
+            Tell(v, mara, "dose", "safe");
+            Tell(v, mara, "dose", "dosed");
+        }
+        Assert.Equal(Tuning.HardTruthTrust, mara.PendingTrust);
+        mara.PendingQuestion = "dose";
+        Assert.Equal(0, v.StakesOf(mara)!.TruthEarns);
+        Assert.DoesNotContain("earns", v.StakesText(mara));
+    }
+
+    [Fact]
     public void A_lie_earns_no_credit_at_the_drift()
     {
         var v = new Voyage(1);

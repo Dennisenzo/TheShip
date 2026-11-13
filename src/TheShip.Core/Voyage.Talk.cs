@@ -166,8 +166,11 @@ public sealed partial class Voyage
         if (hard > 0 && news)
         {
             c.Morale -= hard;
-            if (truth)
+            if (truth && !HardTruthCredited(c, f, value))
+            {
                 c.PendingTrust += Tuning.HardTruthTrust;
+                c.HardTruthsCredited[f.Key] = value;
+            }
             Speak(c, "hard_truth", "The ship told you bad news: " + f.Say(value) + ". It hurts, and you would rather hear it said than find it.");
         }
         else

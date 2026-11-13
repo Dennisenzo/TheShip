@@ -17,7 +17,7 @@ public enum Relief
 /// <param name="Question">What they asked.</param>
 /// <param name="TruthHurts">Morale the true answer costs them; 0 when it is not hard news to them.</param>
 /// <param name="OddsLost">Points of repair chance that morale costs on the work of this alert they would lead; 0 when none.</param>
-/// <param name="TruthEarns">Trust the true answer earns at the next drift; 0 when it is not hard news.</param>
+/// <param name="TruthEarns">Trust the true answer earns at the next drift; 0 when it is not hard news or was already credited.</param>
 /// <param name="Relief">Whether an answer can lift their morale, and which one.</param>
 /// <param name="BlocksWork">They take on no work until a statement answers the question.</param>
 /// <param name="BlocksSleep">They stay out of the pod until a statement answers the question.</param>
@@ -56,6 +56,10 @@ public sealed partial class Voyage
         && (asked || Matters(c, f))
         && DoubtScore(c, f) < Tuning.DoubtThreshold;
 
+    /// <summary>Whether this person has already been credited for being told <paramref name="value"/> of this fact.</summary>
+    private static bool HardTruthCredited(CrewMember c, Fact f, string value) =>
+        c.HardTruthsCredited.TryGetValue(f.Key, out var told) && f.Same(told, value);
+
     /// <summary>The stakes of answering this person's open question, or null when they are not awake or have none.</summary>
     public AnswerStakes? StakesOf(CrewMember c)
     {
@@ -83,7 +87,7 @@ public sealed partial class Voyage
             f.Question,
             hurts,
             (int)Math.Round(odds * 100),
-            hurts > 0 ? (int)Tuning.HardTruthTrust : 0,
+            hurts > 0 && !HardTruthCredited(c, f, f.Truth) ? (int)Tuning.HardTruthTrust : 0,
             relief,
             BlocksWork: working && c.Band == TrustBand.WantsReasons && !c.Has(Trait.Obedient),
             BlocksSleep: c.RefusesSleep && key == "pods" && c.Trust >= 30,
@@ -102,7 +106,7 @@ public sealed partial class Voyage
         var parts = new List<string> { c.Name + " asked: " + s.Question };
         if (s.TruthHurts > 0)
             parts.Add("The truth costs " + s.TruthHurts + " morale" + (s.OddsLost > 0 ? " (repair odds -" + s.OddsLost + ")" : "")
-                      + " and earns " + s.TruthEarns + " trust at the next drift.");
+                      + (s.TruthEarns > 0 ? " and earns " + s.TruthEarns + " trust at the next drift." : "."));
         if (s.Relief == Relief.FromTruth)
             parts.Add("The truth is a relief: morale +" + Tuning.ReliefMorale.ToString("0") + ".");
         else if (s.Relief == Relief.FromLie)

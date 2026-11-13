@@ -116,7 +116,7 @@ Each of the 24 crew is a small sheet of game state, and the two numbers that mat
 
 Trust rises on a kept promise, a granted request and a hard truth told early. It falls on a broken promise and on an order that got someone hurt. It falls furthest on a discovered lie. A hard truth lowers morale at once and raises trust later.
 
-The trust a hard truth earns arrives at the next drift, unannounced: the trust number just moves. No line names the credit or the statement, because only a true statement earns it, and what the player sees never says whether a statement was true (decided 2026-11-13; this rule wins over showing the reward).
+A hard truth earns trust once per person and fact: told again after a lie about the same thing, it earns nothing more until the truth itself changes. The trust a hard truth earns arrives at the next drift, unannounced: the trust number just moves. No line names the credit or the statement, because only a true statement earns it, and what the player sees never says whether a statement was true (decided 2026-11-13; this rule wins over showing the reward).
 
 A good answer is a relief. When a person asked a question that has a hard answer (is my partner alive, is it safe in there, are the pods sound) and hears the good one from the ship, as news, and believes it, their morale rises by 6. News means they had no answer yet or held the hard one: going from one good answer to another ("no word from Earth" to "good news") is no relief, so switching back and forth gains nothing. A true good answer earns this; a lie borrows it, and the morale of the hard truth is paid when the lie is found out. Someone who doubts the answer gets no relief.
 
