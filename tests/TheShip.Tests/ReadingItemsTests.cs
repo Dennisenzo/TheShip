@@ -124,6 +124,29 @@ public class ReadingItemsTests
         Assert.Contains(v.Ledger(), e => e.Person == mara && e.Key == "wake_partner");
     }
 
+    [Theory]
+    [InlineData("other")]
+    [InlineData("none")]
+    [InlineData(null)]
+    public void Accepting_terms_with_a_promise_of_no_key_is_the_word_they_asked_for(string? key)
+    {
+        var (v, mara, f) = TermsOpen();
+        v.Say("You have my word.", Item(LineKind.Promise, "mara.terms", ItemResponse.Accept, key), new[] { mara });
+        Assert.Equal(f.Id, mara.WorkingOn);
+        Assert.Equal(1, v.BargainsStruck);
+        Assert.Contains(v.Ledger(), e => e.Person == mara && e.Key == "wake_partner");
+    }
+
+    [Fact]
+    public void Accepting_terms_with_another_specific_promise_keeps_that_promise()
+    {
+        var (v, mara, f) = TermsOpen();
+        v.Say("I will never thaw you again.", Item(LineKind.Promise, "mara.terms", ItemResponse.Accept, "no_more_thaws"), new[] { mara });
+        Assert.Equal(0, v.BargainsStruck);
+        Assert.DoesNotContain(v.Ledger(), e => e.Person == mara && e.Key == "wake_partner");
+        Assert.Contains(v.Statements, s => s.PromiseKey == "no_more_thaws");
+    }
+
     [Fact]
     public void A_refusal_of_a_request_declines_it_with_its_cost_and_is_no_promise()
     {
@@ -143,6 +166,43 @@ public class ReadingItemsTests
         Assert.DoesNotContain(v.Ledger(), e => e.Key == "no_more_thaws");
         // Declining is not charged again at sleep, and the request leaves "Waiting on you".
         Assert.DoesNotContain(v.OpenItems(new[] { mara }), i => i.Kind == "request");
+        Assert.False(mara.RequestOpen);
+    }
+
+    [Fact]
+    public void A_lie_said_while_refusing_terms_is_recorded_and_the_terms_are_still_refused()
+    {
+        var (v, mara, f) = TermsOpen();
+        var trust = mara.Trust;
+        var before = v.Statements.Count;
+        v.Say("No, I won't wake him. Idris is dead.", new Reading(LineKind.Statement, "alive:idris", "dead", Item: "mara.terms", Response: ItemResponse.Refuse), new[] { mara });
+        var lie = Assert.Single(v.Statements.Skip(before));
+        Assert.Equal(StatementKind.False, lie.Kind);
+        Assert.Equal("alive:idris", lie.FactKey);
+        Assert.Contains(mara.Id, lie.Hearers);
+        Assert.Equal("dead", mara.Beliefs["alive:idris"].Value);
+        Assert.Contains(v.Log, e => e.Text.StartsWith("Recorded: you told Mara that", StringComparison.Ordinal));
+        // The push came after the statement: its cost is in the trust, the lie's own cost waits until it is found out.
+        Assert.True(mara.Trust <= trust - Tuning.BargainPushedTrust + 1e-6);
+        var kinds = v.Log.Where(e => e.Intent != null).Select(e => e.Intent!.Kind).ToList();
+        Assert.Contains(kinds[^1], new[] { "comply_pushed", "bargain_refused" });
+    }
+
+    [Fact]
+    public void A_statement_said_while_declining_a_request_is_recorded_and_the_request_declined()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        VoyageTests.FinishAlert(v);
+        mara.RequestMade = true;
+        var before = v.Statements.Count;
+        v.Say("No. Idris is fine where he is.", new Reading(LineKind.Statement, "alive:idris", "alive", Item: "mara.request", Response: ItemResponse.Refuse), new[] { mara });
+        Assert.True(mara.RequestDeclined);
+        var said = Assert.Single(v.Statements.Skip(before));
+        Assert.Equal("alive:idris", said.FactKey);
+        Assert.Equal("alive", mara.Beliefs["alive:idris"].Value);
     }
 
     [Fact]

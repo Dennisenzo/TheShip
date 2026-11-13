@@ -119,4 +119,170 @@ public class ConditionsTests
         Assert.Contains("Ask Mara to sleep", line);
         Assert.Contains("SLEEP", line);
     }
+
+    [Fact]
+    public void Waking_the_partner_instead_of_promising_starts_the_work()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, "alive:idris");
+        Tell(v, mara, f.DangerFact!);
+        Assert.Equal("your word to wake Idris", v.JobLeft(mara));
+        // The price lapses when the ship does what she asked without a word: the last condition is met, so the work starts.
+        v.Wake(v.Find("idris")!);
+        Assert.Null(v.BargainOf(mara));
+        Assert.Equal(f.Id, mara.WorkingOn);
+        Assert.Null(mara.Job);
+        Assert.Empty(v.JobChecklist(mara));
+    }
+
+    [Fact]
+    public void A_question_settled_by_what_she_sees_starts_the_work_on_the_clock_step()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, f.DangerFact!);
+        v.Wake(v.Find("idris")!);
+        // Still waiting on how Idris is: nobody told her.
+        Assert.Equal("alive:idris", mara.PendingQuestion);
+        Assert.NotEqual(f.Id, mara.WorkingOn);
+        // The thaw ends and she sees him: the question is settled by evidence, and the work starts without another click.
+        while (v.Find("idris")!.State == CrewState.Thawing && v.Phase == Phase.Alert)
+            v.Go();
+        Assert.Null(mara.PendingQuestion);
+        Assert.Equal(f.Id, mara.WorkingOn);
+        Assert.Null(mara.Job);
+    }
+
+    [Fact]
+    public void Refusing_the_terms_while_questions_are_open_is_no_push()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Assert.False(v.OnlyPriceLeft(mara));
+        var trust = mara.Trust;
+        var from = v.Log.Count;
+        v.Say("No, I won't promise that.", new Reading(LineKind.Plain, Item: "mara.terms", Response: ItemResponse.Refuse), new[] { mara });
+        Assert.DoesNotContain(v.Log.Skip(from), e => e.Text.Contains("pressed", StringComparison.Ordinal));
+        Assert.Equal(trust, mara.Trust, 3);
+        Assert.Equal(0, v.BargainsPushedThrough + v.BargainsPushedRefused);
+        // She says what she still waits on.
+        Assert.Equal("conditions", v.Log.Skip(from).Last(e => e.Intent != null).Intent!.Kind);
+        Tell(v, mara, "alive:idris");
+        Tell(v, mara, f.DangerFact!);
+        Assert.True(v.OnlyPriceLeft(mara));
+    }
+
+    [Fact]
+    public void Giving_the_word_while_questions_are_open_gets_a_line_that_says_what_is_left()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        var from = v.Log.Count;
+        v.Say("I promise I will wake Idris.", new Reading(LineKind.Promise, PromiseKey: "wake_partner"), new[] { mara });
+        Assert.NotEqual(f.Id, mara.WorkingOn);
+        var line = v.Log.Skip(from).Last(e => e.Intent != null).Intent!;
+        Assert.Equal("promise", line.Kind);
+        Assert.Contains("How is Idris?", line.Decision);
+        Assert.Equal(1, v.BargainsStruck);
+    }
+
+    [Fact]
+    public void An_order_to_someone_already_working_gets_what_they_are_on()
+    {
+        var (v, mara, f) = Alert1();
+        mara.Trust = 70;
+        v.Assign(mara, f, patch: false);
+        Assert.Equal(f.Id, mara.WorkingOn);
+        var from = v.Log.Count;
+        v.Say("get on with it", new Reading(LineKind.Order), new[] { mara });
+        var line = v.Log.Skip(from).Last(e => e.Intent != null).Intent!;
+        Assert.Equal("busy", line.Kind);
+        Assert.Contains("coolant", line.Detail);
+        Assert.DoesNotContain(v.Log.Skip(from), e => e.Kind == LogKind.Help);
+    }
+
+    [Fact]
+    public void The_checklist_carries_the_stakes_and_the_price_as_short_sub_lines_and_fits_the_waiting_box()
+    {
+        var seen = 0;
+        for (var seed = 0; seed < 30; seed++)
+        {
+            var v = new Voyage(seed, Variation.Draw(seed));
+            var mara = v.Find("mara")!;
+            v.Wake(mara);
+            v.Go();
+            if (v.Current.Faults.FirstOrDefault(f => f.Skill == Skill.Engineering && !f.Resolved) is not { } f)
+                continue;
+            v.Assign(mara, f, patch: false);
+            seen++;
+            Assert.True(v.JobHoldsQuestion(mara));
+            var (text, tip) = v.JobItem(mara, withStakes: true)!.Value;
+            Assert.StartsWith("Mara starts", text);
+            Assert.Contains("\nAnswer: ", text);
+            Assert.Contains("\nYour word: ", text);
+            // The push is not offered while questions are open.
+            Assert.DoesNotContain("without it", text);
+            Assert.Contains(v.StakesText(mara), tip);
+            Assert.Contains(v.BargainText(mara)!, tip);
+            // 8 rows of 45 columns are what "Waiting on you" has with every crew card shown.
+            var rows = text.Split('\n').Sum(TermsTextTests.WaitingRows);
+            Assert.True(rows <= 8, seed + ": " + rows + " rows: " + text);
+            // Without the stakes (another person's are shown) there is no Answer sub-line.
+            Assert.DoesNotContain("Answer:", v.JobItem(mara, withStakes: false)!.Value.Text);
+        }
+        Assert.True(seen >= 20);
+    }
+
+    [Fact]
+    public void The_price_sub_line_names_the_push_once_only_the_price_is_left()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, "alive:idris");
+        Tell(v, mara, f.DangerFact!);
+        Assert.False(v.JobHoldsQuestion(mara));
+        var (text, _) = v.JobItem(mara, withStakes: true)!.Value;
+        Assert.Contains("without it about", text);
+        Assert.True(text.Split('\n').Sum(TermsTextTests.WaitingRows) <= 8);
+    }
+
+    /// <summary>An obedient person short of trusting, woken for the coolant leak, asked to repair: Asha at trust 45.</summary>
+    private static (Voyage v, CrewMember asha, Fault f) ObedientWary()
+    {
+        var v = new Voyage(1);
+        var asha = v.Find("asha")!;
+        v.Wake(asha);
+        v.Go();
+        asha.Trust = 45;
+        asha.PendingQuestion = null;
+        return (v, asha, v.FindFault("")!);
+    }
+
+    [Fact]
+    public void An_obedient_person_waits_on_the_danger_question_until_it_is_answered()
+    {
+        var (v, asha, f) = ObedientWary();
+        v.Assign(asha, f, patch: false);
+        Assert.Equal(f.DangerFact, asha.PendingQuestion);
+        Assert.NotEqual(f.Id, asha.WorkingOn);
+        Assert.Equal(new[] { false }, v.JobChecklist(asha).Select(i => i.Done));
+        // Repair again does not slip past the question: they ask it again.
+        var from = v.Log.Count;
+        v.Assign(asha, f, patch: false);
+        Assert.NotEqual(f.Id, asha.WorkingOn);
+        Assert.Equal("refuse_answer", v.Log.Skip(from).Last(e => e.Intent != null).Intent!.Kind);
+        Tell(v, asha, f.DangerFact!);
+        Assert.Equal(f.Id, asha.WorkingOn);
+    }
+
+    [Fact]
+    public void An_obedient_person_starts_after_a_dodge_of_the_danger_question()
+    {
+        var (v, asha, f) = ObedientWary();
+        v.Assign(asha, f, patch: false);
+        v.Say("Let's not get into that.", new Reading(LineKind.Dodge), new[] { asha });
+        v.Assign(asha, f, patch: false);
+        Assert.Equal(f.Id, asha.WorkingOn);
+    }
 }

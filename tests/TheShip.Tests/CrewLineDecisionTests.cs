@@ -20,6 +20,11 @@ public class CrewLineDecisionTests
     [InlineData("refuse_answer", "How is Idris?", "Not until you tell me how Idris is.", true)]
     [InlineData("refuse_answer", "How is Idris?", "Give me something concrete, you hear?", false)]
     [InlineData("wake_question", "How is Idris?", "How's Idris? Tell me.", true)]
+    [InlineData("request_partner", "Idris", "What are the precise conditions to bring Idris online?", false)]
+    [InlineData("request_partner", "Idris", "Can you wake Idris while I'm up?", true)]
+    [InlineData("request_partner", "Idris", "I want to see Idris. Wake him while I'm up.", true)]
+    [InlineData("request_logs", "", "Open the logs to me. All of them.", true)]
+    [InlineData("request_logs", "", "What exactly are you keeping from the crew in there?", false)]
     public void A_line_must_carry_the_question_or_condition_of_the_decision(string kind, string detail, string line, bool accepted)
     {
         using var mind = Mind();

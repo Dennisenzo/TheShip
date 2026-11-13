@@ -17,7 +17,8 @@ public sealed partial class Voyage
         // is also asked of anyone short of trusting who has heard nothing about it.
         if (c.PendingQuestion is { } pq && _facts.TryGetValue(pq, out var asked) && c.Band == TrustBand.WantsReasons && !c.Has(Trait.Obedient))
             list.Add(new JobCondition(pq == danger ? "danger" : "answer", pq, asked.Question));
-        if (danger != null && c.PendingQuestion != danger && !c.Beliefs.ContainsKey(danger) && !c.Dodged.ContainsKey(danger) && c.Band != TrustBand.Follows)
+        // Asked already (the pending question) or not, it stands until it is answered or dodged; listed once.
+        if (danger != null && !list.Any(l => l.Key == danger) && !c.Beliefs.ContainsKey(danger) && !c.Dodged.ContainsKey(danger) && c.Band != TrustBand.Follows)
             list.Add(new JobCondition("danger", danger, _facts[danger].Question));
         if (BargainOf(c) is { } b)
             list.Add(new JobCondition("bargain", b.Key, CommitmentText(c, b.Key)));
@@ -129,6 +130,18 @@ public sealed partial class Voyage
     }
 
     /// <summary>
+    /// At the end of every step that can meet or lapse a condition (a line, a wake, a clock step, a log opened): drops the prices that
+    /// no longer stand, then starts the work of everyone whose last condition is now met, whatever met it (the partner woken instead of
+    /// promised, a question settled by what they saw, the logs opened, the bay taken).
+    /// </summary>
+    private void SettleJobs()
+    {
+        LapseBargains();
+        foreach (var c in Crew.Where(c => c.Job != null).ToList())
+            ResumeJob(c);
+    }
+
+    /// <summary>
     /// After a line, or a promise: when the last of this person's conditions is met the work starts by itself (the gates are run again:
     /// door, parts, trust, danger). Also brings up the danger question once the one in front of it is answered.
     /// </summary>
@@ -185,6 +198,36 @@ public sealed partial class Voyage
         return c.Name + " starts " + TaskText(f, j.Patch) + " when: " + string.Join("  ", list.Select(i => (i.Done ? "[x] " : "[ ] ") + i.Text));
     }
 
+    /// <summary>The person's open question is an unticked item of their checklist (the stakes of the answer can go under it).</summary>
+    public bool JobHoldsQuestion(CrewMember c) =>
+        c.PendingQuestion is { } q && _facts.TryGetValue(q, out var f)
+        && JobChecklist(c).Any(i => !i.Done && i.Text.EndsWith(f.Question, StringComparison.Ordinal));
+
+    /// <summary>
+    /// The checklist item for "Waiting on you" (<see cref="JobText"/>, about 3 rows of 45 columns) with short sub-lines (1-2 rows each):
+    /// the stakes of the open question when it is on the list and <paramref name="withStakes"/> (the person whose stakes are shown),
+    /// and the price of their work. Their full texts (<see cref="StakesText"/>, <see cref="BargainText"/>) are the tooltip. 3 + 2 + 2 rows
+    /// fit the 8 the box has with every crew card shown; the full stakes alone took 7 and pushed the checklist out. Null with no checklist.
+    /// </summary>
+    public (string Text, string? Tip)? JobItem(CrewMember c, bool withStakes)
+    {
+        if (JobText(c) is not { } text)
+            return null;
+        var tips = new List<string>();
+        if (withStakes && JobHoldsQuestion(c))
+        {
+            if (StakesShort(c) is { } stakes)
+                text += "\nAnswer: " + stakes + ".";
+            tips.Add(StakesText(c));
+        }
+        if (BargainShort(c) is { } price)
+        {
+            text += "\nYour word: " + price + ".";
+            tips.Add(BargainText(c)!);
+        }
+        return (text, tips.Count > 0 ? string.Join("\n\n", tips) : null);
+    }
+
     /// <summary>What is still left on someone's checklist, for the next-step line ("answer: How is Idris?; your word to wake Idris"), or null.</summary>
     public string? JobLeft(CrewMember c)
     {
@@ -213,7 +256,7 @@ public sealed partial class Voyage
                 var f = Current.Faults.First(x => x.Id == b.FaultId);
                 items.Add(new OpenItem(c, who + ".terms", "terms", "will start " + TaskText(f, b.Patch) + " only if the ship gives its word to " + CommitmentText(c, b.Key)));
             }
-            if (c.RequestMade && !c.RequestGranted && !c.RequestDeclined)
+            if (c.RequestOpen)
                 items.Add(new OpenItem(c, who + ".request", "request", "asked the ship " + (c.Want == Want.WakePartner ? "to wake their partner" : "to open the logs")));
             if (OpenAccusation(c) is not null)
                 items.Add(new OpenItem(c, who + ".accusation", "accusation", "caught the ship in a lie and waits for an answer"));
@@ -226,45 +269,69 @@ public sealed partial class Voyage
 
     /// <summary>
     /// The game's outcome for a line's response to an open item. Returns the reading to apply (an accept becomes the promise it agrees to,
-    /// a refusal to answer a dodge) and the listeners the line has been fully dealt with for (a push, a declined request).
+    /// a refusal to answer a dodge), the listeners the line has been fully dealt with for (a push, a declined request), and that outcome,
+    /// to run after the statement or promise the line also carries is applied.
     /// </summary>
-    private (Reading Reading, HashSet<CrewMember> Handled) ApplyItem(Reading reading, List<CrewMember> listeners)
+    private (Reading Reading, HashSet<CrewMember> Handled, Action? Outcome) ApplyItem(Reading reading, List<CrewMember> listeners)
     {
         var handled = new HashSet<CrewMember>();
+        Action? outcome = null;
         if (reading.Item is not { } id || reading.Response == ItemResponse.None || OpenItems(listeners).FirstOrDefault(i => i.Id == id) is not { } item)
-            return (reading, handled);
+            return (reading, handled, outcome);
         var c = item.Who;
         switch (item.Kind, reading.Response)
         {
             case ("terms", ItemResponse.Refuse or ItemResponse.Work):
-                Recorded("Recorded: you pressed " + c.Name + " to start without your word.");
-                PushByWords(c);
+                outcome = () => PushByWords(c);
                 handled.Add(c);
                 break;
-            case ("terms", ItemResponse.Accept) when reading.Kind != LineKind.Promise && BargainOf(c) is { } b:
+            // Agreeing to the terms is giving the word they asked for, also when the promise was read without its key ("other", "none");
+            // a different specific promise (never to thaw them again) stays what it is.
+            case ("terms", ItemResponse.Accept) when !NamesPromise(reading) && BargainOf(c) is { } b:
                 reading = reading with { Kind = LineKind.Promise, PromiseKey = b.Key };
                 break;
             case ("request", ItemResponse.Refuse):
-                Recorded("Recorded: you told " + c.Name + " no.");
-                DeclineRequest(c);
+                outcome = () =>
+                {
+                    Recorded("Recorded: you told " + c.Name + " no.");
+                    DeclineRequest(c);
+                };
                 handled.Add(c);
                 break;
-            case ("request", ItemResponse.Accept) when reading.Kind != LineKind.Promise:
+            case ("request", ItemResponse.Accept) when !NamesPromise(reading):
                 reading = reading with { Kind = LineKind.Promise, PromiseKey = c.Want == Want.WakePartner ? "wake_partner" : "show_logs" };
                 break;
             case ("asked" or "danger", ItemResponse.Refuse or ItemResponse.Dodge) when reading.Kind != LineKind.Dodge:
                 reading = reading with { Kind = LineKind.Dodge, FactKey = null, Value = null, PromiseKey = null };
                 break;
         }
-        return (reading, handled);
+        return (reading, handled, outcome);
     }
 
-    /// <summary>The player's words are the push (same as Repair again): the person decides now.</summary>
+    /// <summary>The line is a promise of something specific the game can name (not "other" or no key).</summary>
+    private static bool NamesPromise(Reading r) =>
+        r.Kind == LineKind.Promise && r.PromiseKey is { } k && k != "other" && Reading.PromiseKeys.Contains(k);
+
+    /// <summary>
+    /// The player's words are the push (same as Repair again): the person decides now. While other conditions are still open there
+    /// is nothing to push past yet: the same click would have them say what they still wait on, and nothing is recorded as a push.
+    /// </summary>
     private void PushByWords(CrewMember c)
     {
-        if (BargainOf(c) is { } b && Current.Faults.FirstOrDefault(x => x.Id == b.FaultId) is { } f)
-            Assign(c, f, b.Patch);
+        if (BargainOf(c) is not { } b || Current.Faults.FirstOrDefault(x => x.Id == b.FaultId) is not { } f)
+            return;
+        if (OnlyPriceLeft(c) && (c.Job is { } j && j.FaultId == b.FaultId && j.Patch == b.Patch || c.BargainDeclined))
+            Recorded("Recorded: you pressed " + c.Name + " to start without your word.");
+        Assign(c, f, b.Patch);
     }
+
+    /// <summary>
+    /// The ship's word is all this person still waits on for their job: Repair or Patch again (or saying no to the terms) is the push.
+    /// While a question is open too it is not (the button keeps its own label).
+    /// </summary>
+    public bool OnlyPriceLeft(CrewMember c) =>
+        BargainOf(c) is { } b && Current.Faults.FirstOrDefault(x => x.Id == b.FaultId) is { } f
+        && OpenConditions(c, f) is { Count: 1 } left && left[0].Kind == "bargain";
 
     private void DeclineRequest(CrewMember c)
     {

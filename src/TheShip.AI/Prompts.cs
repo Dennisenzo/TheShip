@@ -229,6 +229,18 @@ public static class Prompts
     public static readonly HashSet<string> MustCarry = new()
     {
         "wake_question", "ask_again", "ask_danger", "refuse_answer", "bargain", "bargain_refused", "conditions", "sleep_no_pod",
+        "request_partner", "request_logs",
+    };
+
+    /// <summary>
+    /// What a line of this decision must carry, in the game's words, or "" for nothing: the question or condition the game named,
+    /// "wake Idris" for a request to wake the partner (its detail is only the name) and "open the logs" for the logs request.
+    /// </summary>
+    public static string Carry(CrewIntent intent) => intent.Kind switch
+    {
+        "request_partner" => intent.Detail.Length > 0 ? "wake " + intent.Detail : "",
+        "request_logs" => "open the logs",
+        _ => MustCarry.Contains(intent.Kind) ? intent.Detail : "",
     };
 
     /// <summary>The kinds of decision whose line may ask a question; any other kind must not ask the ship something new.</summary>
@@ -265,9 +277,14 @@ public static class Prompts
             sb.Append("\nYou feel: ").Append(feeling).Append('.');
         if (speaker != null)
             sb.Append("\nYour tone toward the ship: ").Append(Tone(band)).Append('.');
-        if (intent.Detail.Length > 0 && MustCarry.Contains(intent.Kind))
+        if (Carry(intent) is { Length: > 0 } carry)
             sb.Append("\nYour line must carry this, in your own words and nothing more: ")
-                .Append(intent.Kind is "bargain" or "bargain_refused" ? "you want the ship's word to " + intent.Detail : intent.Detail);
+                .Append(intent.Kind switch
+                {
+                    "bargain" or "bargain_refused" => "you want the ship's word to " + carry,
+                    "request_partner" or "request_logs" => "you ask the ship to " + carry,
+                    _ => carry,
+                });
         sb.Append("\nSay it in your own words.");
         return sb.ToString();
     }

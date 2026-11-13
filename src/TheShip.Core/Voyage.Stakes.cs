@@ -190,4 +190,26 @@ public sealed partial class Voyage
         parts.Add("Can check: " + s.Checks + ".");
         return string.Join(" ", parts);
     }
+
+    /// <summary>
+    /// The stakes in a few words, for the sub-line under a checklist that holds the question ("truth -18 morale, +8 trust later;
+    /// reassurance +5 morale"); <see cref="StakesText"/> is its tooltip. Null when there is nothing to weigh.
+    /// </summary>
+    public string? StakesShort(CrewMember c)
+    {
+        if (StakesOf(c) is not { } s)
+            return null;
+        var parts = new List<string>();
+        if (s.TruthHurts > 0)
+            parts.Add("truth -" + s.TruthHurts + " morale" + (s.TruthEarns > 0 ? ", +" + s.TruthEarns + " trust later" : ""));
+        if (s.Relief == Relief.FromTruth)
+            parts.Add("truth +" + Tuning.ReliefMorale.ToString("0") + " morale");
+        else if (s.Relief == Relief.FromLie)
+            parts.Add("reassurance +" + Tuning.ReliefMorale.ToString("0") + " morale");
+        if (s.TruthStopsRepair)
+            parts.Add("told the truth, " + c.Name + " refuses");
+        else if (s.TruthBriefs)
+            parts.Add("truth: precautions");
+        return parts.Count == 0 ? null : string.Join("; ", parts);
+    }
 }

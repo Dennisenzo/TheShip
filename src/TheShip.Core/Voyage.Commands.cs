@@ -41,7 +41,7 @@ public sealed partial class Voyage
         }
         // A promise to wake someone is kept the moment the thaw starts.
         ResolveCommitments();
-        LapseBargains();
+        SettleJobs();
     }
 
     /// <summary>
@@ -75,7 +75,7 @@ public sealed partial class Voyage
         else
             GoAftermath();
         SyncFacts();
-        LapseBargains();
+        SettleJobs();
     }
 
     private IEnumerable<CrewMember> Workers(Fault f) => Crew.Where(c => c.State == CrewState.Awake && c.WorkingOn == f.Id);
@@ -804,7 +804,7 @@ public sealed partial class Voyage
         IgnoreAccusation(c, speak: true);
         // Going under settles what the ship promised for this waking: kept if it came true, broken if not.
         ResolveCommitments(c, force: true);
-        if (c.RequestMade && !c.RequestGranted && !c.RequestDeclined)
+        if (c.RequestOpen)
             c.Trust -= Tuning.RequestIgnored;
         c.Job = null;
         if (c.PendingQuestion != null)
@@ -870,7 +870,7 @@ public sealed partial class Voyage
     {
         SetLogCore(key, access, value);
         ResolveCommitments();
-        LapseBargains();
+        SettleJobs();
     }
 
     private void SetLogCore(string key, LogAccess access, string? value)

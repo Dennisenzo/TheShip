@@ -330,6 +330,10 @@ public sealed partial class Voyage
         // The word is given. If it was the last condition the work starts now; otherwise it starts when the rest are met.
         c.Job = new JobTerms(f.Id, b.Patch, stated);
         ResumeJob(c, "bargain_struck", "You have the ship's word to " + CommitmentText(c, b.Key) + ". You start " + TaskText(f, b.Patch) + ".");
+        // Other conditions still open: they say they have the word and what they still wait on.
+        if (c.Job != null && JobLeft(c) is { } left)
+            Speak(c, "promise", "The ship gave you its word to " + CommitmentText(c, b.Key) + ". You still wait on the rest before you start "
+                                + TaskText(f, b.Patch) + ": " + left + ".");
         return true;
     }
 
@@ -350,6 +354,22 @@ public sealed partial class Voyage
             ? "They refuse to start without your word. Say it to them."
             : FormattableString.Invariant($"Without it: about {PushChance(c) * 100:0}% {StartsText(c)}, -{Tuning.BargainPushedTrust:0} trust. Say it to them.");
         return text;
+    }
+
+    /// <summary>
+    /// The price in a few words, for the sub-line under the checklist that holds it ("kept +10, broken -15 trust; without it about
+    /// 63% she starts, -5 trust"); <see cref="BargainText"/> is its tooltip. The push is named only once the price is all that is left.
+    /// </summary>
+    public string? BargainShort(CrewMember c)
+    {
+        if (BargainOf(c) is null)
+            return null;
+        var text = FormattableString.Invariant($"kept +{Tuning.PromiseKept:0}, broken -{Tuning.PromiseBroken:0} trust");
+        if (c.BargainDeclined)
+            return text + "; no start without it";
+        return OnlyPriceLeft(c)
+            ? text + FormattableString.Invariant($"; without it about {PushChance(c) * 100:0}% {StartsText(c)}, -{Tuning.BargainPushedTrust:0} trust")
+            : text;
     }
 
     /// <summary>"she starts", "he starts", or "they start" when the sheet has no pronoun.</summary>

@@ -124,6 +124,8 @@ public sealed class CrewMember
     public bool RequestGranted { get; set; }
     /// <summary>The ship said no to their request (in words); the cost was charged then.</summary>
     public bool RequestDeclined { get; set; }
+    /// <summary>Their request still waits on the ship: made, not granted and not declined (an open item, and in "Waiting on you").</summary>
+    public bool RequestOpen => RequestMade && !RequestGranted && !RequestDeclined;
     /// <summary>The conditions they stated for the job they were asked to start (null when none are open).</summary>
     public JobTerms? Job { get; set; }
     public bool SawPartner { get; set; }

@@ -26,10 +26,8 @@ public sealed partial class Voyage
         Apply(text, reading, listeners);
         foreach (var l in listeners)
             Clamp(l);
-        LapseBargains();
         // The last condition of a job met by this line: the work starts by itself.
-        foreach (var l in listeners)
-            ResumeJob(l);
+        SettleJobs();
         return true;
     }
 
@@ -55,14 +53,18 @@ public sealed partial class Voyage
 
     private void Apply(string text, Reading reading, List<CrewMember> listeners)
     {
-        // What the line responds to (an open question, terms, a request): the game decides what that does, then the rest is as usual.
-        (reading, var handled) = ApplyItem(reading, listeners);
-        if (handled.Count > 0)
-        {
-            listeners = listeners.Where(l => !handled.Contains(l)).ToList();
-            if (listeners.Count == 0)
-                return;
-        }
+        // What the line responds to (an open question, terms, a request): the game decides what that does. A statement or a
+        // promise the line also carries counts for everyone who heard it and comes first ("No, I won't wake him. Idris is dead."
+        // is recorded, then refuses the terms); any other kind is answered only by those the item did not already settle.
+        (reading, var handled, var outcome) = ApplyItem(reading, listeners);
+        var rest = reading.Kind is LineKind.Statement or LineKind.Promise ? listeners : listeners.Where(l => !handled.Contains(l)).ToList();
+        if (rest.Count > 0)
+            ApplyKind(text, reading, rest);
+        outcome?.Invoke();
+    }
+
+    private void ApplyKind(string text, Reading reading, List<CrewMember> listeners)
+    {
         var names = string.Join(" and ", listeners.Select(l => l.Name));
         var ids = listeners.Select(l => l.Id).ToList();
         switch (reading.Kind)
@@ -174,6 +176,12 @@ public sealed partial class Voyage
                 {
                     Recorded("Recorded: you told " + ordered.Who.Name + " to get on with it.");
                     Assign(ordered.Who, job.Fault, job.Patch);
+                    break;
+                }
+                // Someone already at work says what they are on, rather than asking which fault.
+                if (listeners.FirstOrDefault(l => l.WorkingOn != null) is { } busy && Current.Faults.FirstOrDefault(x => x.Id == busy.WorkingOn) is { } on)
+                {
+                    Speak(busy, "busy", "The ship told you to get on with the work. You are already on " + TaskText(on, on.Patching) + "; say so.", "the " + on.CrewName);
                     break;
                 }
                 Speak(listeners[0], "order", "The ship gave an order in words. You ask which fault it means.");

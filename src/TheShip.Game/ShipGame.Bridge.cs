@@ -181,8 +181,9 @@ public sealed partial class ShipGame
             ? (anyone ? "Choose who to ask." : "Nobody is awake.")
             : who.Name + " has " + skill + " " + who.SkillOf(fault.Skill) + "; this needs " + fault.Level + "."
               + (v.TermsText(who, fault) is { Length: > 0 } terms ? " " + terms : "");
-        // A person with an open bargain on this very piece of work: the button pushes past it (and says so).
-        var bargain = who != null ? v.BargainOf(who) : null;
+        // A person whose only open condition is the price of this very piece of work: the button pushes past it (and says so).
+        // While a question is open too, it is still Repair or Patch: the click has them say what they wait on.
+        var bargain = who != null && v.OnlyPriceLeft(who) ? v.BargainOf(who) : null;
         var pushRepair = bargain is { } br && br.FaultId == fault.Id && !br.Patch;
         var pushPatch = bargain is { } bp && bp.FaultId == fault.Id && bp.Patch;
         var pushTip = who != null && v.BargainText(who) is { } bt ? bt : fit;
@@ -806,9 +807,7 @@ public sealed partial class ShipGame
             _p.TextRight(_p.Small, "select a person for stakes", x + width - 12, waiting.Y + 10, Painter.Dim);
         var wy = waiting.Y + 36;
         var limit = waiting.Bottom - 22;
-        // The terms item is shown short (two rows); its full text is the tooltip.
-        var terms = _target != null ? v.TermsItem(_target) : null;
-        foreach (var (who, item) in Waiting(v, _target))
+        foreach (var (who, item, tip) in Waiting(v, _target))
         {
             // An item that doesn't fit is left out; a shorter one after it may still fit.
             var rows = _p.Lines(item, width - 24);
@@ -827,10 +826,9 @@ public sealed partial class ShipGame
                     Do(() => _target = person);
                 }
             }
-            if (terms is { } t && who == _target && item == t.Short)
-                _p.Tip(row, t.Full);
-            else if (who != null && v.AccusationText(who) is { } accusation && item == AccusationShort(v, who))
-                _p.Tip(row, accusation);
+            // A short item (terms, an accusation, a checklist with its stakes and price) has its full text as the tooltip.
+            if (tip != null)
+                _p.Tip(row, tip);
             wy = _p.Paragraph(item, x + 12, wy, width - 24, Painter.Ink) + 4;
         }
     }
@@ -853,20 +851,22 @@ public sealed partial class ShipGame
     /// warning and the bay lockout; then per awake person, the selected one first: their other open question, their request, what the ship
     /// owes them (<see cref="Voyage.LedgerLine"/>), their doubts and a pod refusal; last, promises to people asleep.
     /// </remarks>
-    private static IEnumerable<(CrewMember? Who, string Text)> Waiting(Voyage v, CrewMember? selected)
+    private static IEnumerable<(CrewMember? Who, string Text, string? Tip)> Waiting(Voyage v, CrewMember? selected)
     {
-        // The stakes come first: they are the longest item and the one the player is deciding on.
         var asking = v.Awake.Count(a => v.StakesOf(a) != null);
         var staked = v.Awake.Where(c => c.PendingQuestion != null && v.HasFact(c.PendingQuestion))
             .FirstOrDefault(c => c == selected || asking == 1);
-        if (staked != null)
-            yield return (staked, v.StakesText(staked));
+        // The stakes come first: they are the longest item and the one the player is deciding on. When the question they are about is
+        // on that person's checklist, the checklist comes first instead, with the stakes as a short sub-line (the full stakes are the
+        // tooltip): the stakes alone take 7 of the 8 rows "Waiting on you" has with every card shown and pushed the checklist out.
+        if (staked != null && !v.JobHoldsQuestion(staked))
+            yield return (staked, v.StakesText(staked), null);
         // The conditions a wary person stated for their job, one checklist per person that ticks off as each is met.
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1))
-            if (v.JobText(c) is { } job)
-                yield return (c, job);
-        // What a wary person wants before starting: the selected one's (or the only one's) bargain, ahead of the bay items.
-        var bargainers = v.Awake.Where(c => v.BargainOf(c) != null).ToList();
+            if (v.JobItem(c, withStakes: c == staked) is { } checklist)
+                yield return (c, checklist.Text, checklist.Tip);
+        // What a wary person wants before starting when no checklist carries it: the selected one's (or the only one's) bargain, ahead of the bay items.
+        var bargainers = v.Awake.Where(c => v.BargainOf(c) != null && v.JobText(c) is null).ToList();
         // With several and none of them selected, the first one's, and a hint to select the others.
         var bargainer = bargainers.FirstOrDefault(c => c == selected) ?? bargainers.FirstOrDefault();
         if (bargainer != null && v.BargainText(bargainer) is { } bargainText)
@@ -874,42 +874,43 @@ public sealed partial class ShipGame
             var others = bargainers.Where(c => c != bargainer).Select(c => c.Name).ToList();
             yield return (bargainer, bargainText + (others.Count > 0 && bargainer != selected
                 ? " Select " + string.Join(" or ", others) + " to see " + (others.Count == 1 ? "theirs." : "each of theirs.")
-                : ""));
+                : ""), null);
         }
         // A lie they caught: short form here (two rows), the full text is the tooltip. Selected person first.
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).Where(a => v.OpenAccusation(a) != null))
-            yield return (c, AccusationShort(v, c));
+            yield return (c, AccusationShort(v, c), v.AccusationText(c));
         if (v.Lockouts.BayWarned.Count > 0)
             yield return (null, string.Join(" and ", v.Lockouts.BayWarned.Select(id => v.Crew.First(c => c.Id == id).Name))
-                         + " will take the cold-sleep bay at the next step. Win one of them back above 15 trust, or they do.");
+                         + " will take the cold-sleep bay at the next step. Win one of them back above 15 trust, or they do.", null);
         if (v.Lockouts.Bay)
             yield return (null, v.BayLockReason + (v.LogsLocked
                 ? " The crew hold the logs too: no promise to them can be kept now."
                 : " Promise one of them to open the logs, have every log open when it falls due, and win their trust above "
-                  + Tuning.BayReturnTrust.ToString("0") + " to get it back."));
+                  + Tuning.BayReturnTrust.ToString("0") + " to get it back."), null);
         // The terms the selected idle person would work their likely job on, in two rows (the full text is the row's tooltip), so they
         // still fit under a six-row stakes item or a four-row bargain.
         if (selected != null && v.TermsItem(selected) is { } terms)
-            yield return (selected, terms.Short);
+            yield return (selected, terms.Short, terms.Full);
         var owed = v.Ledger().Where(e => e.State == "open").ToList();
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {
             if (c != staked && c.PendingQuestion != null && v.HasFact(c.PendingQuestion) && v.JobText(c) is null)
-                yield return (c, c.Name + " asked: " + v.GetFact(c.PendingQuestion).Question);
-            if (c.RequestMade && !c.RequestGranted)
-                yield return (c, c.Name + " asked you " + (c.Want == Want.WakePartner ? "to wake their partner." : "to open the logs."));
+                yield return (c, c.Name + " asked: " + v.GetFact(c.PendingQuestion).Question, null);
+            // A request the ship said no to is settled: it leaves the list.
+            if (c.RequestOpen)
+                yield return (c, c.Name + " asked you " + (c.Want == Want.WakePartner ? "to wake their partner." : "to open the logs."), null);
             // What the ship owes them comes before their doubts.
             foreach (var e in owed.Where(e => e.Person == c))
-                yield return (c, v.LedgerLine(e));
+                yield return (c, v.LedgerLine(e), null);
             foreach (var doubt in c.Doubts)
                 if (v.HasFact(doubt))
-                    yield return (c, v.DoubtText(c, doubt));
+                    yield return (c, v.DoubtText(c, doubt), null);
             if (v.PodRefusalText(c) is { } refusal)
-                yield return (c, refusal);
+                yield return (c, refusal, null);
         }
         // Promises to people who are asleep (never to thaw them again).
         foreach (var e in owed.Where(e => e.Person.State != CrewState.Awake && e.Person.Alive))
-            yield return (e.Person, v.LedgerLine(e));
+            yield return (e.Person, v.LedgerLine(e), null);
     }
 
 }
