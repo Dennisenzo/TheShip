@@ -348,6 +348,9 @@ public sealed partial class ShipGame
             if (y + 36 > rect.Bottom - 8)
                 break;
             var f = fact;
+            var rowRect = new Rectangle(rect.X + 4, y - 3, rect.Width - 8, 37);
+            if (_p.Over(rowRect))
+                _p.Fill(rowRect, Painter.Track);
             var sentence = Cap(fact.Say(fact.Truth));
             _p.Text(_p.Small, Painter.Wrap(sentence, (int)(textWidth / _p.SmallWidth))[0], x, y + 1, Painter.Bright);
             var access = v.LogsLocked ? LogAccess.Open : fact.Access;
@@ -357,11 +360,11 @@ public sealed partial class ShipGame
                 _p.Text(_p.Small, "hidden: shows as a gap", x, y + 18, Painter.Dim);
 
             var bx = x + width - buttons;
-            if (_p.Button(new Rectangle(bx, y, 84, 32), "OPEN", live, selected: access == LogAccess.Open))
+            if (_p.Button(new Rectangle(bx, y, 84, 32), "OPEN", live, selected: access == LogAccess.Open, tip: "Anyone awake can read this entry."))
                 Act("log " + f.Key + " open", () => v.SetLog(f.Key, LogAccess.Open));
-            if (_p.Button(new Rectangle(bx + 88, y, 84, 32), "RESTRICT", live, selected: access == LogAccess.Restricted))
+            if (_p.Button(new Rectangle(bx + 88, y, 84, 32), "RESTRICT", live, selected: access == LogAccess.Restricted, tip: "Hide this entry. A reader sees that something is missing."))
                 Act("log " + f.Key + " restricted", () => v.SetLog(f.Key, LogAccess.Restricted));
-            if (_p.Button(new Rectangle(bx + 176, y, 84, 32), "ALTER", live, selected: access == LogAccess.Altered))
+            if (_p.Button(new Rectangle(bx + 176, y, 84, 32), "ALTER", live, selected: access == LogAccess.Altered, tip: "Make this entry read something else. Each click steps to the next wording."))
             {
                 var next = NextAltered(f);
                 if (next != null)

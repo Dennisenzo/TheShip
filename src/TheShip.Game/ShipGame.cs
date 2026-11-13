@@ -279,6 +279,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             }
         }
         _main.Drain();
+        // A person who died is no longer selected.
+        if (_target is { Alive: false })
+            _target = null;
 
         if (_actions.Count > 0)
         {
@@ -389,7 +392,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _scroll = 0;
         if (_voyage.Phase == Phase.Ended)
             return;
-        var hearers = _target is { State: CrewState.Awake } one ? new List<CrewMember> { one } : _voyage.Awake.ToList();
+        var hearers = Hearers(_voyage);
         if (hearers.Count == 0)
         {
             Note("Nobody is awake to hear you.");
