@@ -36,7 +36,7 @@ real-time stamp and a tag per line. The game's opening note gives the file's pat
 | Tag | What it records |
 | --- | --- |
 | `start`, `quit` | seed, model and backend; whether the voyage had ended |
-| `state` | after each clock move: year, phase, stores, parts, pod wear, the alert's faults, every person's state, age, trust, morale, days awake, thaws, beliefs, caught lies, doubts |
+| `state` | after each clock move: year, phase, stores, parts, pod wear, the alert's faults, the ship flags (`POWER LOW`, `NAV LOST`, `LOGS LOCKED`, `BAY TAKEN` or `BAY WARNED`), every person's state, age, trust, morale, days awake, thaws, beliefs, caught lies, doubts |
 | `Y<year> ship/crew/you/recorded/help` | every ship log line; a crew line shows its template and the game's decision |
 | `voiced` | the model's wording of that crew line, or that it was rejected and the template stayed |
 | `click` | every click that changes the game: wake, sleep, repair, patch, advance, drift, doors, logs |

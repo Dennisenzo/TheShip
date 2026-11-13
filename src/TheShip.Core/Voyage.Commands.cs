@@ -813,7 +813,10 @@ public sealed partial class Voyage
         var unsettled = Awake.Where(c => !c.AskedToSleep).Select(c => c.Name).ToList();
         if (unsettled.Count > 0)
         {
-            Ship("Still awake and not asked to sleep: " + string.Join(", ", unsettled) + ".");
+            // While the crew hold the bay the ship can't ask anyone; the crew put people under when their three months are up.
+            Ship(Lockouts.Bay
+                ? "Still awake: " + string.Join(", ", unsettled) + ". The crew hold the cold-sleep bay and put people under once they can sleep; advance the clock."
+                : "Still awake and not asked to sleep: " + string.Join(", ", unsettled) + ".");
             return;
         }
 

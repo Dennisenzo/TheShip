@@ -206,6 +206,57 @@ public class BayTakeoverTests
     }
 
     [Fact]
+    public void Drift_while_the_bay_is_taken_does_not_say_the_crew_were_not_asked_to_sleep()
+    {
+        var v = Aftermath("jonah");
+        Hostile(v, "mara", "jonah");
+        v.Go();
+        Hostile(v, "mara", "jonah");
+        v.Go();
+        Assert.True(v.Lockouts.Bay);
+        Assert.NotEmpty(v.Awake);
+        v.Drift();
+        Assert.Equal(1, v.Current.Number);
+        Assert.DoesNotContain(v.Log, e => e.Kind == LogKind.Ship && e.Text.Contains("not asked to sleep"));
+        Assert.Contains(v.Log, e => e.Kind == LogKind.Ship && e.Text.StartsWith("Still awake:", StringComparison.Ordinal) && e.Text.Contains("crew hold the cold-sleep bay"));
+    }
+
+    [Fact]
+    public void A_warning_ended_by_death_says_so_not_that_the_crew_changed_their_minds()
+    {
+        var v = Aftermath("jonah");
+        Hostile(v, "mara", "jonah");
+        v.Go();
+        Assert.NotEmpty(v.Lockouts.BayWarned);
+        v.Kill(v.Find("jonah")!, "died");
+        v.Go();
+        Assert.False(v.Lockouts.Bay);
+        Assert.Empty(v.Lockouts.BayWarned);
+        Assert.DoesNotContain(v.Log, e => e.Kind == LogKind.Ship && e.Text.Contains("dropped the idea"));
+        Assert.Contains(v.Log, e => e.Kind == LogKind.Ship && e.Text == "With Jonah dead, the plan to take the cold-sleep bay is off.");
+    }
+
+    [Fact]
+    public void A_warning_ended_by_a_change_of_heart_says_the_crew_dropped_it()
+    {
+        var v = Aftermath("jonah");
+        Hostile(v, "mara", "jonah");
+        v.Go();
+        v.Find("jonah")!.Trust = 40;
+        v.Go();
+        Assert.Contains(v.Log, e => e.Kind == LogKind.Ship && e.Text.Contains("dropped the idea"));
+    }
+
+    [Theory]
+    [InlineData("bay_returned", "You feel: guarded")]
+    [InlineData("takeover_warning", "You feel: angry")]
+    public void The_bay_lines_carry_a_feeling(string kind, string feeling)
+    {
+        var v = new Voyage(1);
+        Assert.Contains(feeling, TheShip.AI.Prompts.CrewUser(new CrewIntent(kind, "The bay."), v.Find("mara")!, v));
+    }
+
+    [Fact]
     public void Advance_until_attention_does_not_stall_when_everyone_can_sleep_and_the_bay_is_taken()
     {
         var v = Aftermath("jonah");

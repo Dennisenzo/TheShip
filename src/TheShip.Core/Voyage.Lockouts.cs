@@ -36,8 +36,19 @@ public sealed partial class Voyage
         {
             if (takers.Count == 0)
             {
+                // Say why it is off: those who warned died or went under, or changed their minds.
+                var warned = Lockouts.BayWarned.Select(id => Crew.First(c => c.Id == id)).ToList();
+                var dead = warned.Where(c => !c.Alive).Select(c => c.Name).ToList();
+                var under = warned.Where(c => c.Alive && c.State != CrewState.Awake).Select(c => c.Name).ToList();
                 Lockouts.BayWarned.Clear();
-                Ship("The crew have dropped the idea of taking the cold-sleep bay.");
+                var gone = new List<string>();
+                if (dead.Count > 0)
+                    gone.Add(string.Join(" and ", dead) + " dead");
+                if (under.Count > 0)
+                    gone.Add(string.Join(" and ", under) + " asleep");
+                Ship(gone.Count > 0
+                    ? "With " + string.Join(" and ", gone) + ", the plan to take the cold-sleep bay is off."
+                    : "The crew have dropped the idea of taking the cold-sleep bay.");
                 return;
             }
             Lockouts.Bay = true;
