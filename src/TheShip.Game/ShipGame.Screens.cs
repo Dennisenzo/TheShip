@@ -278,13 +278,15 @@ public sealed partial class ShipGame
                 var released = listener != null ? s.Released.Contains(listener.Id) : s.Released.Count > 0 && s.PromiseKept.Count == 0;
                 if (released)
                     return ("PROMISE", false, text + "released, it could no longer be kept.");
+                if (listener != null ? s.Repeated.Contains(listener.Id) : s.Hearers.Count > 0 && s.Repeated.Count == s.Hearers.Count)
+                    return ("PROMISE", false, text + "a repeat of a promise already open.");
                 // An open promise shows when it falls due.
                 var dueNote = "open.";
                 var dues = listener != null ? s.DueBy.Where(kv => kv.Key == listener.Id) : s.DueBy.Where(kv => s.OpenFor(kv.Key));
                 if (kept is null && dues.Any())
                 {
-                    var left = v.DaysLeft(dues.Min(kv => kv.Value));
-                    dueNote = "open, " + (left <= 0 ? "due now." : left + (left == 1 ? " day left." : " days left."));
+                    var first = dues.MinBy(kv => kv.Value);
+                    dueNote = "open, " + v.DueText(v.Crew.First(c => c.Id == first.Key), s.PromiseKey!, first.Value) + ".";
                 }
                 return ("PROMISE", kept != true, text + (kept is null ? dueNote : kept.Value ? "kept." : "broken."));
             case StatementKind.Dodge:

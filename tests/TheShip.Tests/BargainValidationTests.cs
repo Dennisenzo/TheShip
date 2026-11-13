@@ -73,4 +73,37 @@ public class BargainValidationTests
         Assert.Equal(1, Count(v, "promise_kept", mara));
         Assert.True(v.Lockouts.Bay, "one kept promise does not lift trust 5 to the bay's return");
     }
+
+    // ---- 3. Sleeping settles a promise at once: the ledger and the SLEEP button say so ----
+
+    [Fact]
+    public void The_ledger_line_says_a_promise_also_ends_when_the_person_sleeps()
+    {
+        var (v, mara, _) = Aftermath();
+        Promised(v, mara, "wake_partner");
+        var e = v.Ledger().Single(x => x.Person == mara && x.State == "open");
+        Assert.Matches(@"^Promise to Mara: wake Idris, \d+ days left or when she sleeps\.$", v.LedgerLine(e));
+    }
+
+    [Fact]
+    public void The_sleep_warning_names_the_promise_sleeping_would_break()
+    {
+        var (v, mara, idris) = Aftermath();
+        Assert.Null(v.SleepBreaksText(mara));
+        Promised(v, mara, "wake_partner");
+        Assert.Equal("Mara still waits for Idris: sleeping now breaks that promise.", v.SleepBreaksText(mara));
+        v.Wake(idris);
+        Assert.Null(v.SleepBreaksText(mara));
+    }
+
+    [Fact]
+    public void The_sleep_warning_on_the_logs_follows_whether_they_are_open()
+    {
+        var (v, mara, _) = Aftermath();
+        v.SetLog("all", LogAccess.Restricted);
+        Promised(v, mara, "show_logs");
+        Assert.Equal("Mara still waits for the logs to open: sleeping now breaks that promise.", v.SleepBreaksText(mara));
+        v.SetLog("all", LogAccess.Open);
+        Assert.Null(v.SleepBreaksText(mara));
+    }
 }

@@ -741,7 +741,7 @@ public sealed partial class ShipGame
                 var sleepTip = v.Lockouts.Bay
                     ? v.BayLockReason
                     : can
-                    ? "Ask " + c.Name + " to go back into the pod. They may refuse."
+                    ? "Ask " + c.Name + " to go back into the pod. They may refuse." + (v.SleepBreaksText(c) is { } breaks ? " " + breaks : "")
                     : "A pod takes a person back after " + N(Tuning.MinAwakeHours / 24) + " days awake at the earliest: " + days + " to go.";
                 if (_p.Button(act, v.Lockouts.Bay ? "BAY TAKEN" : can ? "SLEEP" : "in " + days + " d", can && !ended && !v.Lockouts.Bay, tip: sleepTip))
                     Act("ask " + person.Name + " to sleep", () => v.AskSleep(person));
@@ -817,7 +817,7 @@ public sealed partial class ShipGame
                 yield return (c, c.Name + " asked you " + (c.Want == Want.WakePartner ? "to wake their partner." : "to open the logs."));
             // What the ship owes them comes before their doubts.
             foreach (var e in owed.Where(e => e.Person == c))
-                yield return (c, LedgerLine(v, e));
+                yield return (c, v.LedgerLine(e));
             foreach (var doubt in c.Doubts)
                 if (v.HasFact(doubt))
                     yield return (c, c.Name + " doubts you on " + v.GetFact(doubt).Label + " and will check.");
@@ -826,11 +826,7 @@ public sealed partial class ShipGame
         }
         // Promises to people who are asleep (never to thaw them again).
         foreach (var e in owed.Where(e => e.Person.State != CrewState.Awake && e.Person.Alive))
-            yield return (e.Person, LedgerLine(v, e));
+            yield return (e.Person, v.LedgerLine(e));
     }
 
-    /// <summary>"Promise to Mara: wake Idris, 12 days left." (a standing promise has no days.)</summary>
-    private static string LedgerLine(Voyage v, LedgerEntry e) =>
-        "Promise to " + e.Person.Name + ": " + e.Text
-        + (e.DueBy is { } due ? ", " + (v.DaysLeft(due) <= 0 ? "due now" : v.DaysLeft(due) + (v.DaysLeft(due) == 1 ? " day left" : " days left")) : ", until arrival") + ".";
 }

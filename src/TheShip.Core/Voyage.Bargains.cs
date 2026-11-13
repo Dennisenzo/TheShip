@@ -38,6 +38,50 @@ public sealed partial class Voyage
     /// <summary>Days left to a clock hour, rounded up; at most 0 when due.</summary>
     public int DaysLeft(double dueBy) => (int)Math.Max(0, Math.Ceiling((dueBy - Clock) / 24 - 1e-9));
 
+    /// <summary>
+    /// When an open promise to this person falls due, in words: "12 days left", "due now", "until arrival" (no date). While they are
+    /// awake a promise the game checks also ends when they go to sleep (sleeping settles it), so it says so: "12 days left or when she sleeps".
+    /// </summary>
+    public string DueText(CrewMember c, string key, double? dueBy)
+    {
+        if (dueBy is not { } due)
+            return "until arrival";
+        var left = DaysLeft(due);
+        var text = left <= 0 ? "due now" : left + (left == 1 ? " day left" : " days left");
+        if (left > 0 && Checkable(key) && c.State is CrewState.Awake or CrewState.Thawing)
+            text += " or when " + (c.Pronoun ?? "they") + (c.Pronoun is null ? " sleep" : " sleeps");
+        return text;
+    }
+
+    /// <summary>"Promise to Mara: wake Idris, 12 days left or when she sleeps." (a standing promise has no days.)</summary>
+    public string LedgerLine(LedgerEntry e) => "Promise to " + e.Person.Name + ": " + e.Text + ", " + DueText(e.Person, e.Key, e.DueBy) + ".";
+
+    /// <summary>Whether an open promise to this person would count as kept if it were settled now (they went to sleep).</summary>
+    private bool KeptNow(CrewMember c, string key)
+    {
+        if (key == "show_logs")
+            return AllLogsOpen;
+        var partner = c.PartnerId is null ? null : Crew.First(x => x.Id == c.PartnerId);
+        return partner is not null && (partner.State == CrewState.Thawing || (partner.State == CrewState.Awake && c.State == CrewState.Awake && c.SawPartner));
+    }
+
+    /// <summary>
+    /// What going to sleep now would do to the open promises to this person (sleeping settles them at once), for the SLEEP button;
+    /// null when nothing would break. "Mara still waits for Idris: sleeping now breaks that promise."
+    /// </summary>
+    public string? SleepBreaksText(CrewMember c)
+    {
+        var lines = new List<string>();
+        foreach (var e in Ledger().Where(e => e.Person == c && e.State == "open" && Checkable(e.Key) && !KeptNow(c, e.Key)))
+        {
+            var waits = e.Key == "wake_partner" && c.PartnerId is { } p ? Crew.First(x => x.Id == p).Name : "the logs to open";
+            var line = c.Name + " still waits for " + waits + ": sleeping now breaks that promise.";
+            if (!lines.Contains(line))
+                lines.Add(line);
+        }
+        return lines.Count == 0 ? null : string.Join(" ", lines);
+    }
+
     /// <summary>The person has an open promise with this key from the ship (other than <paramref name="except"/>).</summary>
     internal bool HasOpenCommitment(CrewMember c, string key, Statement? except = null) =>
         Statements.Any(s => s != except && s.Kind == StatementKind.Promise && s.PromiseKey == key && s.OpenFor(c.Id));
@@ -84,7 +128,7 @@ public sealed partial class Voyage
                         s.Released.Add(id);
                         continue;
                     }
-                    if (partner.State == CrewState.Thawing || (partner.State == CrewState.Awake && c.State == CrewState.Awake && c.SawPartner))
+                    if (KeptNow(c, "wake_partner"))
                     {
                         ResolvePromise(s, c, kept: true);
                         continue;
