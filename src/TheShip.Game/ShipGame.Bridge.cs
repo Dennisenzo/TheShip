@@ -785,10 +785,13 @@ public sealed partial class ShipGame
         }
     }
 
-    /// <summary>Questions nobody has answered, things people asked for, doubts, and promises still open; each with the person it is about, if one.</summary>
+    /// <summary>Questions nobody has answered, conditions, things people asked for, doubts, and promises still open; each with the person it is about, if one.</summary>
     /// <remarks>
-    /// The stakes come first, then the bay lockout, then the selected person. Their open question (or the only open question) is shown with its stakes: what the true
-    /// answer costs and earns, what a reassuring one buys, and where the answer can be checked (<see cref="Voyage.StakesText"/>).
+    /// In order: the stakes of the selected person's open question (or of the only open question): what the true answer costs and earns,
+    /// what a reassuring one buys, and where the answer can be checked (<see cref="Voyage.StakesText"/>); then a bargain's price
+    /// (<see cref="Voyage.BargainText"/>: the selected person's, else the first bargainer's with a hint to select the others); then the bay
+    /// warning and the bay lockout; then per awake person, the selected one first: their other open question, their request, what the ship
+    /// owes them (<see cref="Voyage.LedgerLine"/>), their doubts and a pod refusal; last, promises to people asleep.
     /// </remarks>
     private static IEnumerable<(CrewMember? Who, string Text)> Waiting(Voyage v, CrewMember? selected)
     {
