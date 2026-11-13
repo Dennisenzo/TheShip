@@ -87,6 +87,10 @@ public sealed partial class ShipGame
             var line = v.Log.Skip(before.LogCount).FirstOrDefault(e => e.Kind == LogKind.Ship && e.Text.StartsWith("DRIFT:", StringComparison.Ordinal));
             report = line is null ? "" : line.Text["DRIFT:".Length..].Trim();
         }
+        // A transition plays over the bridge only. A clock click held behind a line being read can land after the player
+        // opened another screen: the clock move they asked for brings them back to the bridge to see it.
+        _screen = Screen.Bridge;
+        _picker = null;
         _transition = new Transition { Kind = kind, From = before, Start = _now, Banner = banner, Report = report };
         if (kind == SkipKind.Drift)
             _sounds.Drift();
@@ -147,6 +151,12 @@ public sealed partial class ShipGame
     {
         if (_transition is not { } t || _voyage is not { } v)
             return;
+        if (_screen != Screen.Bridge)
+        {
+            // Left the bridge some other way while it ran: it is over (the log holds what it showed).
+            EndTransition();
+            return;
+        }
         switch (t.Kind)
         {
             case SkipKind.Hours:
