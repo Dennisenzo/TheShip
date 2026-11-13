@@ -183,7 +183,8 @@ public class BalanceTests
     {
         // The Corrector lies like the Liar and then tells each person the truth before they find out. It may match Honest but not beat it by
         // more than 6 points (600 seeds); if it does, raise Tuning.SelfCorrectTrust.
-        Assert.True(Rate(BotKind.Corrector) - Rate(BotKind.Honest) <= 0.06,
+        // 200 seeds are too few to hold a 6-point line (the gap swings by 8 points between runs of 200 and 600 seeds): 10 points there.
+        Assert.True(Rate(BotKind.Corrector) - Rate(BotKind.Honest) <= (SeedCount >= 600 ? 0.06 : 0.10),
             $"Corrector {Rate(BotKind.Corrector):P1} vs Honest {Rate(BotKind.Honest):P1}");
     }
     [Fact]

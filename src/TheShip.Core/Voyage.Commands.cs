@@ -544,8 +544,9 @@ public sealed partial class Voyage
             w.Terms = null;
             if (f.ExposureFact is { } seen)
                 Learn(w, seen, _facts[seen].Truth, "evidence", how: "saw it when the work finished");
-            // Everyone who finishes the work learns what really caused the fault (a false cause they were told is caught here).
-            if (f.CauseFact is { } cause && _facts.ContainsKey(cause))
+            // A worker with the fault's skill at CauseSeenSkill or more sees what really caused it (a false cause they were told is caught here).
+            // A less skilled worker goes on believing what they were told: the log or a crewmate may show them later (decided by the user, 2026-11-13).
+            if (f.CauseFact is { } cause && _facts.ContainsKey(cause) && w.SkillOf(f.Skill) >= Tuning.CauseSeenSkill)
                 Learn(w, cause, _facts[cause].Truth, "evidence", how: "saw it when the work finished");
             if (f.Kind == "illness")
             {

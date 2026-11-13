@@ -17,6 +17,8 @@ public static class Tuning
     /// <summary>One year of ageing per ten years asleep.</summary>
     public const double SleepAgeing = 0.1;
     public const double WorkingAge = 65;
+    /// <summary>The skill level in the fault's own skill a worker needs to see its true cause when the work is done.</summary>
+    public const int CauseSeenSkill = 2;
 
     public const double StartStores = 1500;     // person-days
     public const int StartParts = 2;
