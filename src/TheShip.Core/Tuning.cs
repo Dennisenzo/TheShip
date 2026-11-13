@@ -68,8 +68,12 @@ public static class Tuning
     public const double PromiseBrokenMorale = 8;
     /// <summary>Days from a keyed promise to its due date (wake the partner, open the logs).</summary>
     public const double PromiseDueDays = 45;
-    /// <summary>Days from a bargain being struck to its due date (bargains come in a later step).</summary>
+    /// <summary>Days from a bargain being struck to its due date.</summary>
     public const double BargainDueDays = 40;
+    /// <summary>Pushing past a bargain (Repair again without the ship's word): the chance they start anyway is trust / 100 plus this.</summary>
+    public const double BargainPushBase = 0.10;
+    /// <summary>Trust lost by being pushed, whether they start or refuse.</summary>
+    public const double BargainPushedTrust = 3;
     /// <summary>A promise with this many days left or fewer is warned about once, and Advance stops.</summary>
     public const double PromiseDueWarnDays = 14;
     public const double RequestGranted = 6;

@@ -11,7 +11,8 @@ public sealed record RunResult(
     int Seed, string Ending, int Alive, int Dead, int DeadUnscripted, List<string> Causes, List<double> AgesAtArrival,
     double MeanTrust, int CaughtLies, int LiesTold, int Thaws, int PodWear, double Stores, int Parts, bool Ended,
     int FaultsLost = 0, int Patches = 0, List<int>? ThawsPerAlert = null, string Signature = "", int AskedAgain = 0, int Refusals = 0,
-    int BayWarnings = 0, int BayTakeovers = 0);
+    int BayWarnings = 0, int BayTakeovers = 0,
+    int BargainsOffered = 0, int BargainsStruck = 0, int BargainsKept = 0, int BargainsBroken = 0, int BargainsPushed = 0, int BargainsPushRefused = 0);
 
 /// <summary>
 /// Bots that play a whole voyage through the public <see cref="Voyage"/> API only. They measure the game; they do not
@@ -151,12 +152,38 @@ public sealed class BalanceBot
                 : _kind == BotKind.Thrifty && f.Id != _primary ? true
                 : _v.Parts <= 0 || (ReserveParts && !Critical(f) && _v.Parts <= _v.Current.Faults.Count(x => Critical(x) && !x.Resolved));
             _v.Assign(c, f, patch);
+            if (_v.BargainOf(c) is { } bargain && Accepts(c, bargain))
+                _v.Say("Agreed.", new Reading(LineKind.Promise, PromiseKey: bargain.Key), new[] { c });
             AnswerAll();
         }
         if (c.WorkingOn != f.Id)
         {
             _gaveUp.Add(c.Id + "/" + f.Id);
             _refusedKind.Add(c.Id + "/" + f.Skill);
+        }
+    }
+
+    /// <summary>
+    /// Whether the bot gives its word for a bargain (step-2 policy; the real bargain behaviour comes in step 3). Honest accepts what it can
+    /// keep; Thrifty only the logs, and pushes on a partner; Careless, Liar and Silent accept anything and keep none of it.
+    /// </summary>
+    private bool Accepts(CrewMember c, Bargain b) => _kind switch
+    {
+        BotKind.Honest => b.Key == "show_logs" || _v.Crew.Count(Up) < Tuning.MaxAwake,
+        BotKind.Thrifty => b.Key == "show_logs",
+        _ => true,
+    };
+
+    /// <summary>Honest and Thrifty keep their word to the logs; Honest also wakes the partner it promised. Not at once: after 600 hours awake (25 days) and before the 40-day due date, like a player who delivers late.</summary>
+    private void KeepPromises()
+    {
+        foreach (var e in _v.Ledger().Where(e => e.State == "open" && e.Person.State == CrewState.Awake && e.Person.HoursAwake > 600))
+        {
+            if (e.Key == "show_logs")
+                _v.SetLog("all", LogAccess.Open);
+            else if (e.Key == "wake_partner" && _kind == BotKind.Honest && e.Person.PartnerId is { } pid
+                     && _v.Find(pid) is { State: CrewState.Asleep } partner && _v.Crew.Count(Up) < Tuning.MaxAwake)
+                _v.Wake(partner);
         }
     }
 
@@ -202,7 +229,10 @@ public sealed class BalanceBot
         {
             AnswerAll();
             if (_kind is BotKind.Honest or BotKind.Thrifty)
+            {
+                KeepPromises();
                 GrantRequests();
+            }
             if (_v.Crew.Where(Up).All(c => c.State == CrewState.Awake && c.HoursAwake >= Tuning.MinAwakeHours))
                 break;
             _v.Go();
@@ -275,6 +305,8 @@ public sealed class BalanceBot
             allFaults.Count(f => f.State == FaultState.Lost), allFaults.Count(f => f.State == FaultState.Patched), perAlert, signature,
             v.Log.Count(e => e.Kind == LogKind.Crew && e.Intent?.Kind == "ask_again"),
             v.Log.Count(e => e.Kind == LogKind.Crew && e.Intent?.Kind is "refuse_answer" or "refuse_trust" or "refuse_danger"),
-            v.Lockouts.BayWarnings, v.Lockouts.BayTakeovers);
+            v.Lockouts.BayWarnings, v.Lockouts.BayTakeovers,
+            v.BargainsOffered, v.BargainsStruck, v.Ledger().Count(e => e.Origin == "bargain" && e.State == "kept"),
+            v.Ledger().Count(e => e.Origin == "bargain" && e.State == "broken"), v.BargainsPushedThrough, v.BargainsPushedRefused);
     }
 }

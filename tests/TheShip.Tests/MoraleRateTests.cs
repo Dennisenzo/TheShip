@@ -54,10 +54,10 @@ public class MoraleRateTests
         var mara = Woken(v, "mara");
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
         var fault = v.FindFault("")!;
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         Assert.Equal("dose", mara.PendingQuestion);
         v.Say(v.GetFact("dose").Say(value), new Reading(LineKind.Statement, "dose", value), new[] { mara });
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         Assert.Equal(FaultState.InRepair, fault.State);
         var start = v.Clock;
         v.Go();
@@ -85,7 +85,7 @@ public class MoraleRateTests
         var v = new Voyage(1);
         var mara = Woken(v, "mara");
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
-        v.Assign(mara, v.FindFault("")!, patch: false);
+        v.AssignDeal(mara, v.FindFault("")!, patch: false);
         var s = v.StakesOf(mara)!;
         Assert.True(s.HoursSlower > 0 && s.HoursFaster > 0);
         var text = v.StakesText(mara);

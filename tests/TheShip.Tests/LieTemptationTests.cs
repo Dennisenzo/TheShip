@@ -67,7 +67,7 @@ public class LieTemptationTests
         var v = new Voyage(1);
         var mara = Woken(v, "mara");
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
-        v.Assign(mara, v.FindFault("")!, patch: false);
+        v.AssignDeal(mara, v.FindFault("")!, patch: false);
         Assert.Equal("dose", mara.PendingQuestion);
         var s = v.StakesOf(mara)!;
         Assert.Equal(10, s.TruthHurts);
@@ -89,7 +89,7 @@ public class LieTemptationTests
         var v = new Voyage(1);
         var mara = Woken(v, "mara");
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
-        v.Assign(mara, v.FindFault("")!, patch: false);
+        v.AssignDeal(mara, v.FindFault("")!, patch: false);
         var morale = mara.Morale;
         Tell(v, mara, "dose", "safe");
         Assert.Equal(StatementKind.False, v.Statements[^1].Kind);
@@ -234,9 +234,9 @@ public class LieTemptationTests
         var mara = Woken(v, "mara");
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
         var fault = v.FindFault("")!;
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         Tell(v, mara, "dose", "safe");
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         VoyageTests.FinishAlert(v);
         Assert.DoesNotContain(v.Log, l => l.Text.Contains("thinks better of you"));
         Assert.Equal(0, mara.PendingTrust);

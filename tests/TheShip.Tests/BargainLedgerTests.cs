@@ -16,6 +16,7 @@ public class BargainLedgerTests
     {
         var v = new Voyage(1);
         var mara = VoyageTests.HonestFirstAlert(v);
+        v.ReleaseOwed(mara); // the first alert's bargain promise is not under test here
         mara.Trust = 70;
         mara.Morale = 60;
         return (v, mara, v.Find("idris")!);
@@ -117,7 +118,9 @@ public class BargainLedgerTests
         var warning = v.Log.Single(e => e.Kind == LogKind.Ship && e.Text.StartsWith("Promise to Mara: wake Idris."));
         Assert.Contains("days left", warning.Text);
         var due = Entry(v, mara, "wake_partner").DueBy!.Value;
-        Assert.True(due - v.Clock <= Tuning.PromiseDueWarnDays * 24 + 0.001);
+        Assert.True(due - v.Clock <= Tuning.PromiseDueWarnDays * 24 + Tuning.AftermathStepHours + 0.001);
+        // Warned with time left to act, not on the day it falls due.
+        Assert.True(due - v.Clock > Tuning.PromiseDueWarnDays * 24 - 0.001);
         // Once only.
         v.Go();
         Assert.Single(v.Log, e => e.Kind == LogKind.Ship && e.Text.StartsWith("Promise to Mara: wake Idris."));

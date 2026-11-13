@@ -88,6 +88,9 @@ public sealed partial class Voyage
                 Recorded("Recorded: you promised " + names + " " + PromiseText(key) + ".");
                 foreach (var l in listeners)
                 {
+                    // The price a wary person set for their work: the work starts, and the promise is held to a due date.
+                    if (BargainOf(l) is { } open && open.Key == key && StrikeBargain(made, l, open))
+                        continue;
                     // The small gain is earned once per person per waking, so repeating a promise buys nothing more.
                     if (!l.PromiseCredited)
                     {

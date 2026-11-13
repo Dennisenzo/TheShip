@@ -190,7 +190,7 @@ The game picks one agenda for each conversation from the person's sheet and the 
 | Agenda | What the person does | Picked when | What it leaves behind |
 | --- | --- | --- | --- |
 | Question | Asks for a fact | They lack a fact that matters to them; the default (built) | A statement or a dodge |
-| Bargain | Sets a condition before they work, sleep or keep quiet | Trust 30 to 59, or the request touches their want | A promise with a due date, or a refusal |
+| Bargain | Sets a condition before they work, sleep or keep quiet | Trust 30 to 59, or the request touches their want (built for work: wake the partner, open the logs) | A promise with a due date, or a refusal |
 | Test | Asks something they already know | Sceptical temperament, or they hold a note or another person's account | A lie caught at once, or a small rise in trust |
 | Accusation | Puts evidence against one of your statements in front of you | They have met that evidence | A true statement that corrects it, or a second false one |
 | Confidence | Tells you something and asks you to keep it from a named person | Trust 60 and up, and a bond under strain | A promise of silence that a later question from that person will strain |
@@ -199,6 +199,7 @@ The game picks one agenda for each conversation from the person's sheet and the 
 How the hard ones resolve:
 
 - **Bargain.** The condition comes from the person's want and bonds: wake someone, show a log, stay awake longer. Accepting records a promise. Refusing leaves the compliance roll to trust alone, with a penalty.
+  *Built for work (step 2 of the bargains plan).* When the player asks a wary person to repair or patch (trust 30 to 59, not Obedient; asked after the trust-band refusals, the pending question and the danger question) and the ship can grant their want, they set one condition per waking instead of starting: Mara-like (wants her partner) asks the ship's word to wake the partner if he is asleep and alive and a slot is free; Lin-like (wants the logs) asks the word to open the logs if any log is restricted (all logs are open until the player restricts one, so this is rare). The line is a `bargain` crew line; the work does not start. The player accepts by saying the matching promise to them (a promise reading with the same key): the work starts, the ledger gets the commitment with origin "bargain" and a due date `BargainDueDays` (40) away, and there is no `PromiseMade` trust. A promise with another key is an ordinary promise and the bargain stays open. Pressing Repair or Patch again is a push (the click is "without your word"): one roll, they start with chance trust / 100 + `BargainPushBase` (0.10), and it costs `BargainPushedTrust` (3) either way. A failed push declines: they refuse until the matching promise. The condition lapses silently when its fault is resolved, the alert changes, the person goes to sleep, or the ship meets the condition another way; they set no second condition that waking. The player-facing text (`Voyage.BargainText`) states the price, the stakes and the odds of a push, and never whether a statement is true. A bargain costs no clock yet (that comes with work terms).
 - **Test.** The player is never told a question is a test. A truthful answer raises trust more than an ordinary truth does.
 - **Accusation.** Telling the truth now stops the fall in trust at the discovered-lie cost. A denial is a new false statement, caught as it is said. This is a new statement, not a take-back: the first one stays in the record.
 - **Confidence.** If the named person later asks about it, the player must break the promise, dodge, or lie to them.
@@ -265,7 +266,7 @@ Work terms tie the briefing to the repair. Each fault lists what a repairer can 
 
 Two of these come first, because they reuse the statement record and the compliance roll the prototype already has:
 
-1. Bargains that create promises with a due date.
+1. Bargains that create promises with a due date (built: the ledger, and the offer, acceptance and push in the game core; the button, the Waiting item and the bots follow).
 2. Work terms set by the briefing.
 
 ## Alerts

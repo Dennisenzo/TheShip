@@ -18,6 +18,8 @@ public static class RuleReader
 
     private static readonly string[] PromiseCues = { "i promise", "you have my word", "i give you my word", "i swear", "i will wake", "i'll wake", "i will open", "i'll open", "i won't wake", "i will not wake", "i'll never wake", "i will never wake" };
 
+    private static readonly string[] BargainCues = { "agreed", "i'll do it", "i will do it", "you have my word", "i give you my word", "deal" };
+
     private static readonly string[] OrderCues = { "go ", "fix ", "repair ", "patch ", "please fix", "please repair", "get to ", "i need you to", "you must", "you have to" };
 
     private static readonly Regex Number = new(@"\d{1,4}", RegexOptions.CultureInvariant);
@@ -27,6 +29,10 @@ public static class RuleReader
         var line = " " + text.ToLowerInvariant().Trim() + " ";
         if (line.Trim().Length == 0)
             return Reading.Plain;
+
+        // A listener who set the ship's word as the price of their work: a plain yes gives it.
+        if (voyage.OpenBargainKey(hearers) is { } bargainKey && BargainCues.Any(line.Contains))
+            return new Reading(LineKind.Promise, PromiseKey: bargainKey);
 
         if (PromiseCues.Any(line.Contains))
         {

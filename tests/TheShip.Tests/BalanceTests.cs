@@ -65,6 +65,8 @@ public class BalanceTests
             sb.AppendLine($"  Mean age at arrival     {(ages.Count == 0 ? "n/a" : N(ages.Average()))}");
             sb.AppendLine($"  Mean trust at end       {N(r.Average(x => x.MeanTrust))}");
             sb.AppendLine($"  Asked again / refusals  {N(r.Average(x => x.AskedAgain))} / {N(r.Average(x => x.Refusals))} per run");
+            sb.AppendLine($"  Bargains offered/struck/kept/broken  {N(r.Average(x => x.BargainsOffered))} / {N(r.Average(x => x.BargainsStruck))} / {N(r.Average(x => x.BargainsKept))} / {N(r.Average(x => x.BargainsBroken))} per run");
+            sb.AppendLine($"  Bargains pushed through / refused    {N(r.Average(x => x.BargainsPushed))} / {N(r.Average(x => x.BargainsPushRefused))} per run");
             sb.AppendLine($"  Lies told / caught      {N(r.Average(x => x.LiesTold))} / {N(r.Average(x => x.CaughtLies))} per run");
             sb.AppendLine($"  Thaws / pod wear        {N(r.Average(x => x.Thaws))} / {N(r.Average(x => x.PodWear))}");
             double Sd(IEnumerable<double> xs) { var l = xs.ToList(); if (l.Count < 2) return 0; var mu = l.Average(); return Math.Sqrt(l.Sum(x => (x - mu) * (x - mu)) / l.Count); }

@@ -197,7 +197,7 @@ public class SideFaultTests
         Assert.Equal(2, v.Current.Number);
         var lin = WakeAndAnswer(v, "lin");
         var ill = v.Current.Faults.Single(f => f.Kind == "illness");
-        v.Assign(lin, ill, patch: true);
+        v.AssignDeal(lin, ill, patch: true);
         VoyageTests.FinishAlert(v);
         Assert.Equal(FaultState.Patched, ill.State);
         VoyageTests.SleepWhenAllowed(v, lin);
@@ -207,7 +207,7 @@ public class SideFaultTests
         var again = v.Current.Faults.Single(f => f.Kind == "illness");
         Assert.True(again.ClockHours >= Tuning.ThawHours + again.Hours / Tuning.PatchRate + variation.SlackHours[2]);
         lin = WakeAndAnswer(v, "lin");
-        v.Assign(lin, again, patch: true);
+        v.AssignDeal(lin, again, patch: true);
         VoyageTests.FinishAlert(v);
         Assert.Equal(FaultState.Patched, again.State);
         Assert.True(v.Find("tomas")!.Alive);
@@ -246,7 +246,7 @@ public class SideFaultTests
         v.Drift();
         var lin = WakeAndAnswer(v, "lin");
         var ill = v.Current.Faults.Single(f => f.Kind == "illness");
-        v.Assign(lin, ill, patch: true);
+        v.AssignDeal(lin, ill, patch: true);
         VoyageTests.FinishAlert(v);
         Assert.Equal(FaultState.Patched, ill.State);
         // The patch is still outstanding when the last drift comes; this one has nothing at the later alerts to carry it.
@@ -400,7 +400,7 @@ public class SideFaultTests
         v.Drift();
         var lin = WakeAndAnswer(v, "lin");
         var ill = v.Current.Faults.Single(f => f.Kind == "illness");
-        v.Assign(lin, ill, patch: false);
+        v.AssignDeal(lin, ill, patch: false);
         VoyageTests.FinishAlert(v);
         Assert.Equal(FaultState.Repaired, ill.State);
         KillQuietly(v, v.Find("tomas")!);

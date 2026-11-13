@@ -11,6 +11,7 @@ public class UnansweredQuestionTests
     {
         var v = new Voyage(1);
         var mara = VoyageTests.HonestFirstAlert(v);
+        v.ReleaseOwed(mara); // the bargain's promise to wake Idris would add its own due warning
         mara.Trust = 70;
         mara.PendingQuestion = "date";
         return (v, mara);
@@ -77,22 +78,22 @@ public class UnansweredQuestionTests
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
         mara.Trust = 45;
         var fault = v.FindFault("")!;
-        v.Assign(mara, fault, patch: false); // she asks whether it is safe first
+        v.AssignDeal(mara, fault, patch: false); // she asks whether it is safe first
         Assert.Equal("dose", mara.PendingQuestion);
         v.Say("Not now.", new Reading(LineKind.Dodge), new[] { mara });
         Assert.Equal("dose", mara.PendingQuestion);
         mara.Trust = 45;
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         Assert.Contains(v.Log, e => e.Intent?.Kind == "refuse_answer");
         Assert.NotEqual(fault.Id, mara.WorkingOn);
         v.Say("Not now.", new Reading(LineKind.Dodge), new[] { mara });
         mara.Trust = 45;
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         Assert.NotEqual(fault.Id, mara.WorkingOn);
 
         VoyageTests.Say(v, mara, "It is dangerous. You will take a radiation dose.");
         mara.Trust = 45;
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         Assert.Equal(fault.Id, mara.WorkingOn);
     }
 
@@ -147,10 +148,10 @@ public class UnansweredQuestionTests
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
         var fault = v.FindFault("")!;
         mara.Trust = 45;
-        v.Assign(mara, fault, patch: false); // she asks first, nobody works
+        v.AssignDeal(mara, fault, patch: false); // she asks first, nobody works
         v.Go(); // warns that nobody works
         var year = v.Clock;
-        v.Assign(mara, fault, patch: false); // refused: still unanswered
+        v.AssignDeal(mara, fault, patch: false); // refused: still unanswered
         Assert.NotEqual(fault.Id, mara.WorkingOn);
         v.Go();
         Assert.True(v.Clock > year, "a refused repair must not make Advance warn instead of moving the clock");

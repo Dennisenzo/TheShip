@@ -37,10 +37,10 @@ public class VoyageTests
         Assert.Equal(CrewState.Awake, mara.State);
         Say(v, mara, "Idris is alive and asleep.");
         var fault = v.FindFault("")!;
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         Assert.Equal("dose", mara.PendingQuestion);
         Say(v, mara, "It is dangerous. You will take a radiation dose.");
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         Assert.Equal(fault.Id, mara.WorkingOn);
         FinishAlert(v);
         Assert.Equal(FaultState.Repaired, fault.State);
@@ -108,7 +108,7 @@ public class VoyageTests
         v.Wake(mara);
         v.Go();
         Say(v, mara, "Idris is alive and asleep.");
-        v.Assign(mara, v.FindFault("")!, patch: false);
+        v.AssignDeal(mara, v.FindFault("")!, patch: false);
         var morale = mara.Morale;
         Say(v, mara, "It is dangerous. You will take a radiation dose.");
         Assert.True(mara.Morale < morale);
@@ -138,7 +138,7 @@ public class VoyageTests
         // The pod clock is tight: a shaken Mara works slower and would miss it (morale sets work speed), so she is steady here.
         mara.Morale = 70;
         // Patched, so the work finishes whatever the parts: a failed repair on the last part now stops it.
-        v.Assign(mara, v.FindFault("pod")!, patch: true);
+        v.AssignDeal(mara, v.FindFault("pod")!, patch: true);
         FinishAlert(v);
         Assert.True(lie.FoundOutBy.ContainsKey("mara"));
         Assert.True(mara.Trust <= trust - Tuning.LieTrust);
@@ -369,9 +369,9 @@ public class VoyageTests
         v.Go();
         Say(v, mara, "Idris is alive and asleep.");
         var fault = v.FindFault("")!;
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         Say(v, mara, "It is dangerous. You will take a radiation dose.");
-        v.Assign(mara, fault, patch: false);
+        v.AssignDeal(mara, fault, patch: false);
         Assert.Equal(fault.Id, mara.WorkingOn);
         Assert.Equal(0, fault.Progress, 3);
         mara.Morale = Tuning.MoraleRateNeutral;
@@ -781,10 +781,10 @@ public class DoorTests
         v.Go();
         v.SetDoor("coolant", DoorState.Locked);
         var fault = v.FindFault("")!;
-        v.Assign(asha, fault, patch: false);
+        v.AssignDeal(asha, fault, patch: false);
         Assert.Null(asha.WorkingOn);
         v.SetDoor("coolant", DoorState.Open);
-        v.Assign(asha, fault, patch: false);
+        v.AssignDeal(asha, fault, patch: false);
         Assert.Equal(fault.Id, asha.WorkingOn);
     }
 

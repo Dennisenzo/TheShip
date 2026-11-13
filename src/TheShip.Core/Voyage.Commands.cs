@@ -300,6 +300,9 @@ public sealed partial class Voyage
         c.RequestGranted = false;
         c.SawPartner = false;
         c.PromiseCredited = false;
+        c.BargainOffered = false;
+        c.BargainDeclined = false;
+        c.OpenBargain = null;
         c.SmallTalkDone = false;
         c.CanSleepAnnounced = false;
         c.EarlySleepAnnounced = false;
@@ -419,18 +422,9 @@ public sealed partial class Voyage
             }
         }
 
-        if (f.Patching != patch)
-        {
-            f.Progress = 0;
-            f.Patching = patch;
-        }
-        _idleWarned = false;
-        c.WorkingOn = f.Id;
-        f.State = FaultState.InRepair;
-        var task = (patch ? "patching the " : "the ") + f.CrewName;
-        Speak(c, "comply", "You agree to take on " + task + ".", task);
-        if (!Staffed(f))
-            Ship(f.Name + " needs " + f.People + " people before the work can start.");
+        if (BargainGate(c, f, patch))
+            return;
+        StartWork(c, f, patch);
     }
 
     private void CompleteRepair(Fault f)
@@ -680,6 +674,7 @@ public sealed partial class Voyage
         c.Memories.Add($"Year {Math.Floor(Year):0}: woken for {Current.Title.ToLowerInvariant()}; went back to sleep with trust in the ship {CrewMember.BandText(c.Band)}.");
         c.State = CrewState.Asleep;
         c.WorkingOn = null;
+        c.OpenBargain = null;
         c.PendingQuestion = null;
         Clamp(c);
         Ship(c.Name + " is asleep.");
