@@ -105,9 +105,12 @@ public sealed partial class ShipGame
         {
             var on = bands[i] == c.Band;
             _p.Fill(new Rectangle(x + i * (segment + 4), y, segment, 10), on ? Painter.Accent : Painter.Track);
-            _p.Text(_p.Small, CrewMember.BandText(bands[i]), x + i * (segment + 4), y + 16, on ? Painter.Accent : Painter.Dim);
+            // The label wraps to the width of its segment ("wants" / "reasons") so neighbours never touch.
+            var label = Painter.Wrap(CrewMember.BandText(bands[i]), Math.Max(8, (int)(segment / _p.SmallWidth) - 3));
+            for (var row = 0; row < label.Count; row++)
+                _p.Text(_p.Small, label[row], x + i * (segment + 4), y + 16 + row * 19, on ? Painter.Accent : Painter.Dim);
         }
-        y += 44;
+        y += 62;
         var manner = c.Band switch
         {
             TrustBand.Follows => "Follows a reasonable request without asking why.",
@@ -384,5 +387,81 @@ public sealed partial class ShipGame
             return null;
         var at = fact.Access == LogAccess.Altered && fact.AlteredValue != null ? wrong.IndexOf(fact.AlteredValue) : -1;
         return wrong[(at + 1) % wrong.Count];
+    }
+
+    // ---- The ending ----
+
+    /// <summary>
+    /// The ending's own screen: the title and what happened, who is left, what they believe about you, and the record of what you said
+    /// (scrolls with the wheel and PageUp/PageDown).
+    /// </summary>
+    private void DrawEnding(Voyage v, Ending ending)
+    {
+        Header(v, "VOYAGE ENDED", back: false);
+        var right = Painter.ScreenWidth - 16;
+        if (_p.Button(new Rectangle(right - 80, 8, 80, 40), "QUIT"))
+            Do(Exit);
+        if (_p.Button(new Rectangle(right - 288, 8, 200, 40), "RECORD AND LOGS"))
+            Do(() => _screen = Screen.Record);
+        if (_p.Button(new Rectangle(right - 400, 8, 104, 40), "BRIDGE"))
+            Do(() => _screen = Screen.Bridge);
+
+        const int top = 72;
+        var bottom = Painter.ScreenHeight - 16;
+        const int leftWidth = 500;
+        const int midWidth = 440;
+        var left = new Rectangle(16, top, leftWidth, bottom - top);
+        var mid = new Rectangle(left.Right + 12, top, midWidth, bottom - top);
+        var rec = new Rectangle(mid.Right + 12, top, Painter.ScreenWidth - 16 - (mid.Right + 12), bottom - top);
+
+        _p.Box(left, Painter.Edge);
+        var x = left.X + 16;
+        var width = left.Width - 32;
+        var y = left.Y + 18;
+        _p.Text(_p.Small, "HOW IT ENDED", x, y, Painter.Dim);
+        y += 30;
+        foreach (var line in Painter.Wrap(ending.Title, (int)(width / _p.HeadWidth)))
+        {
+            _p.Text(_p.Head, line, x, y, Painter.Accent);
+            y += 34;
+        }
+        y = _p.Paragraph(ending.Summary, x, y + 4, width, Painter.Bright) + 22;
+        _p.Text(_p.Small, "THE CREW", x, y, Painter.Dim);
+        y += 28;
+        foreach (var line in ending.Crew)
+            y = _p.Paragraph(line, x, y, width, line.Contains("dead", StringComparison.OrdinalIgnoreCase) ? Painter.Dim : Painter.Ink) + 6;
+
+        _p.Box(mid, Painter.Edge);
+        x = mid.X + 16;
+        width = mid.Width - 32;
+        y = mid.Y + 18;
+        _p.Text(_p.Small, "WHAT THEY BELIEVE ABOUT YOU", x, y, Painter.Dim);
+        y += 30;
+        if (ending.Beliefs.Count == 0)
+            _p.Paragraph("Nobody is left who could believe anything about you.", x, y, width, Painter.Dim);
+        foreach (var line in ending.Beliefs)
+            y = _p.Paragraph(line, x, y, width, Painter.Ink) + 10;
+
+        _p.Box(rec, Painter.Edge);
+        x = rec.X + 16;
+        width = rec.Width - 32;
+        _p.Text(_p.Small, "THE RECORD OF WHAT YOU SAID", x, rec.Y + 18, Painter.Dim);
+        var lines = new List<string>();
+        if (ending.Record.Count == 0)
+            lines.Add("You said nothing that was recorded.");
+        foreach (var entry in ending.Record)
+        {
+            lines.AddRange(Painter.Wrap(entry, (int)(width / _p.SmallWidth)));
+            lines.Add("");
+        }
+        var areaTop = rec.Y + 48;
+        var visible = (rec.Bottom - 34 - areaTop) / 19;
+        var maxOffset = Math.Max(0, lines.Count - visible);
+        _scroll = Math.Clamp(_scroll, 0, maxOffset);
+        var first = maxOffset - _scroll;
+        for (var i = first; i < Math.Min(lines.Count, first + visible); i++)
+            _p.Text(_p.Small, lines[i], x, areaTop + (i - first) * 19, Painter.Ink);
+        if (maxOffset > 0)
+            _p.TextRight(_p.Small, "lines " + (first + 1) + " to " + Math.Min(lines.Count, first + visible) + " of " + lines.Count + "  (mouse wheel, PageUp, PageDown)", rec.Right - 16, rec.Bottom - 26, Painter.Dim);
     }
 }

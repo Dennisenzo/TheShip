@@ -11,6 +11,17 @@ public sealed partial class ShipGame
 
     private static string Sentence(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..].ToLowerInvariant();
 
+    /// <summary>A section's name as a sentence start, but keeping single letters upper case: "POD BANK A" becomes "Pod bank A".</summary>
+    private static string SectionName(string s) =>
+        string.Join(' ', s.Split(' ').Select((w, i) => w.Length == 1 ? w.ToUpperInvariant() : i == 0 ? Sentence(w) : w.ToLowerInvariant()));
+
+    /// <summary>A non-breaking space (<see cref="Painter.Wrap"/> shows it as a space but never breaks a line at it): "12 h" stays together.</summary>
+    private const char Nb = '\u00A0';
+
+    /// <summary>Keeps a number and its unit on one line ("12 h", "3 days").</summary>
+    private static string Glue(string text) =>
+        System.Text.RegularExpressions.Regex.Replace(text, @"(?<=\d) (?=(h|hours?|d|days?|years?)\b)", Nb.ToString());
+
     private void DrawBridge(Voyage v)
     {
         Header(v, "THE SHIP", back: false);
@@ -24,8 +35,8 @@ public sealed partial class ShipGame
         _p.TextRight(_p.Small, numbers, right - 312, 21, v.PowerLow || v.NavLost ? Painter.Accent : Painter.Dim);
 
         DrawIssues(v, 16, 72, 330, Painter.ScreenHeight - 16);
-        DrawPlan(v, new Rectangle(358, 72, 864, 432));
-        DrawLog(v, new Rectangle(358, 516, 864, Painter.ScreenHeight - 16 - 516));
+        DrawPlan(v, new Rectangle(358, 72, 864, 456));
+        DrawLog(v, new Rectangle(358, 540, 864, Painter.ScreenHeight - 16 - 540));
         DrawCrew(v, 1234, 72, 350, Painter.ScreenHeight - 16);
     }
 
@@ -73,11 +84,11 @@ public sealed partial class ShipGame
             if (!f.Resolved)
             {
                 var where = v.GetSection(f.Section)?.Name ?? "";
-                var needs = Sentence(where) + ". " + Patient(v, f) + "Needs " + f.Skill.ToString().ToLowerInvariant() + " " + f.Level
-                            + (f.People > 1 ? ", " + f.People + " people" : "") + ", " + N(f.Hours) + " hours. If the clock runs out: " + f.IfIgnored + ".";
+                var needs = SectionName(where) + ". " + Patient(v, f) + "Needs " + f.Skill.ToString().ToLowerInvariant() + Nb + f.Level
+                            + (f.People > 1 ? ", " + f.People + Nb + "people" : "") + ", " + N(f.Hours) + Nb + "hours. If the clock runs out: " + f.IfIgnored + ".";
                 y = _p.Paragraph(needs, ix, y, inner, Painter.Dim);
                 var verdict = v.EarliestDoneText(f);
-                y = _p.Paragraph("If started now: " + char.ToLowerInvariant(verdict[0]) + verdict[1..], ix, y, inner, Painter.Ink) + 6;
+                y = _p.Paragraph(Glue("If started now: " + char.ToLowerInvariant(verdict[0]) + verdict[1..]), ix, y, inner, Painter.Ink) + 6;
 
                 var workers = v.Awake.Where(c => c.WorkingOn == f.Id).Select(c => c.Name).ToList();
                 if (f.State == FaultState.InRepair)
@@ -176,7 +187,6 @@ public sealed partial class ShipGame
             _p.Frame(new Rectangle(x, cardTop, width, IssueCardLayout.ResolvedRow), Painter.Edge);
             return cardTop + IssueCardLayout.ResolvedRow + IssueCardLayout.Gap;
         }
-        var height = IssueCardLayout.OpenCardHeight(shown);
         y += 8;
         var state = f.State switch { FaultState.Open => "OPEN", _ => f.Patching ? "PATCHING" : "IN REPAIR" };
         _p.Text(_p.Small, tag + " - " + state + (f.Critical ? " - CRITICAL" : ""), ix, y, Painter.Accent);
@@ -186,13 +196,17 @@ public sealed partial class ShipGame
         y += 22;
         // The lines below the name: the needs, the verdict (always whole, on its own line), who is on it, and the danger or exposure line.
         var where = v.GetSection(f.Section)?.Name ?? "";
-        var needs = Sentence(where) + ". " + Patient(v, f) + f.Skill + " " + f.Level + (f.People > 1 ? ", " + f.People + " people" : "") + ", " + N(f.Hours) + " h.";
+        var needs = SectionName(where) + ". " + Patient(v, f) + f.Skill + Nb + f.Level + (f.People > 1 ? ", " + f.People + Nb + "people" : "") + ", " + N(f.Hours) + Nb + "h.";
         var extra = f.DangerFact is { } danger ? "Known: " + v.GetFact(danger).Say(v.GetFact(danger).Truth) + "."
             : f.ExposureFact is { } seen ? "Whoever works here learns " + v.GetFact(seen).Label + "." : "";
         var workers = v.Awake.Where(c => c.WorkingOn == f.Id).Select(c => c.Name).ToList();
         var split = IssueCardLayout.Split(shown, _p.Lines(needs, inner), extra.Length == 0 ? 0 : _p.Lines(extra, inner), workers.Count > 0);
+        var verdict = Glue(v.EarliestDoneText(f));
+        // The card is as tall as its text (never more than the per-count maximum), with the buttons right below it.
+        var textLines = split.Needs + _p.Lines(verdict, inner) + (split.Workers ? 1 : 0) + split.Extra;
+        var height = Math.Min(IssueCardLayout.OpenCardHeight(shown), IssueCardLayout.CardTop + textLines * IssueCardLayout.LineHeight + IssueCardLayout.CardBottom);
         y = _p.Paragraph(FitLines(needs, inner, split.Needs), ix, y, inner, Painter.Dim);
-        y = _p.Paragraph(v.EarliestDoneText(f), ix, y, inner, Painter.Ink);
+        y = _p.Paragraph(verdict, ix, y, inner, Painter.Ink);
         if (split.Workers)
         {
             var line = string.Join(" and ", workers) + (workers.Count == 1 ? " is" : " are") + " on it"
@@ -380,8 +394,8 @@ public sealed partial class ShipGame
             }
         }
 
-        _p.Text(_p.Small, "door outlined: open   grey: closed   amber: locked     dashed blue: coolant     diamond: fault (bold: critical)     triangle: awake",
-            rect.X + 14, rect.Bottom - 24, Painter.Dim);
+        _p.Text(_p.Small, "door outlined: open   grey: closed   amber: locked   dashed blue: coolant", rect.X + 14, rect.Bottom - 40, Painter.Dim);
+        _p.Text(_p.Small, "diamond: fault (bold: critical)   triangle: awake person", rect.X + 14, rect.Bottom - 20, Painter.Dim);
     }
 
     // ---- The log and the voice line ----

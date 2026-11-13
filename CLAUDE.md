@@ -164,6 +164,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 
 - 2026-11-13: `--tour <dir>` dev tool: unattended screenshot tour (render-target PNGs of the bridge, dossier, record and ending). No in-game control.
 
+- 2026-11-13: UI polish from the screenshot tour (`fix/ui-polish`): the plan legend is two lines (plan panel 456 px high, log starts at 540), dossier trust labels wrap inside their segment, issue cards size to their text (buttons right below it) and keep "12 h" together with a non-breaking space (`Painter.Wrap` shows it as a space), section names read "Pod bank A", and the ending has its own screen (`Screen.Ending`: crew, beliefs, scrolling record; Bridge, Record and Quit buttons). No new voyage button: restarting needs a new `ShipMind` and worker, not built.
+
 ### Built
 
 Written on 2026-11-12 in sessions without a compiler. The first version builds and runs; changes after it are marked in Status.

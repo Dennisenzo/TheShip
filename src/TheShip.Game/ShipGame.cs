@@ -15,7 +15,7 @@ namespace TheShip.Game;
 /// </summary>
 public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
 {
-    private enum Screen { Bridge, Dossier, Record }
+    private enum Screen { Bridge, Dossier, Record, Ending }
 
     private readonly GraphicsDeviceManager _graphics;
     private readonly Options _options;
@@ -333,7 +333,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         if (_voyage is { Phase: Phase.Ended, Ending: { } ending } && !_endingShown)
         {
             _endingShown = true;
-            _screen = Screen.Bridge;
+            _screen = Screen.Ending;
+            _scroll = int.MaxValue / 2;
             ShowEnding(ending);
             _session?.Follow(_voyage);
             _session?.Ending(ending);
@@ -378,28 +379,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _ => "plain talk (nothing recorded)",
     };
 
-    private void ShowEnding(Ending ending)
-    {
-        Note("");
-        Note("=== " + ending.Title.ToUpperInvariant() + " ===");
-        Note(ending.Summary);
-        Note("");
-        Note("The crew:");
-        foreach (var line in ending.Crew)
-            Note("  " + line);
-        Note("");
-        Note("What they believe about you:");
-        foreach (var line in ending.Beliefs)
-            Note("  " + line);
-        Note("");
-        Note("The record of what you said:");
-        if (ending.Record.Count == 0)
-            Note("  You said nothing that was recorded.");
-        foreach (var line in ending.Record)
-            Note("  " + line);
-        Note("");
-        Note("PageUp and the mouse wheel scroll.");
-    }
+    private void ShowEnding(Ending ending) =>
+        Note("The voyage is over: " + ending.Title + ". The ending screen shows the crew, what they believe and the record.");
 
     protected override void UnloadContent()
     {
@@ -433,6 +414,10 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         else if (_screen == Screen.Dossier && _dossier is not null)
         {
             DrawDossier(_voyage, _dossier);
+        }
+        else if (_screen == Screen.Ending && _voyage.Ending is { } ending)
+        {
+            DrawEnding(_voyage, ending);
         }
         else if (_screen == Screen.Record)
         {
