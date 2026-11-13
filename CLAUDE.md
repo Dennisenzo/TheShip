@@ -191,15 +191,20 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-13: DESIGN.md gained a "Conversations" section (feature/conversations-design): agendas (question, bargain, test, accusation, confidence, proposal), asking the crew, outcomes (promise ledger, work terms, independent action, spread, stance), pressure (clock cost, patience, audience, disagreement, mood). Design only; nothing built. First build: bargains with promises, then work terms. Two playtest questions added.
 - 2026-11-13: cold-sleep bay takeover, "Landfall without you" (feature/bay-takeover, roadmap 1.8). `Lockouts` (Core) holds `Logs` (`Voyage.LogsLocked` now wraps it) and `Bay`; `Voyage.Lockouts.cs`: at the end of each aftermath beat two or more awake people in the Against band (trust < 15) with Engineering summing to 2+ warn (`takeover_warning` line, "Waiting on you" item, header chip), and take the bay at the next beat if the condition still holds (else cancelled). While taken `Wake`/`AskSleep` are refused with the reason, the crew sleep whoever can sleep each beat and wake the best-qualified for the open faults at each alert start (no deadlock; `GoUntilAttention` keeps stepping), a promise kept to a taker at trust >= 30 returns the bay (`bay_returned`). Landfall with the bay taken at arrival is "Landfall without you". `Tuning.BayTakers/BayEngineering/BayReturnTrust`. UI: WAKE/SLEEP show "BAY TAKEN" greyed, header chip, session log state. 10 tests (`BayTakeoverTests`). Balance, re-measured on the merged tree (200 seeds; main at eafa6b4 against the merge): the takeover fires in one Liar run in 200 (warned 0.5% / taken 0.5%) and never for Honest, Careless, Thrifty or Silent, whose reports are identical to before. Landfall is unchanged for every bot (Honest 48.5%, Thrifty 36%, Silent 25%, Liar 20%, Careless 18.5%; the B1 table below stands) and "Landfall without you" is 0% for every bot. Liar moves only through that one run: deaths excl. scripted 3.39 -> 3.38, end trust 27.10 -> 27.02, lies told / caught 3.47 / 2.96 -> 3.45 / 2.94. The trigger is rare for bots because two Against people must be awake together in an aftermath beat. Validator findings, fixed: the crew's wake rule thaws only sleepers with the fault's skill (a fault nobody asleep can fix is left to its clock) and never an open fault's patient; a bay whose takers are all dead goes back to the ship (`MaybeFreeBay`, from `Kill`; after the drift report for deaths in a drift), and the refusal reason names only living takers; while the bay is taken the drift's "still awake" line no longer says "not asked to sleep"; a warning that lapses because the warners died or went under says so instead of "dropped the idea"; `bay_returned` has a feeling in `Prompts.Feeling`; the session-log table lists `BAY TAKEN` / `BAY WARNED`; DESIGN.md's open low-trust question is now whether players reach the takeover. Tests: 9 more cases in `BayTakeoverTests` (19 in all).
 
-### Balance table (B1, 200 seeds, Short haul)
+- 2026-11-13: main validated after the three merges (bay takeover, UI plan, lie temptation): builds with 0 warnings, 478 tests pass, `--tour` runs. Docs only (fix/main-validation): the balance table below is re-measured on main, the `WorkingAge` table is marked as measured before the morale-speed step, DESIGN.md's prototype scope names the briefing (the opening notes are gone but one) and both lockouts. Open findings are in the validator's report (the header's lock chip runs into STORES, the NEXT line hides the alert's step while the bay is taken, the card's "Done in" ignores who is on the fault).
+- 2026-11-13: main validation findings fixed (fix/main-validation). The header's lock chip stays left of the bridge's numbers and the ending's buttons (`Header(..., limit)`, `StatsWidth`), with the short text "BAY: CREW" / "BAY WARNED" when the long one would reach them; the NEXT line uses the bay line only where it would say to wake someone or ask them to sleep ("Select Lin, then Repair or Patch." stays); a fault in repair's "Done in" counts the people working on it at their morale (`EarliestDoneHours`; it took the first qualified people up: 7 h quoted, 10 h taken); "Waiting on you" shows the stakes first, the bay items next, and skips an item that doesn't fit instead of dropping everything after it; while the bay is taken the crew's sleep rule leaves a pod refuser awake (`CrewSleepRule` skips `RefusesSleep`, so "No sleep until it is answered" holds and no `QuestionIgnoredAtSleep` is charged); the briefing names the spare parts (the opening note was lost in the merge); the stakes hours are those of the fault the asker would work on (the one they are on, else the most urgent they qualify for; none otherwise), with the team on it (`Voyage.WorkFor`). DESIGN.md: stakes hours, the crew's sleep rule, the briefing. Tests: `MainValidationTests` (5); the Game fixes have none (the test project does not reference `TheShip.Game`). Balance report unchanged (Honest 43.5%, Thrifty 39%, Silent 22.5%, Liar 17.5%, Careless 16.5%). 483 tests pass, 0 warnings.
+
+### Balance table (main after the morale-speed step, 2026-11-13, 200 seeds, Short haul)
 
 | Bot | Landfall | Quiet ship | Adrift | Survivors | Deaths excl. scripted | End trust | Thaws | Main causes (per run) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Honest | 48.5% | 39% | 12.5% | 3.72 | 1.28 | 61.5 | 13.18 | pod failure 0.39, low power 0.27, thaw 0.26, starved 0.18 |
-| Thrifty | 36% | 43.5% | 20.5% | 3.44 | 1.56 | 60.8 | 9.76 | low power 0.50, starved 0.33, pod failure 0.32, thaw 0.28 |
-| Silent | 25% | 63.5% | 11.5% | 3.16 | 1.85 | 56.2 | 12.15 | starved 0.97, pod failure 0.31, thaw 0.23 |
-| Liar | 20% | 26% | 54% | 1.62 | 3.38 | 27.1 | 11.04 | starved 2.72, thaw 0.21, pod failure 0.19 |
-| Careless | 18.5% | 72% | 9.5% | 3.14 | 1.87 | 58.2 | 12.21 | starved 0.99, pod failure 0.30, thaw 0.23 |
+| Honest | 43.5% | 36% | 20.5% | 3.44 | 1.57 | 60.6 | 13.10 | starved 0.59, pod failure 0.41, thaw 0.23, low power 0.21 |
+| Thrifty | 39% | 37.5% | 23.5% | 3.53 | 1.48 | 61.1 | 9.73 | low power 0.48, starved 0.32, pod failure 0.31, thaw 0.28 |
+| Silent | 22.5% | 51.5% | 26% | 3.15 | 1.86 | 55.9 | 12.15 | starved 0.97, pod failure 0.30, thaw 0.25 |
+| Liar | 17.5% | 25.5% | 57% | 1.62 | 3.39 | 27.1 | 11.03 | starved 2.70, pod failure 0.21, thaw 0.20 |
+| Careless | 16.5% | 64% | 19.5% | 3.15 | 1.85 | 58.8 | 12.20 | starved 1.00, pod failure 0.30, thaw 0.24 |
+
+Measured on main at 75c1240 (bay takeover, UI plan and lie temptation merged). The B1 table this replaces (before morale set the work speed) had Landfall Honest 48.5%, Thrifty 36%, Silent 25%, Liar 20%, Careless 18.5%; Adrift rose for every bot since (Honest 12.5% to 20.5%), because slower work loses more navigation faults. The bay takeover fires in one Liar run in 200 and "Landfall without you" in none.
 
 The scripted pod death (1.0 per run) is in every row. Liar is bimodal (a caught liar's crew stays awake and starves); Careless and Silent starve one person a run.
 
@@ -208,7 +213,8 @@ The scripted pod death (1.0 per run) is in every row. Liar is bimodal (a caught 
 - `WorkingAge` is 64. The user's design value was 50 (2026-11-12, chosen on an estimate of about 6 thaws a run), but the code had 65 before this branch, so the
   effective change is 65 to 64 alongside the stricter rule (4 alive and 3 of working age, was 3 alive and 2). Measured thaws per run are 13.18 for Honest and 9.76 for Thrifty,
   and at 3 to 5 years a thaw "3 under 50" is nearly unreachable: at 50 Landfall is Honest 0%, Careless 0%, Silent 0.5%, Liar 1%, Thrifty 8.5%.
-  64 is the lowest value that puts the honest bot in 45-55%. Landfall by `WorkingAge` (200 seeds, merged tree):
+  64 is the lowest value that puts the honest bot in 45-55%. Landfall by `WorkingAge` (200 seeds, merged tree, measured at B1: before morale set the work speed,
+  which took the honest bot at 64 from 48.5% to 43.5%, below that band; the table has not been measured again):
 
 | WorkingAge | Honest | Thrifty | Silent | Liar | Careless |
 | --- | --- | --- | --- | --- | --- |
@@ -221,6 +227,9 @@ The scripted pod death (1.0 per run) is in every row. Liar is bimodal (a caught 
 
   The honest rate moves about 5 points a year around 64, so this is the number to choose. Alternatives: ageing per thaw (a pillar), fewer faults, or fewer required people.
 - `LieTrust` 22 (was 25), to keep Liar out of hopeless (12% to 20%). Review whether lying is costly enough.
+- After the morale-speed step the honest bot lands 43.5%, below the 45-55% band that justified `WorkingAge` 64, and Adrift rose for every bot (Honest 12.5% -> 20.5%:
+  slower work loses more navigation faults). Levers: `MoraleRateSpan` / `MoraleRateMin` (120 / 0.8 measured 40.5%, 100 / 0.7 34%; a wider span or higher minimum softens it),
+  `WorkingAge` 65 (53.5% at B1, before the morale step; not re-measured), or more clock slack on the navigation fault.
 
 ### Built
 
@@ -276,4 +285,4 @@ conversations beyond the question agenda (DESIGN.md, "Conversations"), factions,
 1. `dotnet build TheShip.slnx` and fix what it reports; then `dotnet test`.
 2. Play a run end to end; tune `Tuning.cs` towards "one honest run in two reaches Landfall".
 3. Run the three playthroughs of the prototype's pass test (DESIGN.md, "Prototype scope").
-4. `feature/ui-plan`: built, tested, toured and validated; play a run to look at the transitions, then merge. Decisions 1, 2 and 4 at the end of `UI-PLAN.md` are still the user's to confirm (3 is decided).
+4. `feature/ui-plan` is merged: play a run to look at the transitions. Decisions 1, 2 and 4 at the end of `UI-PLAN.md` are still the user's to confirm (3 is decided).

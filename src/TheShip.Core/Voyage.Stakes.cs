@@ -23,7 +23,7 @@ public enum Relief
 /// <param name="BlocksSleep">They stay out of the pod until a statement answers the question.</param>
 /// <param name="TruthStopsRepair">Told the truth, they refuse the dangerous repair it is about.</param>
 /// <param name="Checks">Where they can find the answer for themselves.</param>
-/// <param name="HoursSlower">Hours (to the half hour) the most urgent open fault takes longer if the truth costs them morale (work speed, <see cref="Voyage.MoraleRate(double)"/>); 0 when none.</param>
+/// <param name="HoursSlower">Hours (to the half hour) the fault they would work on (<c>WorkFor</c>) takes longer if the truth costs them morale (work speed, <see cref="Voyage.MoraleRate(double)"/>); 0 when none.</param>
 /// <param name="HoursFaster">Hours it takes less if a believed good answer lifts their morale; 0 when none.</param>
 public sealed record AnswerStakes(string Question, int TruthHurts, int OddsLost, int TruthEarns, Relief Relief,
     bool BlocksWork, bool BlocksSleep, bool TruthStopsRepair, string Checks, double HoursSlower = 0, double HoursFaster = 0);
@@ -77,6 +77,17 @@ public sealed partial class Voyage
     private static bool HardTruthCredited(CrewMember c, Fact f, string value) =>
         c.HardTruthsCredited.TryGetValue(f.Key, out var told) && f.Same(told, value);
 
+    /// <summary>
+    /// The open fault of this alert this person would work on: the one they are on, else the most urgent one they
+    /// qualify for (critical first, then the shortest clock); null when there is none.
+    /// </summary>
+    private Fault? WorkFor(CrewMember c)
+    {
+        var open = Current.Faults.Where(x => !x.Resolved).ToList();
+        return open.FirstOrDefault(x => x.Id == c.WorkingOn && x.State == FaultState.InRepair)
+               ?? open.Where(x => c.SkillOf(x.Skill) >= x.Level).OrderByDescending(x => x.Critical).ThenBy(x => x.ClockHours).FirstOrDefault();
+    }
+
     /// <summary>The stakes of answering this person's open question, or null when they are not awake or have none.</summary>
     public AnswerStakes? StakesOf(CrewMember c)
     {
@@ -99,16 +110,20 @@ public sealed partial class Voyage
         else if (hurts > 0 && f.Values.FirstOrDefault(v => f.HardnessOf(v) == 0) is { } kind && Relieves(c, f, kind, old, asked: true))
             relief = Relief.FromLie;
 
-        // The work speed effect, in hours on the most urgent open fault they would work on (a person at their own morale).
+        // The work speed effect, in hours on the fault they would work on: the one they are on, else the most urgent open fault
+        // they qualify for, done by the team that would do it (those on it and them). None when they would work on nothing.
         var slower = 0.0;
         var faster = 0.0;
-        if (working && Current.Faults.Where(x => !x.Resolved).OrderByDescending(x => x.Critical).ThenBy(x => x.ClockHours).FirstOrDefault() is { } urgent)
+        if (working && WorkFor(c) is { } job)
         {
-            var left = Math.Max(0, urgent.Hours - (urgent.State == FaultState.InRepair ? urgent.Progress : 0));
-            var baseHours = left / (c.SkillOf(urgent.Skill) >= urgent.Level ? 1 : Tuning.UnskilledRate) / (urgent.Patching ? Tuning.PatchRate : 1);
-            var now = baseHours / MoraleRate(c.Morale);
-            slower = hurts > 0 ? baseHours / MoraleRate(c.Morale - hurts) - now : 0;
-            faster = relief != Relief.None ? now - baseHours / MoraleRate(c.Morale + Tuning.ReliefMorale) : 0;
+            var team = Workers(job).Where(w => w != c).ToList();
+            var left = Math.Max(0, job.Hours - (job.State == FaultState.InRepair ? job.Progress : 0));
+            var skilled = c.SkillOf(job.Skill) >= job.Level || team.Any(w => w.SkillOf(job.Skill) >= job.Level);
+            var baseHours = left / (skilled ? 1 : Tuning.UnskilledRate) / (job.Patching && job.State == FaultState.InRepair ? Tuning.PatchRate : 1);
+            double Hours(double morale) => baseHours / MoraleRate((team.Sum(w => w.Morale) + morale) / (team.Count + 1));
+            var now = Hours(c.Morale);
+            slower = hurts > 0 ? Hours(c.Morale - hurts) - now : 0;
+            faster = relief != Relief.None ? now - Hours(c.Morale + Tuning.ReliefMorale) : 0;
         }
 
         var dangerous = working && Current.Faults.Any(x => !x.Resolved && x.DangerFact == key);
