@@ -149,7 +149,7 @@ public sealed partial class ShipGame
                     _lastAdvance = result;
                     _session?.Line("advance", result.Steps + " step(s), stopped: " + (result.Reason.Length == 0 ? "(step limit or nothing to do)" : result.Reason));
                 }, snapshot: true, skip: SkipKind.Weeks);
-            if (_p.Button(new Rectangle(ix + wide + 8, clock.Y + 44, inner - wide - 8, 40), ClockLabel("advance two weeks", "2 WEEKS")))
+            if (_p.Button(new Rectangle(ix + wide + 8, clock.Y + 44, inner - wide - 8, 40), ClockLabel("advance two weeks", "2 WEEKS", "WAITING")))
                 Act("advance two weeks", v.Go, snapshot: true, skip: SkipKind.Weeks);
         }
         else if (_p.Button(new Rectangle(ix, clock.Y + 44, inner, 40), ClockLabel("advance to next event", "ADVANCE TO NEXT EVENT"), v.Phase != Phase.Ended, primary: true,
@@ -162,8 +162,8 @@ public sealed partial class ShipGame
             Act("drift to the next alert", v.Drift, snapshot: true, skip: SkipKind.Drift);
     }
 
-    /// <summary>A clock button whose click waits for a spoken line to be read says so.</summary>
-    private string ClockLabel(string what, string label) => _held.Contains(what) ? "WAITING FOR YOUR LINE" : label;
+    /// <summary>A clock button whose click waits for a spoken line to be read says so (the small 2 WEEKS button in one word).</summary>
+    private string ClockLabel(string what, string label, string waiting = "WAITING FOR YOUR LINE") => _held.Contains(what) ? waiting : label;
 
     /// <summary>
     /// Repair and Patch on an issue card. With a person selected they go to that person; with nobody selected they open a
