@@ -58,8 +58,8 @@ public sealed class CrewMember
     public Dictionary<string, Belief> Beliefs { get; } = new();
     /// <summary>Fact keys this person doubts and will check when they get the chance.</summary>
     public HashSet<string> Doubts { get; } = new();
-    /// <summary>Fact keys you dodged when they asked.</summary>
-    public HashSet<string> Dodged { get; } = new();
+    /// <summary>Fact keys you dodged when they asked, each with the fact's true values at the times of the dodges.</summary>
+    public Dictionary<string, HashSet<string>> Dodged { get; } = new();
     /// <summary>Locked doors they have already run into.</summary>
     public HashSet<string> SeenLocks { get; } = new();
     /// <summary>Restricted log entries they have already run into.</summary>

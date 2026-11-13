@@ -208,8 +208,18 @@ public sealed partial class Voyage
             Ship($"The stores ran out in year {Math.Floor((start + outAt) / Tuning.HoursPerYear):0}. Whoever is awake now goes hungry: "
                  + $"{Tuning.StarveDays:0} days without food kills. The pods can take them back early.");
         }
-        foreach (var (c, at) in starved.OrderBy(kv => kv.Value))
-            Kill(c, $"starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}");
+        // Two can starve in one step: only those still alive at its end say what they saw.
+        var held = HoldSpeech();
+        try
+        {
+            foreach (var (c, at) in starved.OrderBy(kv => kv.Value))
+                Kill(c, $"starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}");
+        }
+        finally
+        {
+            if (held)
+                ReleaseSpeech();
+        }
     }
 
     /// <summary>
@@ -383,7 +393,7 @@ public sealed partial class Voyage
         if (f.DangerFact is { } danger)
         {
             var df = _facts[danger];
-            if (!c.Beliefs.ContainsKey(danger) && !c.Dodged.Contains(danger) && c.Band != TrustBand.Follows)
+            if (!c.Beliefs.ContainsKey(danger) && !c.Dodged.ContainsKey(danger) && c.Band != TrustBand.Follows)
             {
                 c.PendingQuestion = danger;
                 Speak(c, "ask_danger", "Before you start the repair you ask the ship: " + df.Question, df.Question);
@@ -825,6 +835,8 @@ public sealed partial class Voyage
             deaths.AddRange(aliveBefore.Where(c => !c.Alive).Select(c => c.Name));
         }
         var hours = years * Tuning.HoursPerYear;
+        // Deaths in the drift come out in its report; crew lines from it are said after the report, by those who lived through it.
+        var heldSpeech = HoldSpeech();
         // Whoever would not sleep stays up through the drift and eats the stores, in time order (DESIGN.md, "What every decision spends").
         var awake = Awake.ToList();
         var (storesOut, starved) = Eat(awake, hours);
@@ -890,6 +902,8 @@ public sealed partial class Voyage
              + string.Concat(events.Select(e => e + " "))
              + $"Stores {Stores:0} person-days, spare parts {Parts}, pod wear {PodWear}. "
              + (deaths.Count == 0 ? "No deaths." : "Deaths: " + string.Join(", ", deaths) + "."));
+        if (heldSpeech)
+            ReleaseSpeech();
 
         if (last)
         {

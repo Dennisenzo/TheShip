@@ -116,7 +116,7 @@ Each of the 24 crew is a small sheet of game state, and the two numbers that mat
 
 Trust rises on a kept promise, a granted request and a hard truth told early. It falls on a broken promise and on an order that got someone hurt. It falls furthest on a discovered lie. A hard truth lowers morale at once and raises trust later.
 
-An unanswered question costs trust. A person who asked and got no answer asks again after the next two weeks (and loses 2 trust each time, at most twice); after the second repeat they doubt the fact and check it themselves. Going back to sleep with a question still open costs 4. A dodge is not an answer: it costs 3 trust once per question, makes them doubt the fact, and leaves the question open. Someone who will not work until the ship answers keeps refusing until a statement, true or false, answers the question.
+An unanswered question costs trust. A person who asked and got no answer asks again after the next two weeks (and loses 2 trust each time, at most twice); after the second repeat they doubt the fact and check it themselves. Going back to sleep with a question still open costs 4. A dodge is not an answer: it costs 3 trust once per question, makes them doubt the fact, and leaves the question open. When they later find the answer for themselves, the dodge costs another 3 only if it hid that answer: if it was already the truth when the ship dodged (not if it came true afterwards, as a death after the question). Someone who will not work until the ship answers keeps refusing until a statement, true or false, answers the question.
 
 The full game shows which band a person is in, never the number. The prototype shows the number.
 
@@ -139,7 +139,7 @@ A crew member tests what you tell them when they hear it, and again whenever the
 
 Statements and evidence are stored against the same fact keys, with dates, so finding a keyed lie is a lookup.
 
-A death outside the pods (someone awake, or coming round from a thaw that kills them) happens in front of everyone awake: they know it firsthand at once, as they know who is up when someone is thawed, so a later "they are fine" is caught as it is said. Seeing the answer to a question they asked the ship settles that question. A thaw that kills never logs "is awake".
+A death outside the pods (someone awake, or coming round from a thaw that kills them) happens in front of everyone awake: they know it firsthand at once, as they know who is up when someone is thawed, so a later "they are fine" is caught as it is said. Seeing the answer to a question they asked the ship settles that question. A thaw that kills never logs "is awake". A witness says they saw it, not that they went and looked. Only those alive at the end of a step say anything about it: two who starve in the same hours say nothing of each other, and deaths in a drift come out in the drift report, the awake taking them in silently, with any crew line from the drift said after the report.
 
 An altered log entry is one lie for as long as it says the same false thing: opening, restricting and altering it back to
 the same value again does not add a second lie to the record (a rewrite that someone has already found out does). A rewrite
