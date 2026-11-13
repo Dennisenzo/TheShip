@@ -224,7 +224,7 @@ Done when: every clickable thing reacts within one frame of the mouse arriving, 
 - **Motion on the plan.** A thawing pod pulses. A fault diamond pulses, and faster once under a quarter of its clock is left. The coolant
   dashes crawl slowly. All of it stops while a transition overlay is up.
 - **Log.** A new line fades in over 0.3 s. Lines added since the last clock move have a thin marker in the margin.
-- **Sound** (`Sounds.cs`, made in code like the click): a two-note chime for a new alert, a low sweep for a drift, a short low tone for a
+- **Sound** (`Sounds.cs`, made in code like the click): a low sweep for a drift (the two-note chime for a new alert was replaced by the three-whoop alarm of the music engine, `Music.cs`), a short low tone for a
   refused request or a disabled button. Volumes sit next to `ClickVolume`.
 
 ## Decisions taken in this plan (1, 2 and 4 confirmed by the user, 2026-11-13)

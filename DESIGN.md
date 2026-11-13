@@ -542,6 +542,7 @@ The first build is the Short haul mode in text only, smaller than the mode table
 - **Opening briefing:** a popup at the start of the voyage (and behind the BRIEFING button) states the goal (how many alive and of working age on arrival), what a thaw costs and the spare parts (2 at the start; a repair uses one and can fail, the Repair button shows the odds; a patch uses none and gives way later); one opening line in the log says where the stakes and the record are. The parts left are also in the header (PARTS, with a tooltip).
 - **Two lockouts:** the logs, and the cold-sleep bay ("Losing control").
 - **One ending screen:** survivors and the full record of what you said.
+- **Sound:** made in code. Ambient music that follows what the screen already shows (calm in the aftermath, tense in an alert with its open faults and clocks, deep during a drift, warm or bleak at the ending), an alarm once per new alert, and a MUSIC on/off button. It reads the state and never changes it.
 - **Ship plan:** a wireframe schematic with sections, doors (only locking has an effect), coolant and power lines, pods and fault markers.
 - **Conversations:** the Question agenda, bargains for work (promises with a due date) and work terms set by the briefing are built; the other agendas are designed, not built (see "Conversations").
 - **Left out:** cameras, factions, children, signals from ahead, all modes and modifiers, run variation except: the alert-2 victim and patient, side-fault draws, clock slack, year jitter.
@@ -574,7 +575,7 @@ Decided by the main session while the user was away, 2026-11-13 (first build of 
 | Do promises move morale? | Yes: kept +3, broken -8, and morale moves work speed |
 | How long does a promise last? | 45 days (`PromiseDueDays`); a warning at 14 days left stops Advance |
 | What does pushing past a bargain look like? | The Repair/Patch button of a person with an open bargain reads "WITHOUT YOUR WORD" (tooltip: the price and the odds); a push within 0.6 s real time of any Repair/Patch click for a person is ignored, so a double click (the first makes the offer) cannot push |
-| Is breaking a promise a winning strategy? | No longer (decided by the user, 2026-11-13: waking the partner pays). A reunion makes keeping the word worth its cost instead of punishing the break: see "Waking the partner pays" under "Balance". A strict Breaker (never wakes the partner) lands 64.8% against Honest 64.0% (before: 63.8% against 43.3%) |
+| Is breaking a promise a winning strategy? | No longer (decided by the user, 2026-11-13: waking the partner pays). A reunion makes keeping the word worth its cost instead of punishing the break: see "Waking the partner pays" under "Balance". A strict Breaker (never wakes the partner) lands 64.7% against Honest 63.7% (before: 63.8% against 43.3%) |
 | What does waking the partner give? | When partners are awake together (a reunion, on the thaw that completes it) both get `ReunionMorale` (8) once, and `Tuning.ReunionPodCare` (2) pod wear is cleared (they look after the pod bank together, which cancels the thaw's own wear); while both are awake each works `PairRate` (x1.10) faster and the pair grows `PairGardenPerDay` (1.2) person-days of stores a day tending the hydroponics. Each says a `reunion` line (templated, model-worded from the sheets' bonds); the bargain text says "Waking Idris lifts them both" |
 
 Decided by the main session while the user was away, 2026-11-13 (work terms, steps 1 and 2):
@@ -685,6 +686,7 @@ seeds (it swung by 8 between 200 and 600 seeds with no change to the rule) and s
 
 Table after the three code steps of this branch (600 seeds, WorkingAge 65): Honest 43.3% (survivors 3.35, Adrift 20.7%), Breaker 44.2% (3.47, 20.2%), Thrifty 43.0% (3.45, 21.2%),
 Corrector 49.0% (3.49, 18.7%), Careless 34.8% (3.22, 15.3%), Silent 31.8% (3.17, 21.0%), Liar 9.7% (1.60, 67.5%).
+The current table (after "Waking the partner pays") is at the end of that section below.
 
 ### Broken promises open an accusation, and the Breaker (2026-11-13, 600 seeds, WorkingAge 65)
 
@@ -741,6 +743,9 @@ there is a cliff between 1.0 and 1.2 a day); the rest of the gap is the extra th
 Final table, 600 seeds (Landfall / survivors / thaws per run): Honest 64.0 / 4.07 / 13.18 (was 43.3 / 3.35 / 13.19), Breaker 64.5 default, 64.8 strict (was 44.2, 63.8), Thrifty 60.0 / 3.99 / 10.13
 (was 43.0), Corrector 56.2 / 3.81 (was 49.0), Careless 34.8 (unchanged), Silent 31.8 (unchanged), Liar 14.8 (was 9.7). Honest moves from 43 to 64 and is now above the design's "one run in two";
 it keeps the 35-65 band and beats Liar, Careless and Silent by 29 points or more. Moving it back down is a separate tuning choice (e.g. fewer stores), not part of this decision.
+After the later doubt fix on the same branch (a doubt on what a person saw is settled), measured on main, 600 seeds (Landfall / survivors / Adrift): Honest 63.7 / 4.07 / 17.2, Breaker 64.7 / 4.07 / 16.2,
+strict Breaker 64.7 / 4.09 / 16.7 (the same 388 landings by coincidence: the runs differ, 13.17 against 12.14 thaws), Thrifty 60.2 / 3.99 / 15.3, Corrector 55.8 / 3.81 / 17.5, Careless 34.8 / 3.20 / 14.7,
+Silent 31.8 / 3.17 / 20.5, Liar 14.0 / 1.86 / 65.8. At 200 seeds Honest is 65.0%, the upper edge of the balance test's band.
 
 ### Work terms and the balance bots (2026-11-13, 600 seeds, bots unchanged)
 
