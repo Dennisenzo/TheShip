@@ -130,6 +130,37 @@ public class CrewLineReferenceTests
                 Context(speaker, "You agree to take on the coolant leak.", null, "Idris is in his pod.", "Stay calm, Asha is here.")), speaker + ": " + line);
     }
 
+    /// <summary>
+    /// A hedge covers only its own clause: a claim after a comma, a colon, a dash or "and/but", or reported with "told me",
+    /// "know why", "care that", is stated (validator finding on fix/read-timeout-and-pronoun-false-rejects).
+    /// </summary>
+    [Theory]
+    [InlineData("I think so, and Idris is dead.")]
+    [InlineData("I think so - Idris is dead.")]
+    [InlineData("I think so: Idris is dead.")]
+    [InlineData("Maybe you're right, but Idris is dead.")]
+    [InlineData("If you say so, but Idris is dead.")]
+    [InlineData("You should have told me Idris is dead.")]
+    [InlineData("You could have told me Idris is dead.")]
+    [InlineData("I would like to know why Idris is dead.")]
+    [InlineData("I doubt you care that Idris is dead.")]
+    [InlineData("I hope you're happy, Idris is dead.")]
+    [InlineData("We may be late, and Idris is dead.")]
+    [InlineData("Maybe, but he is dead.")]
+    [InlineData("You would say that, you killed him.")]
+    [InlineData("It might hold, and the power is low.")]
+    [InlineData("Maybe. He is dead.")]
+    [InlineData("It might hold. Idris is dead.")]
+    [InlineData("Idris is dead, I think.")]
+    [InlineData("I know Idris is dead.")]
+    public void A_claim_outside_the_hedged_clause_is_rejected(string line)
+    {
+        var v = new Voyage(1);
+        using var mind = new ShipMind(v, new FakeLlm(), new MainThreadQueue { Immediate = true });
+        const string decision = "You agree to take on the coolant leak.";
+        Assert.False(mind.Acceptable(line, Nothing, decision, Context("mara", decision)), line);
+    }
+
     /// <summary>The loosened checks still catch a plain claim the speaker can't make.</summary>
     [Fact]
     public void Plain_claims_are_still_rejected()

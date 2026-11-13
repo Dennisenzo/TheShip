@@ -114,10 +114,24 @@ public static class RuleReader
         + @"nearly|almost|don't tell me|do not tell me|don't say|do not say|afraid that|scared that|worried that)\b",
         RegexOptions.CultureInvariant);
 
-    /// <summary>Whether the text of a sentence before a claim makes the claim a condition, a guess or a counterfactual.</summary>
+    /// <summary>
+    /// Where a hedge stops covering what follows: the end of a sentence or a clause (a comma, a colon, a dash, a bracket,
+    /// "and", "but", "so", "yet"), or words that report what follows as a fact: "told me", "warned us", "know why",
+    /// "care that" ("You should have told me Idris is dead", "I doubt you care that Idris is dead" state the death).
+    /// </summary>
+    private static readonly Regex HedgeEnd = new(
+        @"[.!?;,:()]|\s[-–—]+\s|[–—]|\b(?:and|but|so|yet)\b|\b(?:told|warned|showed)\s+(?:me|us|you|him|her|them)\b|"
+        + @"\b(?:know|knew|knows|see|saw|wonder|wondered|ask|asked|understand|tell me)\s+why\b|"
+        + @"\b(?:care|cares|cared|know|knew|knows|forget|forgot|realise|realised|realize|realized|see|saw|hear|heard)\s+that\b",
+        RegexOptions.CultureInvariant);
+
+    /// <summary>
+    /// Whether the text before a claim makes the claim a condition, a guess or a counterfactual: only a hedge in the same
+    /// clause counts ("I think he's dead" is a guess; "I think so, and he's dead" states it).
+    /// </summary>
     private static bool Hedged(string before)
     {
-        var start = before.LastIndexOfAny(new[] { '.', '!', '?', ';' }) + 1;
+        var start = HedgeEnd.Matches(before).Select(m => m.Index + m.Length).DefaultIfEmpty(0).Last();
         return Hedge.IsMatch(before[start..]);
     }
 
