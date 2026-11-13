@@ -21,6 +21,12 @@ public sealed record Variation
     /// <summary>Years added to each alert's year (alert order is kept, arrival stays at year 60).</summary>
     public required IReadOnlyList<int> YearJitter { get; init; }
 
+    /// <summary>The fault kinds that have a cause fact, in the order their slots are rolled.</summary>
+    public static readonly string[] CauseKinds = { "coolant", "pod", "illness", "nav", "controller", "blight", "powersag" };
+
+    /// <summary>Which value of each <c>cause:&lt;kind&gt;</c> fact is true: 0 the benign (first) value, 1 the hard one.</summary>
+    public IReadOnlyDictionary<string, int> Causes { get; init; } = CauseKinds.ToDictionary(k => k, _ => 0);
+
     public static Variation Classic { get; } = new()
     {
         Alert2Victim = "idris", Alert2Patient = "tomas", Alert3SideFault = null, Alert5SideFault = null,
@@ -66,8 +72,12 @@ public sealed record Variation
         for (var i = 0; i < jitter.Length; i++)
             jitter[i] = rng.Next(-Tuning.AlertYearJitter, Tuning.AlertYearJitter + 1);
 
+        // Slot 7: which cause is true for each fault kind (always rolled, in the order of CauseKinds; after the jitter so earlier slots keep their draws).
+        var causes = CauseKinds.ToDictionary(k => k, _ => rng.Next(2));
+
         return new Variation
         {
+            Causes = causes,
             Alert2Victim = victim, Alert2Patient = patient, Alert3SideFault = side3, Alert5SideFault = side5,
             SlackHours = slack, YearJitter = jitter,
         };
@@ -75,5 +85,5 @@ public sealed record Variation
 
     public override string ToString() =>
         $"victim {Alert2Victim}, patient {Alert2Patient}, side faults {Alert3SideFault ?? "none"}/{Alert5SideFault ?? "none"}, "
-        + $"slack [{string.Join(",", SlackHours)}], year jitter [{string.Join(",", YearJitter)}]";
+        + $"slack [{string.Join(",", SlackHours)}], year jitter [{string.Join(",", YearJitter)}], hard causes [{string.Join(",", Causes.Where(c => c.Value == 1).Select(c => c.Key))}]";
 }

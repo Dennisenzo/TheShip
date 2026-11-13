@@ -31,8 +31,8 @@ public sealed record AnswerStakes(string Question, int TruthHurts, int OddsLost,
 public sealed partial class Voyage
 {
     /// <summary>The chance that a repair led by <paramref name="lead"/> holds, at the given morale (a patch always holds, and comes back).</summary>
-    public static double RepairChance(CrewMember lead, Fault f, double morale) =>
-        Math.Clamp(Tuning.RepairBaseChance + Tuning.RepairPerSkill * (lead.SkillOf(f.Skill) - f.Level) + (morale - 50) / Tuning.RepairMoraleSpan,
+    public static double RepairChance(CrewMember lead, Fault f, double morale, double bonus = 0) =>
+        Math.Clamp(Tuning.RepairBaseChance + Tuning.RepairPerSkill * (lead.SkillOf(f.Skill) - f.Level) + (morale - 50) / Tuning.RepairMoraleSpan + bonus,
             Tuning.RepairChanceMin, Tuning.RepairChanceMax);
 
     /// <summary>How fast a team works at its average morale: 1.0 at <see cref="Tuning.MoraleRateNeutral"/>, slower below, faster above, within limits.</summary>
@@ -59,7 +59,7 @@ public sealed partial class Voyage
         if (Parts <= 0)
             return null;
         var lead = LeadWith(joining, f);
-        return RepairChance(lead, f, lead.Morale);
+        return RepairChance(lead, f, lead.Morale, TermsOf(lead, f).OddsBonus);
     }
 
     /// <summary>

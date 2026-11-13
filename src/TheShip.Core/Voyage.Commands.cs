@@ -444,7 +444,7 @@ public sealed partial class Voyage
         }
         else
         {
-            var chance = RepairChance(lead, f, lead.Morale);
+            var chance = RepairChance(lead, f, lead.Morale, TermsOf(lead, f).OddsBonus);
             if (_rng.NextDouble() > chance)
             {
                 f.Progress = f.Hours * 0.5;
@@ -511,6 +511,9 @@ public sealed partial class Voyage
             w.Terms = null;
             if (f.ExposureFact is { } seen)
                 Learn(w, seen, _facts[seen].Truth, "evidence");
+            // Everyone who finishes the work learns what really caused the fault (a false cause they were told is caught here).
+            if (f.CauseFact is { } cause && _facts.ContainsKey(cause))
+                Learn(w, cause, _facts[cause].Truth, "evidence");
             if (f.Kind == "illness")
             {
                 // Treating the patient they stand next to the dead pod of the one who was lost.

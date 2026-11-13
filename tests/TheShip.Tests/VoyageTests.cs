@@ -55,7 +55,7 @@ public class VoyageTests
         Assert.Equal(1, v.Current.Number);
         Assert.Single(v.Current.Faults);
         Assert.Equal(4.0, Math.Floor(v.Year));
-        Assert.Equal(20, v.FactList.Count);
+        Assert.Equal(27, v.FactList.Count);
     }
 
     [Fact]

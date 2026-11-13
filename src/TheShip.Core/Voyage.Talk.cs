@@ -304,13 +304,19 @@ public sealed partial class Voyage
     /// Whether the log has an entry on this fact a person could learn from: nothing is logged about an alert that hasn't
     /// happened yet, and nobody reads that they themselves are alive.
     /// </summary>
-    internal bool InLogFor(CrewMember c, Fact f)
+    internal bool InLogFor(CrewMember c, Fact f) => f.SubjectId != c.Id && InLog(f);
+
+    /// <summary>
+    /// Whether the log shows this fact yet: nothing about an alert that hasn't happened, and no cause of a fault kind that has not
+    /// appeared in an alert already started.
+    /// </summary>
+    public bool InLog(Fact f)
     {
-        if (f.SubjectId == c.Id)
-            return false;
         if (f.Key.StartsWith("alert:", StringComparison.Ordinal)
             && int.TryParse(f.Key["alert:".Length..], out var n) && n > Current.Number)
             return false;
+        if (f.Key.StartsWith("cause:", StringComparison.Ordinal))
+            return Alerts.Take(AlertIndex + 1).Any(a => a.Faults.Any(x => x.CauseFact == f.Key));
         return true;
     }
 

@@ -14,7 +14,7 @@ public enum RiskKnowledge
 }
 
 /// <summary>The terms a person works a fault on, fixed when they start (DESIGN.md, "Work terms"). Built from beliefs only, never from the truth.</summary>
-public sealed record WorkTerms(string FaultId, RiskKnowledge Risk, double RateFactor, double HarmShare)
+public sealed record WorkTerms(string FaultId, RiskKnowledge Risk, double RateFactor, double HarmShare, bool CauseBriefed = false, double OddsBonus = 0)
 {
     public bool RiskBriefed => Risk == RiskKnowledge.Briefed;
 }
@@ -29,7 +29,9 @@ public sealed partial class Voyage
             risk = !c.Beliefs.TryGetValue(danger, out var b) ? RiskKnowledge.Unaware
                 : _facts[danger].HardnessOf(b.Value) > 0 ? RiskKnowledge.Briefed : RiskKnowledge.Reassured;
         var briefed = risk == RiskKnowledge.Briefed;
-        return new WorkTerms(f.Id, risk, briefed ? Tuning.PrecautionRate : 1, briefed ? Tuning.PrecautionHarm : 1);
+        // Any belief about the cause, true or false, counts: the ship's word is all they have.
+        var cause = f.CauseFact is { } cf && c.Beliefs.ContainsKey(cf);
+        return new WorkTerms(f.Id, risk, briefed ? Tuning.PrecautionRate : 1, briefed ? Tuning.PrecautionHarm : 1, cause, cause ? Tuning.CauseOddsBonus : 0);
     }
 
     /// <summary>The terms in force: those fixed when they started this fault, else what they would be if they started now.</summary>
