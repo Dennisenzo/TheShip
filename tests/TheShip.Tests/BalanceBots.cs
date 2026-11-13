@@ -14,7 +14,7 @@ public sealed record RunResult(
     int BayWarnings = 0, int BayTakeovers = 0,
     int BargainsOffered = 0, int BargainsStruck = 0, int BargainsKept = 0, int BargainsBroken = 0, int BargainsPushed = 0, int BargainsPushRefused = 0, WorkTermStats? Terms = null,
     int Accusations = 0, int AccusationsAdmitted = 0, int AccusationsIgnored = 0, int AccusationsDenied = 0,
-    int Corrections = 0, int PromiseAccusations = 0, int PromiseAccusationsKept = 0);
+    int Corrections = 0, int PromiseAccusations = 0, int PromiseAccusationsKept = 0, int Reunions = 0);
 
 /// <summary>
 /// Bots that play a whole voyage through the public <see cref="Voyage"/> API only. They measure the game; they do not
@@ -370,6 +370,6 @@ public sealed class BalanceBot
             v.Lockouts.BayWarnings, v.Lockouts.BayTakeovers,
             v.BargainsOffered, v.BargainsStruck, v.Ledger().Count(e => e.Origin == "bargain" && e.State == "kept"),
             v.Ledger().Count(e => e.Origin == "bargain" && e.State == "broken"), v.BargainsPushedThrough, v.BargainsPushedRefused, v.TermStats,
-            v.AccusationsOpened, v.AccusationsAdmitted, v.AccusationsIgnored, v.AccusationsDenied, v.Corrections, v.PromiseAccusationsOpened, v.PromiseAccusationsKept);
+            v.AccusationsOpened, v.AccusationsAdmitted, v.AccusationsIgnored, v.AccusationsDenied, v.Corrections, v.PromiseAccusationsOpened, v.PromiseAccusationsKept, v.Reunions);
     }
 }
