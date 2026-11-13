@@ -187,9 +187,8 @@ public sealed partial class ShipGame
         {
             if (who != null)
             {
-                if (!PushAllowed(pushRepair))
-                    return;
-                Act("repair " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: false));
+                if (PushAllowed(pushRepair))
+                    Act("repair " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: false));
             }
             else
                 Do(() => _picker = (fault, false, pickerX, y));
@@ -198,9 +197,8 @@ public sealed partial class ShipGame
         {
             if (who != null)
             {
-                if (!PushAllowed(pushPatch))
-                    return;
-                Act("patch " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: true));
+                if (PushAllowed(pushPatch))
+                    Act("patch " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: true));
             }
             else
                 Do(() => _picker = (fault, true, pickerX, y));
@@ -214,12 +212,14 @@ public sealed partial class ShipGame
 
     private double _lastPushClickAt = double.NegativeInfinity;
 
-    /// <summary>False when this click is a repeat of a push within <see cref="PushGuardSeconds"/> (game layer only; the rules are unchanged).</summary>
+    /// <summary>
+    /// False when this click would push past a bargain within <see cref="PushGuardSeconds"/> of the last Repair/Patch click for a
+    /// person (game layer only; the rules are unchanged). Every such click is stamped, pushing or not: the first click of a double
+    /// click makes the offer (or re-targets it to another fault) and must not let the second push.
+    /// </summary>
     private bool PushAllowed(bool pushing)
     {
-        if (!pushing)
-            return true;
-        var ok = _now - _lastPushClickAt >= PushGuardSeconds;
+        var ok = !pushing || _now - _lastPushClickAt >= PushGuardSeconds;
         _lastPushClickAt = _now;
         return ok;
     }
@@ -741,7 +741,7 @@ public sealed partial class ShipGame
                 var sleepTip = v.Lockouts.Bay
                     ? v.BayLockReason
                     : can
-                    ? "Ask " + c.Name + " to go back into the pod. They may refuse."
+                    ? "Ask " + c.Name + " to go back into the pod. They may refuse." + (v.SleepBreaksText(c) is { } breaks ? " " + breaks : "")
                     : "A pod takes a person back after " + N(Tuning.MinAwakeHours / 24) + " days awake at the earliest: " + days + " to go.";
                 if (_p.Button(act, v.Lockouts.Bay ? "BAY TAKEN" : can ? "SLEEP" : "in " + days + " d", can && !ended && !v.Lockouts.Bay, tip: sleepTip))
                     Act("ask " + person.Name + " to sleep", () => v.AskSleep(person));
@@ -785,10 +785,13 @@ public sealed partial class ShipGame
         }
     }
 
-    /// <summary>Questions nobody has answered, things people asked for, doubts, and promises still open; each with the person it is about, if one.</summary>
+    /// <summary>Questions nobody has answered, conditions, things people asked for, doubts, and promises still open; each with the person it is about, if one.</summary>
     /// <remarks>
-    /// The stakes come first, then the bay lockout, then the selected person. Their open question (or the only open question) is shown with its stakes: what the true
-    /// answer costs and earns, what a reassuring one buys, and where the answer can be checked (<see cref="Voyage.StakesText"/>).
+    /// In order: the stakes of the selected person's open question (or of the only open question): what the true answer costs and earns,
+    /// what a reassuring one buys, and where the answer can be checked (<see cref="Voyage.StakesText"/>); then a bargain's price
+    /// (<see cref="Voyage.BargainText"/>: the selected person's, else the first bargainer's with a hint to select the others); then the bay
+    /// warning and the bay lockout; then per awake person, the selected one first: their other open question, their request, what the ship
+    /// owes them (<see cref="Voyage.LedgerLine"/>), their doubts and a pod refusal; last, promises to people asleep.
     /// </remarks>
     private static IEnumerable<(CrewMember? Who, string Text)> Waiting(Voyage v, CrewMember? selected)
     {
@@ -800,14 +803,23 @@ public sealed partial class ShipGame
             yield return (staked, v.StakesText(staked));
         // What a wary person wants before starting: the selected one's (or the only one's) bargain, ahead of the bay items.
         var bargainers = v.Awake.Where(c => v.BargainOf(c) != null).ToList();
-        var bargainer = bargainers.FirstOrDefault(c => c == selected) ?? (bargainers.Count == 1 ? bargainers[0] : null);
+        // With several and none of them selected, the first one's, and a hint to select the others.
+        var bargainer = bargainers.FirstOrDefault(c => c == selected) ?? bargainers.FirstOrDefault();
         if (bargainer != null && v.BargainText(bargainer) is { } bargainText)
-            yield return (bargainer, bargainText);
+        {
+            var others = bargainers.Where(c => c != bargainer).Select(c => c.Name).ToList();
+            yield return (bargainer, bargainText + (others.Count > 0 && bargainer != selected
+                ? " Select " + string.Join(" or ", others) + " to see " + (others.Count == 1 ? "theirs." : "each of theirs.")
+                : ""));
+        }
         if (v.Lockouts.BayWarned.Count > 0)
             yield return (null, string.Join(" and ", v.Lockouts.BayWarned.Select(id => v.Crew.First(c => c.Id == id).Name))
                          + " will take the cold-sleep bay at the next step. Win one of them back above 15 trust, or they do.");
         if (v.Lockouts.Bay)
-            yield return (null, v.BayLockReason + " Keep a promise to one of them and win their trust above " + Tuning.BayReturnTrust.ToString("0") + " to get it back.");
+            yield return (null, v.BayLockReason + (v.LogsLocked
+                ? " The crew hold the logs too: no promise to them can be kept now."
+                : " Promise one of them to open the logs, have every log open when it falls due, and win their trust above "
+                  + Tuning.BayReturnTrust.ToString("0") + " to get it back."));
         var owed = v.Ledger().Where(e => e.State == "open").ToList();
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {
@@ -817,7 +829,7 @@ public sealed partial class ShipGame
                 yield return (c, c.Name + " asked you " + (c.Want == Want.WakePartner ? "to wake their partner." : "to open the logs."));
             // What the ship owes them comes before their doubts.
             foreach (var e in owed.Where(e => e.Person == c))
-                yield return (c, LedgerLine(v, e));
+                yield return (c, v.LedgerLine(e));
             foreach (var doubt in c.Doubts)
                 if (v.HasFact(doubt))
                     yield return (c, c.Name + " doubts you on " + v.GetFact(doubt).Label + " and will check.");
@@ -826,11 +838,7 @@ public sealed partial class ShipGame
         }
         // Promises to people who are asleep (never to thaw them again).
         foreach (var e in owed.Where(e => e.Person.State != CrewState.Awake && e.Person.Alive))
-            yield return (e.Person, LedgerLine(v, e));
+            yield return (e.Person, v.LedgerLine(e));
     }
 
-    /// <summary>"Promise to Mara: wake Idris, 12 days left." (a standing promise has no days.)</summary>
-    private static string LedgerLine(Voyage v, LedgerEntry e) =>
-        "Promise to " + e.Person.Name + ": " + e.Text
-        + (e.DueBy is { } due ? ", " + (v.DaysLeft(due) <= 0 ? "due now" : v.DaysLeft(due) + (v.DaysLeft(due) == 1 ? " day left" : " days left")) : ", until arrival") + ".";
 }

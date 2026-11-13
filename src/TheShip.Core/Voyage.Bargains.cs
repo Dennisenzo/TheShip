@@ -16,7 +16,7 @@ public sealed partial class Voyage
     {
         var list = new List<LedgerEntry>();
         foreach (var s in Statements.Where(s => s.Kind == StatementKind.Promise && s.PromiseKey is { } k && k != "other"))
-            foreach (var id in s.Hearers)
+            foreach (var id in s.Hearers.Where(id => !s.Repeated.Contains(id) && !s.Moot.Contains(id)))
             {
                 var c = Crew.First(x => x.Id == id);
                 var state = s.PromiseKept.TryGetValue(id, out var kept) ? (kept ? "kept" : "broken")
@@ -38,9 +38,66 @@ public sealed partial class Voyage
     /// <summary>Days left to a clock hour, rounded up; at most 0 when due.</summary>
     public int DaysLeft(double dueBy) => (int)Math.Max(0, Math.Ceiling((dueBy - Clock) / 24 - 1e-9));
 
-    /// <summary>The person has an open, checkable promise with this key from the ship.</summary>
-    internal bool HasOpenCommitment(CrewMember c, string key) =>
-        Statements.Any(s => s.Kind == StatementKind.Promise && s.PromiseKey == key && s.OpenFor(c.Id));
+    /// <summary>
+    /// When an open promise to this person falls due, in words: "12 days left", "due now", "until arrival" (no date). While they are
+    /// awake a promise the game checks also ends when they go to sleep (sleeping settles it), so it says so: "12 days left or when she sleeps".
+    /// </summary>
+    public string DueText(CrewMember c, string key, double? dueBy)
+    {
+        if (dueBy is not { } due)
+            return "until arrival";
+        var left = DaysLeft(due);
+        var text = left <= 0 ? "due now" : left + (left == 1 ? " day left" : " days left");
+        if (left > 0 && Checkable(key) && c.State is CrewState.Awake or CrewState.Thawing)
+            text += " or when " + (c.Pronoun ?? "they") + (c.Pronoun is null ? " sleep" : " sleeps");
+        return text;
+    }
+
+    /// <summary>"Promise to Mara: wake Idris, 12 days left or when she sleeps." (a standing promise has no days.)</summary>
+    public string LedgerLine(LedgerEntry e) => "Promise to " + e.Person.Name + ": " + e.Text + ", " + DueText(e.Person, e.Key, e.DueBy) + ".";
+
+    /// <summary>Whether an open promise to this person would count as kept if it were settled now (they went to sleep).</summary>
+    private bool KeptNow(CrewMember c, string key)
+    {
+        if (key == "show_logs")
+            return ShipOpenedLogs;
+        var partner = c.PartnerId is null ? null : Crew.First(x => x.Id == c.PartnerId);
+        return partner is not null && (partner.State == CrewState.Thawing || (partner.State == CrewState.Awake && c.State == CrewState.Awake && c.SawPartner));
+    }
+
+    /// <summary>Whether an open promise to this person can no longer be kept, so settling it now releases it (no penalty).</summary>
+    private bool ReleasedNow(CrewMember c, string key)
+    {
+        if (key == "show_logs")
+            return LogsLocked;
+        var partner = c.PartnerId is null ? null : Crew.First(x => x.Id == c.PartnerId);
+        return partner is null || partner.State == CrewState.Dead || (Lockouts.Bay && partner.State == CrewState.Asleep);
+    }
+
+    /// <summary>
+    /// What going to sleep now would do to the open promises to this person (sleeping settles them at once), for the SLEEP button;
+    /// null when nothing would break. "Mara still waits for Idris: sleeping now breaks that promise."
+    /// </summary>
+    public string? SleepBreaksText(CrewMember c)
+    {
+        var lines = new List<string>();
+        foreach (var e in Ledger().Where(e => e.Person == c && e.State == "open" && Checkable(e.Key) && !KeptNow(c, e.Key) && !ReleasedNow(c, e.Key)))
+        {
+            var waits = e.Key == "wake_partner" && c.PartnerId is { } p ? Crew.First(x => x.Id == p).Name : "the logs to open";
+            var line = c.Name + " still waits for " + waits + ": sleeping now breaks that promise.";
+            if (!lines.Contains(line))
+                lines.Add(line);
+        }
+        return lines.Count == 0 ? null : string.Join(" ", lines);
+    }
+
+    /// <summary>The person has an open promise with this key from the ship (other than <paramref name="except"/>).</summary>
+    internal bool HasOpenCommitment(CrewMember c, string key, Statement? except = null) =>
+        Statements.Any(s => s != except && s.Kind == StatementKind.Promise && s.PromiseKey == key && s.OpenFor(c.Id));
+
+    /// <summary>A promise to wake this person's partner when the partner is already dead: it asks nothing the ship can do (no trust, no ledger entry).</summary>
+    internal bool PartnerDead(CrewMember c, string key) =>
+        key == "wake_partner" && c.PartnerId is { } p && Crew.First(x => x.Id == p).State == CrewState.Dead;
 
     /// <summary>A promise has just been made to a listener: its due date, and whether there is anything left to keep.</summary>
     private void StartCommitment(Statement s, CrewMember c, double days = Tuning.PromiseDueDays)
@@ -58,8 +115,8 @@ public sealed partial class Voyage
 
     /// <summary>
     /// Settles every open promise that has come true, can no longer be kept, or fell due: wake_partner is kept when the partner
-    /// is thawing or met, broken at the due date; show_logs is kept at the due date if all logs are open, else broken. A promise that
-    /// can't be kept any more (partner dead, the bay taken) is released with a SHIP line and no penalty. A promise is warned about once (Advance
+    /// is thawing or met, broken at the due date; show_logs is kept at the due date if the ship has opened every log, else broken. A promise that
+    /// can't be kept any more (partner dead, the bay taken, the crew hold the logs) is released with a SHIP line and no penalty. A promise is warned about once (Advance
     /// stops) at the last beat that leaves time to act: when it has the warning days plus one beat left or less. <paramref name="only"/> and <paramref name="force"/> settle one person's
     /// promises now, as when they go under.
     /// </summary>
@@ -84,7 +141,7 @@ public sealed partial class Voyage
                         s.Released.Add(id);
                         continue;
                     }
-                    if (partner.State == CrewState.Thawing || (partner.State == CrewState.Awake && c.State == CrewState.Awake && c.SawPartner))
+                    if (KeptNow(c, "wake_partner"))
                     {
                         ResolvePromise(s, c, kept: true);
                         continue;
@@ -98,9 +155,16 @@ public sealed partial class Voyage
                         continue;
                     }
                 }
+                else if (LogsLocked)
+                {
+                    // The crew took the logs: the ship can no longer open them, and their opening is not the ship's doing.
+                    s.Released.Add(id);
+                    Ship(c.Name + "'s promise can no longer be kept: the crew hold the logs.");
+                    continue;
+                }
                 else if (late)
                 {
-                    ResolvePromise(s, c, AllLogsOpen);
+                    ResolvePromise(s, c, ShipOpenedLogs);
                     continue;
                 }
                 if (late)
@@ -158,20 +222,32 @@ public sealed partial class Voyage
     }
 
     /// <summary>
-    /// The condition this person has open, or null. It lapses silently when its fault is resolved, the alert changes, the person
-    /// goes to sleep, or the condition is met by other means.
+    /// The condition this person has open, or null when it no longer stands: its fault is resolved, the alert changed, the person
+    /// is not awake, or the condition was met by other means. Only reads (the draw calls it); <see cref="LapseBargains"/> clears
+    /// what no longer stands after each step.
     /// </summary>
-    public Bargain? BargainOf(CrewMember c)
+    public Bargain? BargainOf(CrewMember c) => c.OpenBargain is { } b && Stands(c, b) ? b : null;
+
+    /// <summary>
+    /// This person's word is what the work waits on: they have an open condition and the fault still needs them (others have not
+    /// taken it on at full strength). For the next-step line.
+    /// </summary>
+    public bool AwaitsWord(CrewMember c) =>
+        BargainOf(c) is { } b && Current.Faults.First(f => f.Id == b.FaultId) is var f
+        && Crew.Count(o => o != c && o.State == CrewState.Awake && o.WorkingOn == f.Id) < f.People;
+
+    private bool Stands(CrewMember c, Bargain b) =>
+        c.State == CrewState.Awake && b.Alert == Current.Number
+        && Current.Faults.FirstOrDefault(f => f.Id == b.FaultId) is { Resolved: false } && ConditionOpen(c, b.Key);
+
+    /// <summary>
+    /// Drops every condition that no longer stands, or whose person has left the wary band (trust fell or rose past it), so one
+    /// can't come back to life later (a partner woken and put back to sleep in the same alert). Run at the end of each step.
+    /// </summary>
+    private void LapseBargains()
     {
-        if (c.OpenBargain is not { } b)
-            return null;
-        if (c.State != CrewState.Awake || b.Alert != Current.Number
-            || Current.Faults.FirstOrDefault(f => f.Id == b.FaultId) is not { Resolved: false } || !ConditionOpen(c, b.Key))
-        {
+        foreach (var c in Crew.Where(c => c.OpenBargain is { } b && (!Stands(c, b) || c.Band != TrustBand.WantsReasons)))
             c.OpenBargain = null;
-            return null;
-        }
-        return b;
     }
 
     private static string TaskText(Fault f, bool patch) => (patch ? "patching the " : "the ") + f.CrewName;
@@ -258,7 +334,10 @@ public sealed partial class Voyage
 
     /// <summary>
     /// A promise with the open bargain's key has been given to this person: the commitment is recorded with its due date, no
-    /// trust gain, and the work starts. False (the bargain is dropped) when the work can no longer be done.
+    /// trust gain, and the work starts. False (the bargain is dropped, the promise is an ordinary one) when the work can no longer
+    /// be done. When one of <see cref="Assign"/>'s gates now stops them (trust fell, a question is waiting, the danger), they say
+    /// that refusal instead: the bargain is closed, the ship's word stands as an ordinary promise (no trust gain, no line of its
+    /// own), and a later Repair or Patch starts the work once the gate is clear, without a new price.
     /// </summary>
     private bool StrikeBargain(Statement made, CrewMember c, Bargain b)
     {
@@ -267,6 +346,11 @@ public sealed partial class Voyage
         if (f is null || f.Resolved || Locked(f.Section) || (!b.Patch && Parts <= 0)
             || c.State != CrewState.Awake || (c.WorkingOn != null && c.WorkingOn != f.Id))
             return false;
+        if (Refuses(c, f))
+        {
+            StartCommitment(made, c);
+            return true;
+        }
         StartCommitment(made, c, Tuning.BargainDueDays);
         made.Bargained.Add(c.Id);
         BargainsStruck++;
@@ -287,9 +371,12 @@ public sealed partial class Voyage
         var text = FormattableString.Invariant($"{c.Name} will start {TaskText(f, b.Patch)} if you promise to {cond} within {Tuning.BargainDueDays:0} days. Kept +{Tuning.PromiseKept:0} trust, broken -{Tuning.PromiseBroken:0}. ");
         text += c.BargainDeclined
             ? "They refuse to start without your word. Say it to them."
-            : FormattableString.Invariant($"Without it: about {PushChance(c) * 100:0}% {c.Pronoun ?? "they"} start{(c.Pronoun is null ? "" : "s")}, -{Tuning.BargainPushedTrust:0} trust. Say it to them.");
+            : FormattableString.Invariant($"Without it: about {PushChance(c) * 100:0}% {StartsText(c)}, -{Tuning.BargainPushedTrust:0} trust. Say it to them.");
         return text;
     }
+
+    /// <summary>"she starts", "he starts", or "they start" when the sheet has no pronoun.</summary>
+    public static string StartsText(CrewMember c) => c.Pronoun is { } p ? p + " starts" : "they start";
 
     /// <summary>The key of the condition any of these listeners has open (the test reader reads "agreed" as that promise), or null.</summary>
     public string? OpenBargainKey(IEnumerable<CrewMember> hearers) => hearers.Select(BargainOf).FirstOrDefault(b => b != null)?.Key;

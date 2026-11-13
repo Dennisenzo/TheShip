@@ -26,6 +26,7 @@ public sealed partial class Voyage
         Apply(text, reading, listeners);
         foreach (var l in listeners)
             Clamp(l);
+        LapseBargains();
         return true;
     }
 
@@ -91,6 +92,20 @@ public sealed partial class Voyage
                     // The price a wary person set for their work: the work starts, and the promise is held to a due date.
                     if (BargainOf(l) is { } open && open.Key == key && StrikeBargain(made, l, open))
                         continue;
+                    // The same promise said again while the first is still open is that promise, not a second one to settle.
+                    if (key != "other" && HasOpenCommitment(l, key, except: made))
+                    {
+                        made.Repeated.Add(l.Id);
+                        Speak(l, "promise", "The ship repeated a promise it already made you: " + PromiseText(key) + ".");
+                        continue;
+                    }
+                    // To wake a partner who is already dead: nothing to hold the ship to, nothing earned; they still answer.
+                    if (PartnerDead(l, key))
+                    {
+                        made.Moot.Add(l.Id);
+                        Speak(l, "promise", "The ship made you a promise: " + PromiseText(key) + ".");
+                        continue;
+                    }
                     // The small gain is earned once per person per waking, so repeating a promise buys nothing more.
                     if (!l.PromiseCredited)
                     {

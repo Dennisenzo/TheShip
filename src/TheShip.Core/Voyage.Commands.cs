@@ -40,6 +40,7 @@ public sealed partial class Voyage
         }
         // A promise to wake someone is kept the moment the thaw starts.
         ResolveCommitments();
+        LapseBargains();
     }
 
     /// <summary>
@@ -67,6 +68,7 @@ public sealed partial class Voyage
         else
             GoAftermath();
         SyncFacts();
+        LapseBargains();
     }
 
     private IEnumerable<CrewMember> Workers(Fault f) => Crew.Where(c => c.State == CrewState.Awake && c.WorkingOn == f.Id);
@@ -397,16 +399,30 @@ public sealed partial class Voyage
             return;
         }
 
+        if (Refuses(c, f))
+            return;
+        if (BargainGate(c, f, patch))
+            return;
+        StartWork(c, f, patch);
+    }
+
+    /// <summary>
+    /// Whether this person won't take the work on now, and says why: no trust, an unanswered question (wary and not obedient), the
+    /// danger question first, or the danger they were told about. The gates <see cref="Assign"/> runs before any bargain, and again
+    /// when a bargain is struck.
+    /// </summary>
+    private bool Refuses(CrewMember c, Fault f)
+    {
         if (c.Band == TrustBand.Against || (c.Band == TrustBand.Refuses && !c.RequestGranted))
         {
             Speak(c, "refuse_trust", "You refuse to do the work because you no longer trust the ship.");
-            return;
+            return true;
         }
         if (c.Band == TrustBand.WantsReasons && c.PendingQuestion != null && !c.Has(Trait.Obedient))
         {
             var asked = _facts[c.PendingQuestion].Question;
             Speak(c, "refuse_answer", "You will not start work until the ship answers what you asked: " + asked, asked);
-            return;
+            return true;
         }
         if (f.DangerFact is { } danger)
         {
@@ -415,19 +431,16 @@ public sealed partial class Voyage
             {
                 c.PendingQuestion = danger;
                 Speak(c, "ask_danger", "Before you start the repair you ask the ship: " + df.Question, df.Question);
-                return;
+                return true;
             }
             if (c.Beliefs.TryGetValue(danger, out var b) && df.HardnessOf(b.Value) > 0
                 && c.Trust < 40 && !c.Has(Trait.Obedient) && !c.Has(Trait.Steady))
             {
                 Speak(c, "refuse_danger", "You refuse the repair because of the danger the ship told you about.");
-                return;
+                return true;
             }
         }
-
-        if (BargainGate(c, f, patch))
-            return;
-        StartWork(c, f, patch);
+        return false;
     }
 
     private void CompleteRepair(Fault f)
@@ -698,7 +711,11 @@ public sealed partial class Voyage
         Ship(c.Name + " is asleep.");
     }
 
+    /// <summary>Nothing is kept from the crew: every log is open, or the crew hold the logs themselves (for requests and conditions).</summary>
     private bool AllLogsOpen => LogsLocked || FactList.All(f => f.Access == LogAccess.Open);
+
+    /// <summary>The ship has opened every log itself: what keeps a promise to open the logs (logs the crew took do not).</summary>
+    private bool ShipOpenedLogs => !LogsLocked && FactList.All(f => f.Access == LogAccess.Open);
 
     private void ResolvePromise(Statement s, CrewMember c, bool kept)
     {
@@ -734,6 +751,7 @@ public sealed partial class Voyage
     {
         SetLogCore(key, access, value);
         ResolveCommitments();
+        LapseBargains();
     }
 
     private void SetLogCore(string key, LogAccess access, string? value)
