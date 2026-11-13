@@ -246,6 +246,10 @@ The scripted pod death (1.0 per run) is in every row. Liar is bimodal (a caught 
   (600 seeds): one person's -15 trust and -8 morale rarely matters. Tried and reverted: `PromiseBroken` 20/25/30 (Breaker 43.5/40.5/40.5%), a grudge rule (the wronged person
   refuses the pod until the promise is done: Careless and Silent to 0%), a trust cost for the other crew (Liar to 9%). The Liar bot now keeps its word (`BalanceBot.LiarKeepsWord`),
   because breaking promises let it skip a doomed re-waking (Liar 33.8% when it broke them). Candidates are in DESIGN.md ("Bargains and the balance bots"). To choose.
+- Lying may now be close to hopeless (work terms, 2026-11-13). With cause facts the Liar bot lies about every hard cause and is caught at every completion
+  (7.6 lies, 7.2 caught per run): Liar Landfall 12.8% -> 4.2%, Adrift 66.8% (600 seeds). The bot lies every time it can; a player would pick their lies.
+  Earlier the user's direction was "lying should be tempting and costly, not hopeless" (`LieTrust` 25 -> 22). Levers: a cause lie caught only when the worker
+  can see it (not every completion), a smaller `LieTrust` for a cause lie, or a Liar bot that lies only about the danger. To choose.
 
 ### Built
 
