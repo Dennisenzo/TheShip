@@ -166,7 +166,7 @@ public static class Prompts
         sb.AppendLine();
         sb.AppendLine("Rules: you are speaking aloud to the ship's voice (say \"you\" to it), never to other crew, unless \"What happens now\" says otherwise. Say what \"What happens now\" describes, "
                       + "in your own voice, with some feeling or a small personal touch. Do not state anything about the ship, the date, Earth "
-                      + "or other crew that is not in the list above. One to three spoken sentences. Avoid stock filler such as \"let me check the diagnostics\". "
+                      + "or other crew that is not in the list above. Don't say or guess whether anyone is alive, dead, safe or hurt unless it is in your list; ask the ship instead. One to three spoken sentences. Avoid stock filler such as \"let me check the diagnostics\". "
                       + "No stage directions, no name before the line.");
         return sb.ToString().TrimEnd();
     }
@@ -201,7 +201,6 @@ public static class Prompts
         _ => "",
     };
 
-    /// <summary>The turn for a crew line: the last few lines of the log (this person's and the ship's) and what the game decided now.</summary>
     /// <summary>
     /// The last few lines this person saw, oldest first: their own lines and the ship's lines they heard (awake and spoken to);
     /// lines said to others or while they slept are not theirs.
@@ -211,6 +210,7 @@ public static class Prompts
                 && ((e.Kind == LogKind.Crew && e.CrewId == speaker.Id) || (e.Kind == LogKind.You && e.Hearers?.Contains(speaker.Id) == true)))
             .TakeLast(RecentLines).ToList();
 
+    /// <summary>The turn for a crew line: the last few lines of the log (this person's and the ship's) and what the game decided now.</summary>
     public static string CrewUser(CrewIntent intent, CrewMember? speaker = null, Voyage? voyage = null, LogEntry? current = null)
     {
         var sb = new StringBuilder();

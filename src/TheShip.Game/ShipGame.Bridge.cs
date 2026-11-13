@@ -320,12 +320,13 @@ public sealed partial class ShipGame
             _p.TextRight(_p.Small, "scrolled back " + _scroll + " lines (PageDown)", rect.Right - 14, areaTop - 4, Painter.Dim);
 
         _p.Fill(new Rectangle(rect.X + 1, inputTop, rect.Width - 2, 1), Painter.Edge);
-        var room = Math.Max(10, (int)((rect.Width - 28) / _p.BodyWidth) - 10);
+        var room = Math.Max(10, (int)((rect.Width - 28) / _p.BodyWidth) - 10 - (_mind is { Holding: true } ? 30 : 0));
         var typed = _input.ToString();
         if (typed.Length > room)
             typed = typed[^room..];
         var cursor = DateTime.UtcNow.Millisecond < 500 ? "_" : " ";
         _p.Text(_p.Body, "VOICE > " + typed + cursor, rect.X + 14, inputTop + 12, Painter.Bright);
+        DrawHoldNote(new Rectangle(rect.X, inputTop, rect.Width, rect.Bottom - inputTop));
     }
 
     // ---- The crew ----
