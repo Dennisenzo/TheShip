@@ -9,8 +9,8 @@ using TheShip.Core;
 namespace TheShip.Game;
 
 /// <summary>
-/// The window. Three screens in the wireframe look of the interface design: the bridge (ship plan, issues, crew, log),
-/// a crew dossier, and the record with the ship logs. Every control is a button or a click; the input line is only
+/// The window. Four screens in the wireframe look of the interface design: the bridge (ship plan, issues, crew, log),
+/// a crew dossier, the record with the ship logs, and the ending. Every control is a button or a click; the input line is only
 /// for speaking. A typed line is read by the model, shown as it will be recorded, and said once the player confirms it.
 /// </summary>
 public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
@@ -307,7 +307,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             if (_fatal)
                 Exit();
-            if (_screen != Screen.Bridge)
+            if (_screen == Screen.Record && _voyage is { Phase: Phase.Ended })
+                _screen = Screen.Ending;
+            else if (_screen != Screen.Bridge)
                 _screen = Screen.Bridge;
             else
                 _input.Clear();
@@ -387,6 +389,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _mind?.Dispose();
         _session?.Line("quit", _voyage?.Phase == Phase.Ended ? "after the ending" : "before the end of the voyage");
         _session?.Dispose();
+        _tourTarget?.Dispose();
         _fonts?.Dispose();
         base.UnloadContent();
     }
@@ -451,8 +454,15 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             Phase.Alert => "ALERT " + v.Current.Number + " OF " + v.Alerts.Count + ": " + v.Current.Title.ToUpperInvariant(),
             Phase.Aftermath => "AFTERMATH OF ALERT " + v.Current.Number + ": " + v.Current.Title.ToUpperInvariant(),
-            _ => "ARRIVED",
+            _ => v.Ending?.Title.ToUpperInvariant() ?? "ARRIVED",
         };
+        if (v.Phase == Phase.Ended && _screen != Screen.Ending)
+        {
+            // The ending screen can always be opened again.
+            var edge = Painter.ScreenWidth - 16;
+            if (_p.Button(new Rectangle(title == "THE SHIP" ? edge - 410 : edge - 110, 8, 110, 40), "ENDING"))
+                Do(() => _screen = Screen.Ending);
+        }
         var chip = new Rectangle(x + 124, 14, (int)(phase.Length * _p.SmallWidth) + 20, 28);
         _p.Frame(chip, v.Phase == Phase.Alert ? Painter.Accent : Painter.Wire);
         _p.Text(_p.Small, phase, chip.X + 10, chip.Y + 6, v.Phase == Phase.Alert ? Painter.Accent : Painter.Ink);

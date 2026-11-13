@@ -71,7 +71,7 @@ public sealed partial class ShipGame
         {
             CrewState.Awake => "Awake " + N(c.HoursAwake / 24) + " days" + (c.WorkingOn != null ? ", working on a repair" : ""),
             CrewState.Thawing => "Thawing: " + Voyage.Hours(Math.Max(0, c.ThawDoneAt - v.Clock)) + " to go",
-            CrewState.Asleep => "Asleep in " + (v.GetSection(ShipPlan.Pod(c.Id).Bank)?.Name.ToLowerInvariant() ?? "a pod"),
+            CrewState.Asleep => "Asleep in " + (v.GetSection(ShipPlan.Pod(c.Id).Bank) is { } bank ? SectionName(bank.Name) : "a pod"),
             _ => "Dead",
         };
         _p.Text(_p.Small, state, x, y, c.State == CrewState.Awake ? Painter.Bright : Painter.Ink);

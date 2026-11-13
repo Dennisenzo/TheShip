@@ -32,7 +32,7 @@ public sealed partial class ShipGame
             Do(() => _screen = Screen.Record);
         var numbers = "STORES " + N(v.Stores) + " d   PARTS " + v.Parts + "   POD WEAR " + v.PodWear
                       + "   POWER " + (v.PowerLow ? "LOW" : "normal") + "   COURSE " + (v.NavLost ? "LOST" : "held");
-        _p.TextRight(_p.Small, numbers, right - 312, 21, v.PowerLow || v.NavLost ? Painter.Accent : Painter.Dim);
+        _p.TextRight(_p.Small, numbers, right - (v.Phase == Phase.Ended ? 430 : 312), 21, v.PowerLow || v.NavLost ? Painter.Accent : Painter.Dim);
 
         DrawIssues(v, 16, 72, 330, Painter.ScreenHeight - 16);
         DrawPlan(v, new Rectangle(358, 72, 864, 456));
@@ -339,22 +339,6 @@ public sealed partial class ShipGame
             }
         }
 
-        // Who is up, and where.
-        var placed = new Dictionary<string, int>();
-        foreach (var c in v.Awake)
-        {
-            var where = v.LocationOf(c);
-            var n = placed.TryGetValue(where, out var count) ? count : 0;
-            placed[where] = n + 1;
-            Vector2 at;
-            if (v.GetSection(where) is { } s)
-                at = s.Id.StartsWith("pod", StringComparison.Ordinal) ? P(s.Spot.X - 90 - n * 70, s.Spot.Y) : P(s.Spot.X - 44, s.Spot.Y + 38 + n * 18);
-            else
-                at = P(290 + n * 90, 235);
-            _p.Marker(at, Painter.Bright);
-            _p.Text(_p.Small, c.Name.ToUpperInvariant(), at.X + 12, at.Y - 8, Painter.Bright);
-        }
-
         // Faults, numbered as in the issue list, with a leader to a label outside the hull.
         // Faults in the same section sit side by side, and their labels stack, so none covers another.
         var index = 0;
@@ -392,6 +376,25 @@ public sealed partial class ShipGame
                 _p.Line(end, end + new Vector2(-10, 0), Painter.Accent, 1f);
                 _p.TextRight(_p.Small, label, end.X - 14, end.Y - 8, Painter.Accent);
             }
+        }
+
+        // Who is up, and where.
+        var placed = new Dictionary<string, int>();
+        foreach (var c in v.Awake)
+        {
+            var where = v.LocationOf(c);
+            var n = placed.TryGetValue(where, out var count) ? count : 0;
+            placed[where] = n + 1;
+            Vector2 at;
+            if (v.GetSection(where) is { } s)
+                at = s.Id.StartsWith("pod", StringComparison.Ordinal) ? P((s.Id == "podA" ? 400 : 580) + n * 80, 235) : P(s.Spot.X - 44, s.Spot.Y + 38 + n * 18);
+            else
+                at = P(290 + n * 90, 235);
+            // Drawn after the fault leaders, on a panel-coloured backing, so no leader runs through a name.
+            var name = c.Name.ToUpperInvariant();
+            _p.Fill(new Rectangle((int)at.X - 8, (int)at.Y - 9, (int)(_p.Small.MeasureString(name).X + 28), 18), Painter.Panel);
+            _p.Marker(at, Painter.Bright);
+            _p.Text(_p.Small, name, at.X + 12, at.Y - 8, Painter.Bright);
         }
 
         _p.Text(_p.Small, "door outlined: open   grey: closed   amber: locked   dashed blue: coolant", rect.X + 14, rect.Bottom - 40, Painter.Dim);
