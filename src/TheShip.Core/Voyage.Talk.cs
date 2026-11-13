@@ -137,7 +137,8 @@ public sealed partial class Voyage
     /// <summary>One listener takes in a keyed statement: caught at once, believed, or believed with a doubt.</summary>
     private void Hear(CrewMember c, Fact f, string value, bool truth, Statement s)
     {
-        if (c.PendingQuestion == f.Key)
+        var asked = c.PendingQuestion == f.Key;
+        if (asked)
             c.PendingQuestion = null;
         c.Beliefs.TryGetValue(f.Key, out var old);
         // What they saw themselves counts while it is fresh; a death they saw stays seen.
@@ -151,6 +152,8 @@ public sealed partial class Voyage
         var news = old is null || !f.Same(old.Value, value);
         var hard = f.HardnessOf(value);
         var doubts = DoubtScore(c, f) >= Tuning.DoubtThreshold;
+        // The good answer to what they asked, believed: a relief, whether or not it is true (DESIGN.md, "Trust").
+        var relief = Relieves(c, f, value, old, asked);
         c.Beliefs[f.Key] = new Belief(value, "ship", Year);
         if (doubts)
             c.Doubts.Add(f.Key);
@@ -163,13 +166,19 @@ public sealed partial class Voyage
         if (hard > 0 && news)
         {
             c.Morale -= hard;
-            if (truth)
+            if (truth && !HardTruthCredited(c, f, value))
+            {
                 c.PendingTrust += Tuning.HardTruthTrust;
+                c.HardTruthsCredited[f.Key] = value;
+            }
             Speak(c, "hard_truth", "The ship told you bad news: " + f.Say(value) + ". It hurts, and you would rather hear it said than find it.");
         }
         else
         {
-            Speak(c, "accept", "The ship told you that " + f.Say(value) + ". You " + (doubts ? "are not sure you believe it." : "accept it."));
+            if (relief)
+                c.Morale += Tuning.ReliefMorale;
+            Speak(c, "accept", "The ship told you that " + f.Say(value) + ". You "
+                               + (doubts ? "are not sure you believe it." : relief ? "accept it, and it is a relief." : "accept it."));
         }
     }
 

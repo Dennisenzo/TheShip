@@ -182,6 +182,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         // The briefing explains the scenario; the tour opens it itself for its screenshot.
         _briefingSeen = false;
         _briefing = _options.TourDir is null;
+        Note("What you say is recorded. Select a person to see what answering them costs; RECORD AND LOGS shows how each statement can be found out.");
     }
 
     private void Note(string text) => _voyage?.Log.Add(new LogEntry(LogKind.Help, "", text));

@@ -75,8 +75,9 @@ public sealed partial class Voyage
 
     private static double Rate(Fault f, IEnumerable<CrewMember> team)
     {
-        var skilled = team.Any(w => w.SkillOf(f.Skill) >= f.Level);
-        return (skilled ? 1 : Tuning.UnskilledRate) * (f.Patching ? Tuning.PatchRate : 1);
+        var list = team.ToList();
+        var skilled = list.Any(w => w.SkillOf(f.Skill) >= f.Level);
+        return (skilled ? 1 : Tuning.UnskilledRate) * (f.Patching ? Tuning.PatchRate : 1) * MoraleRate(list);
     }
 
     /// <summary>
@@ -100,7 +101,7 @@ public sealed partial class Voyage
         }
         if (team.Count < f.People)
             wait = Math.Max(wait, Tuning.ThawHours);
-        var rate = (skilled ? 1 : Tuning.UnskilledRate) * (patch ? Tuning.PatchRate : 1);
+        var rate = (skilled ? 1 : Tuning.UnskilledRate) * (patch ? Tuning.PatchRate : 1) * MoraleRate(team);
         var done = f.Patching == patch ? f.Progress : 0;
         return wait + Math.Max(0, f.Hours - done) / rate;
     }
@@ -301,6 +302,8 @@ public sealed partial class Voyage
         c.EarlySleepAnnounced = false;
         c.PendingQuestion = null;
         PodWear++;
+        // The pods' truth follows the wear at once, for anything read later in this same step (the stakes, a check of the pods).
+        SyncFacts();
 
         if (_rng.NextDouble() < Tuning.ThawRiskPerWear * PodWear)
         {
@@ -440,7 +443,7 @@ public sealed partial class Voyage
         }
         else
         {
-            var chance = Math.Clamp(Tuning.RepairBaseChance + Tuning.RepairPerSkill * (lead.SkillOf(f.Skill) - f.Level) + (lead.Morale - 50) / 200, 0.35, 0.97);
+            var chance = RepairChance(lead, f, lead.Morale);
             if (_rng.NextDouble() > chance)
             {
                 f.Progress = f.Hours * 0.5;
@@ -551,6 +554,7 @@ public sealed partial class Voyage
                 break;
             case "pod":
                 PodWear += Tuning.PodLostWear;
+                SyncFacts();
                 break;
             case "illness":
                 // Waking the patient does not cure them: the illness keeps its clock (the thaw has its usual risk).
@@ -565,6 +569,7 @@ public sealed partial class Voyage
                 break;
             case "controller":
                 PodWear += Tuning.ControllerLostWear;
+                SyncFacts();
                 break;
             case "blight":
                 Stores *= Tuning.BlightStoresLeft;
@@ -876,6 +881,8 @@ public sealed partial class Voyage
             foreach (var c in Crew.Where(c => c.Alive).ToList())
             {
                 string? sleepCause = null;
+                // Trust earned by hard truths arrives in this drift, unannounced: a line naming it would tell the player
+                // which statements were true (DESIGN.md, "Trust").
                 c.Trust += c.PendingTrust;
                 c.PendingTrust = 0;
                 if (c.State == CrewState.Awake)

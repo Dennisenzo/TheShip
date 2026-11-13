@@ -52,8 +52,13 @@ public sealed class CrewMember
     public double HoursHungry { get; set; }
     public int Thaws { get; set; }
     public int CaughtLies { get; set; }
-    /// <summary>Trust earned by a hard truth; it arrives at the next drift ("raises trust later").</summary>
+    /// <summary>Trust earned by a hard truth; it arrives at the next drift ("raises trust later"), with no line that names it.</summary>
     public double PendingTrust { get; set; }
+    /// <summary>
+    /// The hard truths already credited, by fact key: the true value told. A hard truth earns trust once per person and fact;
+    /// told again after a lie about it (a flip-flop), it earns nothing more until the truth itself changes.
+    /// </summary>
+    public Dictionary<string, string> HardTruthsCredited { get; } = new();
 
     public Dictionary<string, Belief> Beliefs { get; } = new();
     /// <summary>Fact keys this person doubts and will check when they get the chance.</summary>

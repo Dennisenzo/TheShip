@@ -102,7 +102,7 @@ Each of the 24 crew is a small sheet of game state, and the two numbers that mat
 | Want | One main thing they will ask for: wake someone, know the date, hear from Earth, see the logs, stay awake |
 | Temperament | Two traits, such as steady or anxious, obedient or sceptical |
 | Trust in you | 0 to 100 |
-| Morale | Affects the odds of the work they do |
+| Morale | Affects the odds of the work they do and how fast they work |
 | Knowledge | The list of ship facts they know, and who told them |
 
 ### Trust
@@ -114,7 +114,11 @@ Each of the 24 crew is a small sheet of game state, and the two numbers that mat
 | 15 to 29 | Refuses orders and acts on their own judgement |
 | Under 15 | Works against you and recruits others |
 
-Trust rises on a kept promise, a granted request and a hard truth told early. It falls on a broken promise and on an order that got someone hurt. It falls furthest on a discovered lie. A hard truth lowers morale at once and raises trust later.
+Trust rises on a kept promise, a granted request and a hard truth told early. It falls on a broken promise and on an order that got someone hurt. It falls furthest on a discovered lie. A hard truth lowers morale at once and raises trust later. Morale also sets how fast people work: a team's work speed is 1 + (average morale - 70) / 150, between 0.8 and 1.15, so a team at 70 works at the plain rate, a shaken one is slower and a relieved one faster. This is what makes relief (and a hard truth's cost) matter: a few hours on a fault's clock.
+
+A hard truth earns trust once per person and fact: told again after a lie about the same thing, it earns nothing more until the truth itself changes. The trust a hard truth earns arrives at the next drift, unannounced: the trust number just moves. No line names the credit or the statement, because only a true statement earns it, and what the player sees never says whether a statement was true (decided 2026-11-13; this rule wins over showing the reward).
+
+A good answer is a relief. When a fact has a hard answer (is my partner alive, is it safe in there, are the pods sound, any word from Earth), and the person asked about it or it matters to them (their partner, themselves, or word from Earth for someone waiting on it), and they hear the good one from the ship, as news, and believes it, their morale rises by 6. News means they had no answer yet or held the hard one: going from one good answer to another ("no word from Earth" to "good news") is no relief, so switching back and forth gains nothing. A true good answer earns this; a lie borrows it, and the morale of the hard truth is paid when the lie is found out. Someone who doubts the answer gets no relief.
 
 An unanswered question costs trust. A person who asked and got no answer asks again after the next two weeks (and loses 2 trust each time, at most twice); after the second repeat they doubt the fact and check it themselves. Going back to sleep with a question still open costs 4. A dodge is not an answer: it costs 3 trust once per question, makes them doubt the fact, and leaves the question open. When they later find the answer for themselves, the dodge costs another 3 only if it hid that answer: if it was already the truth when the ship dodged (not if it came true afterwards, as a death after the question). Someone who will not work until the ship answers keeps refusing until a statement, true or false, answers the question.
 
@@ -126,6 +130,7 @@ The full game shows which band a person is in, never the number. The prototype s
 - **Knowers.** Every fact records who knows it and how they learned it.
 - **Your statements.** Each thing you tell someone is stored as true, false or a promise, with everyone who heard it.
 - **Exposure.** Every false statement lists the ways it can be found out: a log, a grave, an empty pod, the calendar, another person. The player can see this list.
+- **The stakes of an answer.** The same list is shown for a question before it is answered, with what each answer does: the morale the true answer costs (and the hours it adds to the most urgent open fault, "work about 3 h slower"; a reassuring answer says how many hours it saves), the trust it earns at the next drift, whether a reassuring answer would lift their morale, whether they refuse work or sleep until they are answered, and whether the truth makes them refuse a dangerous repair. The bridge shows this under "Waiting on you" for the selected person, or for the only person asking. It is about the question and the ship's own facts; nothing on screen says whether a line the player said was true.
 
 ### How a lie is caught
 
@@ -517,7 +522,8 @@ The first build is the Short haul mode in text only, smaller than the mode table
 
 - **Alerts, in order:** coolant leak, death in sleep (a pod fails and its sleeper dies; a bank neighbour has a sleeper illness: Medicine 2, 12 hours, clock = thaw 6 h + work + the run's slack, untreated the patient dies, and every awake crew member says "You let them die in there" and loses 4 trust; the alert report names the patient), navigation drift (clock thaw + 12 h + slack; side fault drawn per seed from hydroponics blight and power sag, filtered by who is alive with the skill), signal from Earth (quiet; only returning patches), pod controller fault (clock thaw + 4 h + slack; power sag always as its side fault; the person woken for it refuses to go back to sleep). Power sag is temporary: an Engineering 2 repair of 14 h in the reactor until power routing exists.
 - **Facts:** about 20, with knowers and the statement record.
-- **Numbers on screen:** trust and morale are shown, so the rules can be judged.
+- **Numbers on screen:** trust and morale are shown, so the rules can be judged. So are the stakes of an open question (in morale, trust and work hours) and, on the Repair button, the chance that the repair holds for the selected person (no odds when no spare parts are left: the button reads "REPAIR: NO PARTS").
+- **Opening notes:** the first lines of the log state the goal (how many alive and of working age on arrival), what a thaw costs, the spare parts, and where the stakes and the record are.
 - **One lockout:** the logs.
 - **One ending screen:** survivors and the full record of what you said.
 - **Ship plan:** a wireframe schematic with sections, doors (only locking has an effect), coolant and power lines, pods and fault markers.

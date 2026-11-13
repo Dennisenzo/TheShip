@@ -30,7 +30,7 @@ public sealed partial class Voyage
     public double Clock { get; private set; }
     public double Year => Clock / Tuning.HoursPerYear;
     public double Stores { get; internal set; } = Tuning.StartStores;
-    public int Parts { get; private set; } = Tuning.StartParts;
+    public int Parts { get; internal set; } = Tuning.StartParts;
     public int PodWear { get; internal set; }
     public bool PowerLow { get; private set; }
     public bool NavLost { get; private set; }
@@ -118,6 +118,16 @@ public sealed partial class Voyage
     {
         if (s.FactKey is null || !_facts.TryGetValue(s.FactKey, out var f))
             return "evidence the model judges related";
+        return CheckWays(f, s.Hearers);
+    }
+
+    /// <summary>
+    /// Where the truth of a fact can be met by the people in <paramref name="hearers"/>: the place of its evidence, and whoever
+    /// else knows it first hand. Used for a statement already made (<see cref="Exposure"/>) and for a question still open
+    /// (<see cref="StakesOf"/>).
+    /// </summary>
+    public string CheckWays(Fact f, IReadOnlyCollection<string> hearers)
+    {
         var ways = new List<string>
         {
             f.Evidence switch
@@ -128,7 +138,7 @@ public sealed partial class Voyage
                 _ => LogsLocked || f.Access == LogAccess.Open ? "the open log" : "the log, if it is opened",
             }
         };
-        var knowers = Crew.Where(c => c.Alive && !s.Hearers.Contains(c.Id) && c.Beliefs.TryGetValue(f.Key, out var b) && b.Firsthand).Select(c => c.Name).ToList();
+        var knowers = Crew.Where(c => c.Alive && !hearers.Contains(c.Id) && c.Beliefs.TryGetValue(f.Key, out var b) && b.Firsthand).Select(c => c.Name).ToList();
         if (knowers.Count > 0)
             ways.Add("talking to " + string.Join(" or ", knowers));
         return string.Join("; ", ways);
