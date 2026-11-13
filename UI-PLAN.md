@@ -1,7 +1,26 @@
 # UI plan: transitions, clarity, briefing, hover
 
-Written 2026-11-13. A plan for the interface in `src/TheShip.Game`; nothing in it is built yet.
+Written 2026-11-13. A plan for the interface in `src/TheShip.Game`.
 DESIGN.md stays the leading document for the game's rules. This file only covers how the interface shows them.
+
+## Status
+
+All six steps are written on the branch `feature/ui-plan` (2026-11-13), in a cloud session with no .NET SDK:
+**none of it has been compiled or run.** The first job is `dotnet build TheShip.slnx`, fixing what it reports, `dotnet test`,
+then a `--tour` run and a played run to look at every transition. The branch is not validated and not merged.
+
+Where the code differs from the plan below:
+
+- **One branch, five commits** (steps 3 and 4 share one), not one branch per step.
+- **Next-step line.** It sits in the title row of the ship plan ("NEXT: ..."), and `NextStep` is in `ShipGame.Clarity.cs`, not in Core; it has no unit tests.
+- **Header numbers** are five separate texts with their own colour, tooltip and flash, not framed chips (the header has no room for frames).
+- **Repair button.** The label stays `REPAIR: MARA`; the skill against the need is in the button's tooltip and in the picker (the button is too narrow for it).
+- **Held clicks.** Only the four clock buttons say that they wait for the line.
+- **Drift.** The issue cards appear together with their diamonds; they do not slide in.
+- **Tooltips.** The coolant and power lines have none (their bounding boxes cover half the plan).
+- **Ending.** The whole ending screen fades in over 1.5 s; the title does not come first.
+- **Plan motion** keeps running under a transition.
+- **Step 0's "screenshots unchanged" check** no longer applies as written: the later steps change the bridge on purpose.
 
 ## Goals
 
