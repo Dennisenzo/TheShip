@@ -734,9 +734,10 @@ public sealed partial class ShipGame
         var limit = waiting.Bottom - 22;
         foreach (var (who, item) in Waiting(v, _target))
         {
+            // An item that doesn't fit is left out; a shorter one after it may still fit.
             var rows = _p.Lines(item, width - 24);
             if (wy + rows * 19 > limit)
-                break;
+                continue;
             // An item about a person selects that person when clicked.
             var row = new Rectangle(x + 4, wy - 2, width - 8, rows * 19 + 4);
             if (who != null && _p.Over(row))
@@ -756,21 +757,26 @@ public sealed partial class ShipGame
 
     /// <summary>Questions nobody has answered, things people asked for, doubts, and promises still open; each with the person it is about, if one.</summary>
     /// <remarks>
-    /// The selected person comes first. Their open question (or the only open question) is shown with its stakes: what the true
+    /// The stakes come first, then the bay lockout, then the selected person. Their open question (or the only open question) is shown with its stakes: what the true
     /// answer costs and earns, what a reassuring one buys, and where the answer can be checked (<see cref="Voyage.StakesText"/>).
     /// </remarks>
     private static IEnumerable<(CrewMember? Who, string Text)> Waiting(Voyage v, CrewMember? selected)
     {
+        // The stakes come first: they are the longest item and the one the player is deciding on.
+        var asking = v.Awake.Count(a => v.StakesOf(a) != null);
+        var staked = v.Awake.Where(c => c.PendingQuestion != null && v.HasFact(c.PendingQuestion))
+            .FirstOrDefault(c => c == selected || asking == 1);
+        if (staked != null)
+            yield return (staked, v.StakesText(staked));
         if (v.Lockouts.BayWarned.Count > 0)
             yield return (null, string.Join(" and ", v.Lockouts.BayWarned.Select(id => v.Crew.First(c => c.Id == id).Name))
                          + " will take the cold-sleep bay at the next step. Win one of them back above 15 trust, or they do.");
         if (v.Lockouts.Bay)
             yield return (null, v.BayLockReason + " Keep a promise to one of them and win their trust above " + Tuning.BayReturnTrust.ToString("0") + " to get it back.");
-        var asking = v.Awake.Count(a => v.StakesOf(a) != null);
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {
-            if (c.PendingQuestion != null && v.HasFact(c.PendingQuestion))
-                yield return (c, c == selected || asking == 1 ? v.StakesText(c) : c.Name + " asked: " + v.GetFact(c.PendingQuestion).Question);
+            if (c != staked && c.PendingQuestion != null && v.HasFact(c.PendingQuestion))
+                yield return (c, c.Name + " asked: " + v.GetFact(c.PendingQuestion).Question);
             if (c.RequestMade && !c.RequestGranted)
                 yield return (c, c.Name + " asked you " + (c.Want == Want.WakePartner ? "to wake their partner." : "to open the logs."));
             foreach (var doubt in c.Doubts)
