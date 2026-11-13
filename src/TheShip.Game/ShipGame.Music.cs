@@ -18,13 +18,29 @@ public sealed partial class ShipGame
     /// <summary>The alarm of a new alert, once, when its title shows.</summary>
     private void SoundAlarm() => _music?.Alarm();
 
-    private void UpdateMusic() => _music?.Follow(_voyage, Drifting);
+    /// <summary>Each update, on the game thread: follow the game's mood and hand the rendered sound to the audio device.</summary>
+    private void UpdateMusic()
+    {
+        _music?.Follow(_voyage, Drifting);
+        _music?.Update();
+    }
 
-    /// <summary>A small MUSIC on/off button; returns where it ends so the caller can place the rest.</summary>
+    /// <summary>A small MUSIC on/off button; "NO AUDIO" (disabled) when the sound could not start or failed.</summary>
     private void MusicButton(Rectangle r)
     {
-        var on = _music?.MusicOn ?? false;
-        if (_p.Button(r, on ? "MUSIC ON" : "MUSIC OFF", enabled: _music is not null, selected: on))
-            Do(() => { if (_music is not null) _music.MusicOn = !_music.MusicOn; });
+        if (_music is null)
+        {
+            // The tour runs silent.
+            _p.Button(r, "MUSIC OFF", enabled: false);
+            return;
+        }
+        if (_music is not { Available: true } music)
+        {
+            _p.Button(r, "NO AUDIO", enabled: false, tip: "No sound: the audio device could not be opened, or failed.");
+            return;
+        }
+        var on = music.MusicOn;
+        if (_p.Button(r, on ? "MUSIC ON" : "MUSIC OFF", selected: on))
+            Do(() => music.MusicOn = !music.MusicOn);
     }
 }

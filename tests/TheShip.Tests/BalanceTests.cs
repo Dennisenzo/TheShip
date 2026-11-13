@@ -81,6 +81,7 @@ public class BalanceTests
             sb.AppendLine($"  Corrections             {N(r.Average(x => x.Corrections))} per run");
             sb.AppendLine($"  Lies told / caught      {N(r.Average(x => x.LiesTold))} / {N(r.Average(x => x.CaughtLies))} per run");
             sb.AppendLine($"  Thaws / pod wear        {N(r.Average(x => x.Thaws))} / {N(r.Average(x => x.PodWear))}");
+            sb.AppendLine($"  Reunions per run        {N(r.Average(x => x.Reunions))}");
             double Sd(IEnumerable<double> xs) { var l = xs.ToList(); if (l.Count < 2) return 0; var mu = l.Average(); return Math.Sqrt(l.Sum(x => (x - mu) * (x - mu)) / l.Count); }
             var perAlert = r.SelectMany(x => x.ThawsPerAlert ?? new List<int>()).ToList();
             sb.AppendLine($"  Faults lost / patched   {N(r.Average(x => x.FaultsLost))} / {N(r.Average(x => x.Patches))} per run");
