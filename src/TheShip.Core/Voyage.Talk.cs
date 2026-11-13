@@ -204,7 +204,8 @@ public sealed partial class Voyage
                        && Statements.Any(o => o.FactKey == f.Key && o.FoundOutBy.ContainsKey(c.Id));
         if (!keepSeen)
             c.Beliefs[f.Key] = new Belief(value, "ship", Year);
-        if (doubts && !admit)
+        // A doubt about what they saw themselves has nothing left to check: the sight stands.
+        if (doubts && !admit && !keepSeen)
             c.Doubts.Add(f.Key);
         if (c.RefusesSleep && f.Key == PodRefusalFact && c.Trust >= Tuning.PodRefuserListensTrust)
         {
@@ -473,7 +474,12 @@ public sealed partial class Voyage
             return;
         }
         if (c.Beliefs.TryGetValue(f.Key, out var have) && have.Firsthand && f.Same(have.Value, f.Truth))
+        {
+            // They already hold the truth from their own eyes: reading it again settles any doubt on it.
+            c.Doubts.Remove(f.Key);
+            c.AuditDoubts.Remove(f.Key);
             return;
+        }
         if (!quiet)
             Ship(c.Name + " reads the log: " + f.Say(f.Truth) + ".");
         Learn(c, f.Key, f.Truth, "evidence", how: "read the log entry");
