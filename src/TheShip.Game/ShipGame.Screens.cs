@@ -361,6 +361,8 @@ public sealed partial class ShipGame
         var textWidth = width - buttons - 12;
         foreach (var fact in v.FactList)
         {
+            if (!v.InLog(fact))
+                continue;
             if (y + 36 > rect.Bottom - 8)
                 break;
             var f = fact;

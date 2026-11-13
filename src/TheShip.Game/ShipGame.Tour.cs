@@ -128,6 +128,11 @@ public sealed partial class ShipGame
             }
             Shoot(dir, tag + "-crew-woken");
 
+            // The terms the first awake person would work on, shown in "Waiting on you" before anything is told.
+            _target = v.Awake.FirstOrDefault();
+            Shoot(dir, tag + "-terms");
+            _target = null;
+
             // Answer the first question truthfully, the way Enter does it.
             var asker = v.Awake.FirstOrDefault(c => c.PendingQuestion != null && v.HasFact(c.PendingQuestion));
             if (asker is not null)

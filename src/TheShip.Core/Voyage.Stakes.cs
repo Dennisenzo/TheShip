@@ -31,8 +31,8 @@ public sealed record AnswerStakes(string Question, int TruthHurts, int OddsLost,
 public sealed partial class Voyage
 {
     /// <summary>The chance that a repair led by <paramref name="lead"/> holds, at the given morale (a patch always holds, and comes back).</summary>
-    public static double RepairChance(CrewMember lead, Fault f, double morale) =>
-        Math.Clamp(Tuning.RepairBaseChance + Tuning.RepairPerSkill * (lead.SkillOf(f.Skill) - f.Level) + (morale - 50) / Tuning.RepairMoraleSpan,
+    public static double RepairChance(CrewMember lead, Fault f, double morale, double bonus = 0) =>
+        Math.Clamp(Tuning.RepairBaseChance + Tuning.RepairPerSkill * (lead.SkillOf(f.Skill) - f.Level) + (morale - 50) / Tuning.RepairMoraleSpan + bonus,
             Tuning.RepairChanceMin, Tuning.RepairChanceMax);
 
     /// <summary>How fast a team works at its average morale: 1.0 at <see cref="Tuning.MoraleRateNeutral"/>, slower below, faster above, within limits.</summary>
@@ -59,7 +59,7 @@ public sealed partial class Voyage
         if (Parts <= 0)
             return null;
         var lead = LeadWith(joining, f);
-        return RepairChance(lead, f, lead.Morale);
+        return RepairChance(lead, f, lead.Morale, TermsOf(lead, f).OddsBonus);
     }
 
     /// <summary>
@@ -120,7 +120,8 @@ public sealed partial class Voyage
             var left = Math.Max(0, job.Hours - (job.State == FaultState.InRepair ? job.Progress : 0));
             var skilled = c.SkillOf(job.Skill) >= job.Level || team.Any(w => w.SkillOf(job.Skill) >= job.Level);
             var baseHours = left / (skilled ? 1 : Tuning.UnskilledRate) / (job.Patching && job.State == FaultState.InRepair ? Tuning.PatchRate : 1);
-            double Hours(double morale) => baseHours / MoraleRate((team.Sum(w => w.Morale) + morale) / (team.Count + 1));
+            var factor = (team.Sum(w => TermsOf(w, job).Speed) + TermsOf(c, job).Speed) / (team.Count + 1);
+            double Hours(double morale) => baseHours / (MoraleRate((team.Sum(w => w.Morale) + morale) / (team.Count + 1)) * factor);
             var now = Hours(c.Morale);
             slower = hurts > 0 ? Hours(c.Morale - hurts) - now : 0;
             faster = relief != Relief.None ? now - Hours(c.Morale + Tuning.ReliefMorale) : 0;

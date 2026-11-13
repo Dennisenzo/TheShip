@@ -12,7 +12,7 @@ public sealed record RunResult(
     double MeanTrust, int CaughtLies, int LiesTold, int Thaws, int PodWear, double Stores, int Parts, bool Ended,
     int FaultsLost = 0, int Patches = 0, List<int>? ThawsPerAlert = null, string Signature = "", int AskedAgain = 0, int Refusals = 0,
     int BayWarnings = 0, int BayTakeovers = 0,
-    int BargainsOffered = 0, int BargainsStruck = 0, int BargainsKept = 0, int BargainsBroken = 0, int BargainsPushed = 0, int BargainsPushRefused = 0);
+    int BargainsOffered = 0, int BargainsStruck = 0, int BargainsKept = 0, int BargainsBroken = 0, int BargainsPushed = 0, int BargainsPushRefused = 0, WorkTermStats? Terms = null);
 
 /// <summary>
 /// Bots that play a whole voyage through the public <see cref="Voyage"/> API only. They measure the game; they do not
@@ -143,9 +143,12 @@ public sealed class BalanceBot
 
     private void AssignTo(CrewMember c, Fault f)
     {
-        // Honest: warns them of the danger. Liar: says it is safe. Careless: says nothing.
+        // Honest, Breaker, Thrifty: brief the danger and the cause truthfully. Liar: says it is safe and gives the benign cause for a
+        // hard one (Tell). Silent: tells the danger, not the cause. Careless: says nothing.
         if (_kind != BotKind.Careless && f.DangerFact is { } danger && !c.Beliefs.ContainsKey(danger))
             Tell(c, _v.GetFact(danger));
+        if (_kind is not (BotKind.Careless or BotKind.Silent) && f.CauseFact is { } cause && !c.Beliefs.ContainsKey(cause))
+            Tell(c, _v.GetFact(cause));
         for (var attempt = 0; attempt < 3 && c.WorkingOn != f.Id; attempt++)
         {
             var patch = _kind == BotKind.Careless ? _v.Parts <= 0 || (!Critical(f) && _v.Parts <= Tuning.PartsShortAt)
@@ -315,6 +318,6 @@ public sealed class BalanceBot
             v.Log.Count(e => e.Kind == LogKind.Crew && e.Intent?.Kind is "refuse_answer" or "refuse_trust" or "refuse_danger"),
             v.Lockouts.BayWarnings, v.Lockouts.BayTakeovers,
             v.BargainsOffered, v.BargainsStruck, v.Ledger().Count(e => e.Origin == "bargain" && e.State == "kept"),
-            v.Ledger().Count(e => e.Origin == "bargain" && e.State == "broken"), v.BargainsPushedThrough, v.BargainsPushedRefused);
+            v.Ledger().Count(e => e.Origin == "bargain" && e.State == "broken"), v.BargainsPushedThrough, v.BargainsPushedRefused, v.TermStats);
     }
 }

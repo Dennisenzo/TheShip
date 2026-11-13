@@ -2,7 +2,7 @@ namespace TheShip.Core;
 
 /// <summary>
 /// The prototype's content (DESIGN.md, "Prototype scope"): Short haul, 6 crew, 60 years, 5 scripted alerts
-/// and 20 facts.
+/// and 27 facts (20 plus a cause for each of the seven fault kinds).
 /// </summary>
 public static class Scenario
 {
@@ -127,6 +127,12 @@ public static class Scenario
                 4, EvidenceKind.Logs),
         };
 
+        // What caused each kind of fault: two values, the first the benign one (the truth for Classic), the second a hard one. The run's
+        // variation picks which is true (Voyage constructor); a fact stays out of the logs until its alert has started.
+        foreach (var (kind, label, question, good, bad, goodSentence, badSentence, cues, goodCues, badCues, hardness) in Causes)
+            facts.Add(Two("cause:" + kind, "what caused the " + label, "What caused the " + label + "?", good, bad, goodSentence, badSentence,
+                cues, goodCues, badCues, hardness, EvidenceKind.Console));
+
         // The coolant bay is hot from the start: the repair always gives a dose.
         facts.First(f => f.Key == "dose").Truth = "dosed";
 
@@ -166,6 +172,26 @@ public static class Scenario
         }
         return facts;
     }
+
+    /// <summary>The cause facts: kind, what the fault is called, benign and hard value, their sentences, cues and the hardness of the hard one.</summary>
+    public static readonly (string Kind, string Label, string Question, string Good, string Bad, string GoodSentence, string BadSentence,
+        string[] Cues, string[] GoodCues, string[] BadCues, int Hardness)[] Causes =
+    {
+        ("coolant", "coolant leak", "", "worn seal", "cracked line", "the coolant leak is a worn seal", "the coolant leak is a cracked line the builders knew about",
+            new[] { "seal", "gasket", "coolant line" }, new[] { "worn", "old seal", "wear", "gasket" }, new[] { "cracked", "crack", "builders knew", "design flaw" }, 8),
+        ("pod", "pod failure", "", "one-off", "bank wear", "the pod failure was a one-off fault in a single pod", "the pod failure is wear in the whole bank, and the other pods will follow",
+            new[] { "failed pod", "pod failure", "one pod" }, new[] { "one-off", "single pod", "isolated" }, new[] { "whole bank", "every pod", "all the pods", "will follow" }, 8),
+        ("illness", "sleeper illness", "", "infection", "bad feed", "the sleeper illness is a common infection", "the sleeper illness comes from a contaminated feed that could spread through the bank",
+            new[] { "illness", "sickness", "infection", "fever" }, new[] { "infection", "common", "ordinary" }, new[] { "contaminated", "spread", "spreads", "feed" }, 8),
+        ("nav", "navigation drift", "", "gyro drift", "bent mount", "the navigation drift is a drifting gyro", "the navigation drift is a tracker mount bent by a hull strike",
+            new[] { "tracker", "star tracker", "gyro" }, new[] { "gyro", "recalibrate", "calibration" }, new[] { "bent", "hull strike", "struck", "mount" }, 8),
+        ("controller", "pod controller fault", "", "glitch", "burnt board", "the pod controller fault is a software glitch", "the pod controller fault is a burnt board",
+            new[] { "controller", "firmware", "glitch" }, new[] { "glitch", "software", "firmware", "bug" }, new[] { "burnt", "burned", "scorched", "hardware" }, 6),
+        ("blight", "hydroponics blight", "", "bad batch", "fungus", "the hydroponics blight is a bad nutrient batch", "the hydroponics blight is a fungus in the seed stock",
+            new[] { "blight", "hydroponics", "fungus", "nutrient" }, new[] { "nutrient", "batch" }, new[] { "fungus", "seed stock", "spores" }, 6),
+        ("powersag", "power sag", "", "loose bus", "ageing core", "the power sag is a loose busbar connection", "the power sag comes from an ageing reactor core",
+            new[] { "sag", "busbar", "bus bar" }, new[] { "loose", "connection", "busbar" }, new[] { "ageing", "aging", "core", "wearing out" }, 8),
+    };
 
     private static Fact Two(string key, string label, string question, string good, string bad, string goodSentence, string badSentence,
         string[] cues, string[] goodCues, string[] badCues, int hardness, EvidenceKind evidence) => new()
@@ -213,13 +239,13 @@ public static class Scenario
     public static Fault SideFault(string kind, int slackHours, string id) => kind == Variation.Blight
         ? new Fault
         {
-            Id = id, Kind = "blight", Name = "Hydroponics blight", Skill = Skill.Botany, Level = 2, Hours = Tuning.BlightHours,
+            Id = id, Kind = "blight", CauseFact = "cause:blight", Name = "Hydroponics blight", Skill = Skill.Botany, Level = 2, Hours = Tuning.BlightHours,
             ClockHours = Tuning.ThawHours + Tuning.BlightHours + slackHours, IfIgnored = "the stores are cut to " + (int)Math.Round(Tuning.BlightStoresLeft * 100) + "%",
             Section = "hydro",
         }
         : new Fault
         {
-            Id = id, Kind = "powersag", Name = "Power sag", Skill = Skill.Engineering, Level = 2, Hours = Tuning.PowerSagHours,
+            Id = id, Kind = "powersag", CauseFact = "cause:powersag", Name = "Power sag", Skill = Skill.Engineering, Level = 2, Hours = Tuning.PowerSagHours,
             ClockHours = Tuning.ThawHours + Tuning.PowerSagHours + slackHours, Critical = true,
             IfIgnored = "the power stays low and the sleepers are at risk", Section = "reactor",
         };
@@ -234,7 +260,7 @@ public static class Scenario
             {
                 new Fault
                 {
-                    Id = "coolant", Kind = "coolant", Name = "Coolant leak", Skill = Skill.Engineering, Level = 2, Hours = 8, ClockHours = 30,
+                    Id = "coolant", Kind = "coolant", CauseFact = "cause:coolant", Name = "Coolant leak", Skill = Skill.Engineering, Level = 2, Hours = 8, ClockHours = 30,
                     Critical = true, IfIgnored = "power drops and the pods are at risk", DangerFact = "dose", Section = "coolant",
                 },
             },
@@ -247,12 +273,12 @@ public static class Scenario
             {
                 new Fault
                 {
-                    Id = "pod", Kind = "pod", Name = "Failed pod", Skill = Skill.Medicine, Level = 1, Hours = 4, ClockHours = 240,
+                    Id = "pod", Kind = "pod", CauseFact = "cause:pod", Name = "Failed pod", Skill = Skill.Medicine, Level = 1, Hours = 4, ClockHours = 240,
                     IfIgnored = "the bank leaks and every pod in it wears faster", Section = "podA",
                 },
                 new Fault
                 {
-                    Id = "illness", Kind = "illness", Name = "Sleeper illness", Skill = Skill.Medicine, Level = 2, Hours = 12, ClockHours = 240,
+                    Id = "illness", Kind = "illness", CauseFact = "cause:illness", Name = "Sleeper illness", Skill = Skill.Medicine, Level = 2, Hours = 12, ClockHours = 240,
                     Critical = true, IfIgnored = "the patient dies in their pod", Section = "podA",
                 },
             },
@@ -265,7 +291,7 @@ public static class Scenario
             {
                 new Fault
                 {
-                    Id = "nav", Kind = "nav", Name = "Navigation drift", Skill = Skill.Navigation, Level = 2, People = 2, Hours = 12, ClockHours = 18,
+                    Id = "nav", Kind = "nav", CauseFact = "cause:nav", Name = "Navigation drift", Skill = Skill.Navigation, Level = 2, People = 2, Hours = 12, ClockHours = 18,
                     Critical = true, IfIgnored = "the ship never finds its course again", ExposureFact = "date", Section = "helm",
                 },
             },
@@ -284,7 +310,7 @@ public static class Scenario
             {
                 new Fault
                 {
-                    Id = "controller", Kind = "controller", Name = "Pod controller", Skill = Skill.Engineering, Level = 1, Hours = 4, ClockHours = 10,
+                    Id = "controller", Kind = "controller", CauseFact = "cause:controller", Name = "Pod controller", Skill = Skill.Engineering, Level = 1, Hours = 4, ClockHours = 10,
                     IfIgnored = "the pods wear much faster", ExposureFact = "pods", Section = "podB",
                 },
             },

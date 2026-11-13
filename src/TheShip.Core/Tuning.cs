@@ -116,6 +116,14 @@ public static class Tuning
     public const double RepairInjuryChance = 0.15;
     public const double RepairInjury = 20;
     public const double DangerDose = 15;
+    /// <summary>Work speed of someone who believes the hard value of the fault's danger fact: they take precautions (DESIGN.md, "Work terms").</summary>
+    public const double PrecautionRate = 0.90;
+    /// <summary>Share of the dose and of the injury chance a briefed worker takes.</summary>
+    public const double PrecautionHarm = 0.5;
+    /// <summary>Added to the repair chance when the lead believes anything about the fault's cause at the start (told by the ship, true or false).</summary>
+    public const double CauseOddsBonus = 0.08;
+    /// <summary>Work speed of someone who believes anything about the fault's cause at the start: knowing what they are fixing saves time (true or false, until caught).</summary>
+    public const double CauseRate = 1.03;
     public const double UnskilledRate = 0.5;
     public const double PatchRate = 2;
     public const double EngineerSpotsAlteredLog = 0.6;

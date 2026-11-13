@@ -58,6 +58,9 @@ public sealed partial class Voyage
         var facts = Scenario.Facts(crew);
         FactList = facts;
         _facts = facts.ToDictionary(f => f.Key);
+        foreach (var (kind, index) in variation.Causes)
+            if (_facts.TryGetValue("cause:" + kind, out var cause))
+                cause.Truth = cause.Values[index];
         Alerts = Scenario.Alerts(variation);
 
         Log.Add(new LogEntry(LogKind.Ship, "SHIP", "Departure. Six people in cold sleep, sixty years to arrival. You have a voice, doors, lights and logs. You have no hands."));

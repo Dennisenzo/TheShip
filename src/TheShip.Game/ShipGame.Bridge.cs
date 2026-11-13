@@ -117,6 +117,8 @@ public sealed partial class ShipGame
                 }
                 if (f.DangerFact is { } danger)
                     y = _p.Paragraph("Known to you: " + v.GetFact(danger).Say(v.GetFact(danger).Truth) + ".", ix, y, inner, Painter.Dim);
+                if (v.CauseKnown(f) is { } cause)
+                    y = _p.Paragraph("Cause: " + cause, ix, y, inner, Painter.Dim);
                 if (f.ExposureFact is { } seen)
                     y = _p.Paragraph("Whoever works here learns " + v.GetFact(seen).Label + ".", ix, y, inner, Painter.Dim);
                 y += 8;
@@ -177,7 +179,8 @@ public sealed partial class ShipGame
         var skill = fault.Skill.ToString().ToLowerInvariant();
         var fit = who is null
             ? (anyone ? "Choose who to ask." : "Nobody is awake.")
-            : who.Name + " has " + skill + " " + who.SkillOf(fault.Skill) + "; this needs " + fault.Level + ".";
+            : who.Name + " has " + skill + " " + who.SkillOf(fault.Skill) + "; this needs " + fault.Level + "."
+              + (v.TermsText(who, fault) is { Length: > 0 } terms ? " " + terms : "");
         // A person with an open bargain on this very piece of work: the button pushes past it (and says so).
         var bargain = who != null ? v.BargainOf(who) : null;
         var pushRepair = bargain is { } br && br.FaultId == fault.Id && !br.Patch;
@@ -275,6 +278,7 @@ public sealed partial class ShipGame
         var where = v.GetSection(f.Section)?.Name ?? "";
         var needs = SectionName(where) + ". " + Patient(v, f) + f.Skill + Nb + f.Level + (f.People > 1 ? ", " + f.People + Nb + "people" : "") + ", " + N(f.Hours) + Nb + "h.";
         var extra = f.DangerFact is { } danger ? "Known: " + v.GetFact(danger).Say(v.GetFact(danger).Truth) + "."
+            : v.CauseKnown(f) is { } cause ? "Cause: " + cause
             : f.ExposureFact is { } seen ? "Whoever works here learns " + v.GetFact(seen).Label + "." : "";
         var workers = v.Awake.Where(c => c.WorkingOn == f.Id).Select(c => c.Name).ToList();
         var split = IssueCardLayout.Split(shown, _p.Lines(needs, inner), extra.Length == 0 ? 0 : _p.Lines(extra, inner), workers.Count > 0);
@@ -820,6 +824,9 @@ public sealed partial class ShipGame
                 ? " The crew hold the logs too: no promise to them can be kept now."
                 : " Promise one of them to open the logs, have every log open when it falls due, and win their trust above "
                   + Tuning.BayReturnTrust.ToString("0") + " to get it back."));
+        // The terms the selected idle person would work their likely job on (dropped when it doesn't fit).
+        if (selected != null && v.TermsItem(selected) is { } terms)
+            yield return (selected, terms);
         var owed = v.Ledger().Where(e => e.State == "open").ToList();
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {

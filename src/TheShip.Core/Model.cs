@@ -95,6 +95,10 @@ public sealed class CrewMember
     public bool DodgeCharged { get; set; }
     /// <summary>The fault they are working on.</summary>
     public string? WorkingOn { get; set; }
+    /// <summary>The terms they started the fault they are on with (fixed at the start).</summary>
+    public WorkTerms? Terms { get; set; }
+    /// <summary>Danger facts they were hurt by with no belief about them at all: the notice beat charges "an order that got someone hurt" only for these.</summary>
+    public HashSet<string> HurtUnbriefed { get; } = new();
     public bool RefusesSleep { get; set; }
     /// <summary>They were asked to sleep and said no: the clock may move on without them.</summary>
     public bool AskedToSleep { get; set; }
@@ -272,6 +276,8 @@ public sealed class Fault
     public string Section { get; set; } = "";
     /// <summary>The fact about the harm the repair does to whoever does it.</summary>
     public string? DangerFact { get; init; }
+    /// <summary>The fact about what caused the fault (<c>cause:&lt;kind&gt;</c>): a repairer who believes anything about it starts with better odds, and every worker learns the true cause at completion.</summary>
+    public string? CauseFact { get; init; }
     /// <summary>Ignoring it ends or cripples the voyage (coolant: power and pods; navigation: the course); a pod or controller fault only wears the ship.</summary>
     public bool Critical { get; init; }
     /// <summary>The crew member the fault is about (the person in a failed pod, a sick patient), if any.</summary>
@@ -297,7 +303,7 @@ public sealed class Fault
     public Fault Again(string id, string name, double slackHours = 0) => new()
     {
         Id = id, Kind = Kind, Name = Prefix + Plain(name).ToLowerInvariant(), Skill = Skill, Level = Level, People = People, Hours = Hours,
-        ClockHours = Math.Max(ClockHours / 2, Tuning.ThawHours + Hours / Tuning.PatchRate + slackHours), IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact, Section = Section, Critical = Critical, SubjectId = SubjectId
+        ClockHours = Math.Max(ClockHours / 2, Tuning.ThawHours + Hours / Tuning.PatchRate + slackHours), IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact, CauseFact = CauseFact, Section = Section, Critical = Critical, SubjectId = SubjectId
     };
 }
 

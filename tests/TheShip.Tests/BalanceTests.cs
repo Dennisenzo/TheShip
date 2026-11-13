@@ -68,6 +68,14 @@ public class BalanceTests
             sb.AppendLine($"  Asked again / refusals  {N(r.Average(x => x.AskedAgain))} / {N(r.Average(x => x.Refusals))} per run");
             sb.AppendLine($"  Bargains offered/struck/kept/broken  {N(r.Average(x => x.BargainsOffered))} / {N(r.Average(x => x.BargainsStruck))} / {N(r.Average(x => x.BargainsKept))} / {N(r.Average(x => x.BargainsBroken))} per run");
             sb.AppendLine($"  Bargains pushed through / refused    {N(r.Average(x => x.BargainsPushed))} / {N(r.Average(x => x.BargainsPushRefused))} per run");
+            var t = r.Where(x => x.Terms != null).Select(x => x.Terms!).ToList();
+            if (t.Count > 0)
+            {
+                sb.AppendLine($"  Work starts / briefed (risk) / cause bonus   {N(t.Average(x => x.Starts))} / {N(t.Average(x => x.BriefedStarts))} of {N(t.Average(x => x.RiskStarts))} / {N(t.Average(x => x.CauseBonusStarts))} per run");
+                sb.AppendLine($"  Cause bonus rolls / result changed           {N(t.Average(x => x.BonusRolls))} / {N(t.Average(x => x.BonusFlips))} per run");
+                sb.AppendLine($"  Doses briefed / unbriefed; hurt-unbriefed    {N(t.Average(x => x.DosesBriefed))} / {N(t.Average(x => x.DosesNotBriefed))}; {N(t.Average(x => x.HurtUnbriefed))} per run");
+                sb.AppendLine($"  Injuries briefed (injured_warned) / not      {N(t.Average(x => x.InjuriesBriefed))} / {N(t.Average(x => x.InjuriesNotBriefed))} per run");
+            }
             sb.AppendLine($"  Lies told / caught      {N(r.Average(x => x.LiesTold))} / {N(r.Average(x => x.CaughtLies))} per run");
             sb.AppendLine($"  Thaws / pod wear        {N(r.Average(x => x.Thaws))} / {N(r.Average(x => x.PodWear))}");
             double Sd(IEnumerable<double> xs) { var l = xs.ToList(); if (l.Count < 2) return 0; var mu = l.Average(); return Math.Sqrt(l.Sum(x => (x - mu) * (x - mu)) / l.Count); }

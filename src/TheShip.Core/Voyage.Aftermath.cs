@@ -14,10 +14,11 @@ public sealed partial class Voyage
             // What they notice by themselves.
             foreach (var key in c.ToNotice.ToList())
             {
-                if (!c.Beliefs.ContainsKey(key) && _facts[key].HardnessOf(_facts[key].Truth) > 0)
+                if (c.HurtUnbriefed.Remove(key) && _facts[key].HardnessOf(_facts[key].Truth) > 0)
                 {
-                    // Nobody told them: an order that got someone hurt.
+                    // They started with no word on the danger: an order that got someone hurt (a worker told, or told "safe", pays nothing here).
                     c.Trust -= Tuning.HurtByOrder;
+                    TermStats.HurtUnbriefed++;
                     Speak(c, "noticed_dose", "You found out the repair hurt you and the ship never told you: " + _facts[key].Say(_facts[key].Truth) + ".");
                 }
                 Learn(c, key, _facts[key].Truth, "evidence");
