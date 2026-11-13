@@ -109,6 +109,9 @@ public sealed partial class ShipGame
         if (_transition is not { } t)
             return;
         _transition = null;
+        // A drift skipped before its alert's title showed (Esc, a key, a click) still sounds the new alert's alarm.
+        if (t is { Kind: SkipKind.Drift, Beat: < 2 } && _voyage is { Phase: Phase.Alert })
+            SoundAlarm();
         ShowBanner(t.Banner);
     }
 
