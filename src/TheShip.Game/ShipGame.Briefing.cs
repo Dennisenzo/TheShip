@@ -24,7 +24,7 @@ public sealed partial class ShipGame
         _briefingSeen = true;
     }
 
-    /// <summary>The scenario in five short paragraphs.</summary>
+    /// <summary>The scenario in six short paragraphs.</summary>
     private static string[] BriefingText(Voyage v)
     {
         var crew = v.Crew.Count;
@@ -38,6 +38,8 @@ public sealed partial class ShipGame
             "A waking costs. The thaw takes " + N(Tuning.ThawHours) + " hours and ages that person " + Tuning.ThawAgeMin + " to " + Tuning.ThawAgeMax
             + " years. A pod takes them back after " + N(Tuning.MinAwakeHours / 24) + " days at the earliest, and each day awake is a day of food from the stores ("
             + N(Tuning.StartStores) + " person-days at the start). At most " + Tuning.MaxAwake + " people can be up at once.",
+            "The ship set out with " + Tuning.StartParts + " spare parts" + (v.Parts != Tuning.StartParts ? " (" + v.Parts + " left)" : "")
+            + ". A repair uses one and can fail; the Repair button shows the odds. A patch uses none, but it gives way later.",
             "The people you wake ask questions. What you say to them is recorded, with who heard it.",
             "The voyage succeeds when at least " + Tuning.LandfallAlive + " of the " + crew + " arrive alive and " + Tuning.LandfallWorkingAge
             + " of them are still under " + N(Tuning.WorkingAge) + ".",

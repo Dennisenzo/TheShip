@@ -85,14 +85,17 @@ public sealed partial class Voyage
     /// <summary>
     /// Hours until the fault is done if the work started now: the thaw of whoever is still thawing or must be woken to reach the people it needs
     /// (the thaw of a qualified sleeper if nobody qualified is up), then the remaining work at the rate that team would work
-    /// (DESIGN.md, "Alerts": the clock rule). Ignores that someone may be busy elsewhere.
+    /// (DESIGN.md, "Alerts": the clock rule). A fault in repair counts the people working on it; otherwise ignores that someone may be busy elsewhere.
     /// </summary>
     public double EarliestDoneHours(Fault f, bool patch = false)
     {
         bool Qualified(CrewMember c) => c.SkillOf(f.Skill) >= f.Level;
         double Thaw(CrewMember c) => c.State == CrewState.Thawing ? Math.Max(0, c.ThawDoneAt - Clock) : 0;
-        var team = Crew.Where(c => c.State is CrewState.Awake or CrewState.Thawing)
-            .OrderByDescending(Qualified).ThenBy(Thaw).Take(f.People).ToList();
+        // A fault in repair is worked by the people on it, at their morale; free slots (and an unstaffed fault) take the best of the rest.
+        var working = f.State == FaultState.InRepair ? Workers(f).ToList() : new List<CrewMember>();
+        var team = working.Concat(Crew.Where(c => (c.State is CrewState.Awake or CrewState.Thawing) && !working.Contains(c))
+                .OrderByDescending(Qualified).ThenBy(Thaw))
+            .Take(Math.Max(f.People, working.Count)).ToList();
         var wait = team.Count == 0 ? 0 : team.Max(Thaw);
         var skilled = team.Any(Qualified);
         if (!skilled && Crew.Any(c => c.State == CrewState.Asleep && Qualified(c)))
