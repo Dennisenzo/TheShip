@@ -466,5 +466,13 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         var chip = new Rectangle(x + 124, 14, (int)(phase.Length * _p.SmallWidth) + 20, 28);
         _p.Frame(chip, v.Phase == Phase.Alert ? Painter.Accent : Painter.Wire);
         _p.Text(_p.Small, phase, chip.X + 10, chip.Y + 6, v.Phase == Phase.Alert ? Painter.Accent : Painter.Ink);
+        // The lockouts the crew hold: a chip each, so the loss of Wake and Sleep is never a mystery.
+        var lockText = v.Lockouts.Bay ? "BAY TAKEN BY THE CREW" : v.Lockouts.BayWarned.Count > 0 ? "CREW WILL TAKE THE BAY" : null;
+        if (lockText != null)
+        {
+            var lock1 = new Rectangle(chip.Right + 12, 14, (int)(lockText.Length * _p.SmallWidth) + 20, 28);
+            _p.Frame(lock1, Painter.Accent);
+            _p.Text(_p.Small, lockText, lock1.X + 10, lock1.Y + 6, Painter.Accent);
+        }
     }
 }

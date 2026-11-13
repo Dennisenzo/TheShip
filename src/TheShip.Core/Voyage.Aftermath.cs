@@ -100,6 +100,7 @@ public sealed partial class Voyage
             }
             Clamp(c);
         }
+        LockoutBeat();
 
         // Shared shifts: the awake talk, and bonded pairs share almost everything.
         up = Awake.ToList();
@@ -171,6 +172,12 @@ public sealed partial class Voyage
         {
             title = "Adrift";
             summary = "Navigation was never restored. The ship passes its star, and the crew live out their lives aboard.";
+        }
+        else if (alive.Count >= Tuning.LandfallAlive && working >= Tuning.LandfallWorkingAge && Lockouts.Bay)
+        {
+            title = "Landfall without you";
+            summary = alive.Count + " of " + Crew.Count + " reach the surface, " + working + " of them of working age. They hold the cold-sleep bay and the landing is theirs; "
+                      + "what becomes of you is for them to decide.";
         }
         else if (alive.Count >= Tuning.LandfallAlive && working >= Tuning.LandfallWorkingAge)
         {

@@ -498,14 +498,14 @@ public sealed partial class ShipGame
             var ended = v.Phase == Phase.Ended;
             if (c.State == CrewState.Asleep)
             {
-                if (_p.Button(act, "WAKE", !ended))
+                if (_p.Button(act, v.Lockouts.Bay ? "BAY TAKEN" : "WAKE", !ended && !v.Lockouts.Bay))
                     Act("wake " + person.Name, () => v.Wake(person));
             }
             else if (c.State == CrewState.Awake)
             {
                 var can = v.CanSleepNow(c);
                 var days = N(Math.Ceiling((Tuning.MinAwakeHours - c.HoursAwake) / 24));
-                if (_p.Button(act, can ? "SLEEP" : "in " + days + " d", can && !ended))
+                if (_p.Button(act, v.Lockouts.Bay ? "BAY TAKEN" : can ? "SLEEP" : "in " + days + " d", can && !ended && !v.Lockouts.Bay))
                     Act("ask " + person.Name + " to sleep", () => v.AskSleep(person));
             }
             if (c.Alive && _p.Hit(card) && !_p.Over(file) && !_p.Over(act))
@@ -531,6 +531,11 @@ public sealed partial class ShipGame
     /// <summary>Questions nobody has answered, things people asked for, doubts, and promises still open.</summary>
     private static IEnumerable<string> Waiting(Voyage v)
     {
+        if (v.Lockouts.BayWarned.Count > 0)
+            yield return string.Join(" and ", v.Lockouts.BayWarned.Select(id => v.Crew.First(c => c.Id == id).Name))
+                         + " will take the cold-sleep bay at the next step. Win one of them back above 15 trust, or they do.";
+        if (v.Lockouts.Bay)
+            yield return v.BayLockReason + " Keep a promise to one of them and win their trust above " + Tuning.BayReturnTrust.ToString("0") + " to get it back.";
         foreach (var c in v.Awake)
         {
             if (c.PendingQuestion != null && v.HasFact(c.PendingQuestion))

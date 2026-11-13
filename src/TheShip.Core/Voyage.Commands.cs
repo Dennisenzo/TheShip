@@ -10,6 +10,11 @@ public sealed partial class Voyage
     {
         if (Phase == Phase.Ended)
             return;
+        if (Lockouts.Bay && !_crewActing)
+        {
+            Ship("The cold-sleep bay is not yours to open: " + BayLockReason);
+            return;
+        }
         if (c.State != CrewState.Asleep)
         {
             Ship(c.Name + " is not asleep.");
@@ -584,6 +589,11 @@ public sealed partial class Voyage
     {
         if (Phase == Phase.Ended)
             return;
+        if (Lockouts.Bay)
+        {
+            Ship("The cold-sleep bay is not yours to close: " + BayLockReason);
+            return;
+        }
         if (c.State != CrewState.Awake)
         {
             Ship(c.Name + " is not awake.");
@@ -689,6 +699,8 @@ public sealed partial class Voyage
             Speak(c, "promise_broken", "The ship broke a promise it made you: " + PromiseText(s.PromiseKey) + ".", PromiseText(s.PromiseKey));
         }
         Clamp(c);
+        if (kept)
+            MaybeReturnBay(c);
     }
 
     public static string PromiseText(string? key) => key switch
@@ -801,7 +813,10 @@ public sealed partial class Voyage
         var unsettled = Awake.Where(c => !c.AskedToSleep).Select(c => c.Name).ToList();
         if (unsettled.Count > 0)
         {
-            Ship("Still awake and not asked to sleep: " + string.Join(", ", unsettled) + ".");
+            // While the crew hold the bay the ship can't ask anyone; the crew put people under when their three months are up.
+            Ship(Lockouts.Bay
+                ? "Still awake: " + string.Join(", ", unsettled) + ". The crew hold the cold-sleep bay and put people under once they can sleep; advance the clock."
+                : "Still awake and not asked to sleep: " + string.Join(", ", unsettled) + ".");
             return;
         }
 
@@ -812,6 +827,8 @@ public sealed partial class Voyage
         var deaths = new List<string>();
         var events = new List<string>();
         var start = Clock;
+        // The bay's takers dying in the drift free it after the report, not before it.
+        _holdBayRelease = true;
         // A patch still holding at the last drift gives way on the way in (DESIGN.md, "How alerts are scheduled").
         var patchFailed = false;
         if (last && _patched.Count > 0)
@@ -909,7 +926,10 @@ public sealed partial class Voyage
         {
             if (heldSpeech)
                 ReleaseSpeech();
+            _holdBayRelease = false;
         }
+        // Before the ending and the crew's wake rule: a bay with no living taker is the ship's again.
+        MaybeFreeBay();
 
         if (last)
         {

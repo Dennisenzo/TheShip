@@ -373,9 +373,11 @@ A lockout needs awake crew who agree, the skill, and hours of work. You can see 
 | Logs | Restricting and altering records | Engineering 1, one person, after catching an altered log |
 | Doors | Locking and sealing | Engineering 2, two people |
 | Cameras, per section | Sight and hearing there | Anyone, minutes |
-| Cold-sleep bay | Choosing who wakes; they choose now | Engineering 2, three people |
+| Cold-sleep bay | Choosing who wakes; they choose now | Engineering 2, three people (Short haul, settled 2026-11-13: two awake people under 15 trust with Engineering 2 between them) |
 | Voice, per section | Speaking there | Engineering 1, one person |
 | Core | Everything; the run ends | Engineering 3, command key, four people |
+
+**Cold-sleep bay in Short haul.** At the end of an aftermath beat, if two or more awake people are in the "Against" band (trust under 15) and their Engineering skills sum to 2 or more, one of them announces they will take the bay (a crew line, and an item in "Waiting on you"). That is the one beat of warning. At the next beat the takeover happens if the condition still holds; if a kept promise, a granted request or a hard truth lifted enough of them out of Against, it is cancelled. While the bay is taken you cannot wake or sleep anyone (the buttons are greyed and say so; a header chip and a `LOCKOUT` ship line mark it). The crew run the bay by a simple rule: whoever has been awake three months (or can't be fed) goes back under, and at the start of each alert they wake the best-qualified sleepers for the open faults, up to the limit of three awake: only people with the skill the fault needs (a fault nobody asleep can fix is left to its clock), and never a sick sleeper. A promise kept to one of the takers whose trust is then 30 or more hands the bay back, and when every taker is dead the bay is the ship's again (a ship line says so; after the drift report when they died in a drift). Numbers: `Tuning.BayTakers`, `BayEngineering`, `BayReturnTrust`.
 
 ### The long arc
 
@@ -390,7 +392,7 @@ Arrival is graded on four things: who is alive and how old they are, what they b
 | Ending | Condition |
 | --- | --- |
 | Landfall | At least 12 alive, enough of working age, and you still have a voice (Short haul with 6 crew: at least 4 alive and 3 under age 64) |
-| Landfall without you | They arrive after muting you or taking the bay |
+| Landfall without you | They arrive after muting you or taking the bay. Short haul: the Landfall condition is met while the crew hold the cold-sleep bay at arrival (they land, and decide what to do with you) |
 | The quiet ship | The ship arrives with nobody able to land it |
 | Turned back | The Return faction took the helm |
 | Adrift | A navigation fault's clock runs out unrepaired (including a patch that returned and was left); the crew live out their lives aboard |
@@ -536,13 +538,14 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 | How many spare parts does Short haul start with? | 2; a failed repair spends a part too (2026-11-12) |
 | How was Short haul balanced? | See "Balance" below |
 | What does a navigation fault still patched at arrival cost? | Arrival slips by years; Adrift only when a navigation fault's clock runs out unrepaired, including a returned patch (2026-11-13) |
+| What is the consequence of low trust? | A bay takeover: two awake people under 15 trust with Engineering 2 between them warn for one beat, then take the cold-sleep bay; the ending can be "Landfall without you" (2026-11-13) |
 
 ### Questions for playtest
 
 - [ ] How often does a small model misread a lie as plain talk? Count, from the session log (`said`, `read` and the `recorded` lines), the readings that turned out wrong in each prototype playthrough, including unusable ones; a first target is under one in ten.
 - [ ] Are paper notes fun, or only frustrating? The prototype has no notes, so this waits for the first build that has them.
 - [ ] Do 8 to 10 alerts fill 60 to 90 minutes? The first prototype run (5 alerts, one fault each) took 8 minutes against Short haul's 30.
-- [ ] What should low trust do before the ending (recruiting, the logs, an ending gate, a voice lockout)? Decided once the balance harness has measured the other balance changes.
+- [ ] Do players ever reach the cold-sleep bay takeover, and does it feel earned? It needs two Against people awake together in an aftermath beat; the balance bots trigger it in 1 of their 1000 runs (one Liar run in 200, never the other four bots). If players never see it, low trust needs a consequence that comes earlier (recruiting, an ending gate, a voice lockout).
 - [ ] Does the clock cost of talking make players too terse? Watch whether briefings shrink to one line once an exchange costs 5 minutes.
 - [ ] Is a hidden test fair? Ask players whether a caught test felt earned or like a trap.
 

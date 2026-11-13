@@ -34,7 +34,7 @@ public sealed partial class Voyage
     public int PodWear { get; internal set; }
     public bool PowerLow { get; private set; }
     public bool NavLost { get; private set; }
-    public bool LogsLocked { get; private set; }
+    public bool LogsLocked { get => Lockouts.Logs; private set => Lockouts.Logs = value; }
     public Ending? Ending { get; private set; }
 
     /// <summary>A crew line was added; its text is the template and the model may reword it.</summary>
@@ -210,7 +210,7 @@ public sealed partial class Voyage
     /// they learn it as evidence, the way they learn who is up when someone is thawed (<see cref="Meet"/>).
     /// <paramref name="witnessesSilent"/>: the caller has the witnesses say it in its own line (<c>LeftBehind</c>).
     /// </summary>
-    private void Kill(CrewMember c, string how, bool quiet = false, bool witnessesSilent = false)
+    internal void Kill(CrewMember c, string how, bool quiet = false, bool witnessesSilent = false)
     {
         if (!c.Alive)
             return;
@@ -226,6 +226,8 @@ public sealed partial class Voyage
             foreach (var w in Awake.ToList())
                 Learn(w, "alive:" + c.Id, "dead", "evidence", silent: witnessesSilent || quiet, witnessed: c.Name);
         DropIllnessOf(c);
+        if (Lockouts.BayTakers.Contains(c.Id))
+            MaybeFreeBay();
     }
 
     /// <summary>A sick person who has died needs no more treatment: their illness fault (and any patch of it that would return) goes.</summary>
@@ -370,6 +372,7 @@ public sealed partial class Voyage
             Ship($"Fault: {FaultTitle(f)}. Needs {f.Skill.ToString().ToLowerInvariant()} {f.Level}"
                  + (f.People > 1 ? $", {f.People} people" : "")
                  + $", {f.Hours:0} hours of work. Clock: {Hours(f.ClockHours)}. If ignored: {f.IfIgnored}.");
+        CrewWakeRule();
         if (alert.Faults.Count == 0)
         {
             Phase = Phase.Aftermath;
