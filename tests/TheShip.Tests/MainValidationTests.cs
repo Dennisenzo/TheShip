@@ -60,4 +60,37 @@ public class MainValidationTests
         var fault = v.FindFault("coolant")!;
         Assert.Equal(fault.Hours / Voyage.MoraleRate(new[] { mara }), v.EarliestDoneHours(fault), 3);
     }
+
+    [Fact]
+    public void Stakes_name_no_hours_for_someone_who_would_work_on_nothing()
+    {
+        var v = new Voyage(1);
+        var lin = Woken(v, "lin");
+        v.Go();
+        lin.PendingQuestion = "dose";
+        var s = v.StakesOf(lin)!;
+        Assert.True(s.TruthHurts > 0);
+        Assert.Equal(0, s.HoursSlower);
+        Assert.DoesNotContain(" h slower)", v.StakesText(lin));
+    }
+
+    [Fact]
+    public void Stakes_hours_are_those_of_the_fault_they_are_on_with_its_team()
+    {
+        var v = new Voyage(1);
+        var mara = Woken(v, "mara");
+        v.Go();
+        var fault = v.FindFault("coolant")!;
+        AssignAnswering(v, mara, fault);
+        mara.Morale = 60;
+        mara.Beliefs.Remove("dose");
+        mara.PendingQuestion = "dose";
+        var s = v.StakesOf(mara)!;
+        Assert.True(s.TruthHurts > 0);
+        var now = v.EarliestDoneHours(fault);
+        mara.Morale -= s.TruthHurts;
+        var hurt = v.EarliestDoneHours(fault);
+        Assert.Equal(Math.Round((hurt - now) * 2) / 2, s.HoursSlower);
+        Assert.True(s.HoursSlower > 0);
+    }
 }
