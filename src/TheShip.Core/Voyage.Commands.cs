@@ -637,6 +637,21 @@ public sealed partial class Voyage
     }
 
     /// <summary>
+    /// What lifts a pod refusal, for "Waiting on you": the ship's word on the pods (<see cref="PodRefusalFact"/>), heard at
+    /// <see cref="Tuning.PodRefuserListensTrust"/> trust or more (Voyage.Talk.cs). Null when the person doesn't refuse the pod.
+    /// </summary>
+    public string? PodRefusalText(CrewMember c)
+    {
+        if (!c.RefusesSleep)
+            return null;
+        var text = c.Name + " will not go back into the pod until the ship says " + _facts[PodRefusalFact].Label;
+        return c.Trust >= Tuning.PodRefuserListensTrust
+            ? text + "."
+            : text + ", and believes it only at " + Tuning.PodRefuserListensTrust.ToString("0", CultureInfo.InvariantCulture)
+              + " trust (now " + Math.Floor(c.Trust).ToString("0", CultureInfo.InvariantCulture) + ").";
+    }
+
+    /// <summary>
     /// Said when someone refuses to sleep: whoever refuses stays awake through the next drift and eats the stores. The player
     /// hears how far the stores go before choosing to drift.
     /// </summary>

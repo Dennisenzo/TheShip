@@ -782,8 +782,8 @@ public sealed partial class ShipGame
             foreach (var doubt in c.Doubts)
                 if (v.HasFact(doubt))
                     yield return (c, c.Name + " doubts you on " + v.GetFact(doubt).Label + " and will check.");
-            if (c.RefusesSleep)
-                yield return (c, c.Name + " will not go back into the pod.");
+            if (v.PodRefusalText(c) is { } refusal)
+                yield return (c, refusal);
         }
         foreach (var s in v.Statements.Where(s => s.Kind == StatementKind.Promise && s.PromiseKey != "other"))
         {

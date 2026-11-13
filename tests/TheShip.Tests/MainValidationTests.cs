@@ -175,4 +175,22 @@ public class MainValidationTests
         v.GoUntilAttention();
         Assert.Equal(CrewState.Asleep, lin.State);
     }
+
+    [Fact]
+    public void A_pod_refuser_whose_question_was_settled_is_shown_what_lifts_the_refusal()
+    {
+        var v = new Voyage(1);
+        var lin = Woken(v, "lin");
+        v.Go();
+        lin.RefusesSleep = true;
+        // She read the log, so Learn settled her pods question; the refusal stays.
+        lin.PendingQuestion = null;
+        lin.Trust = 50;
+        Assert.Equal("Lin will not go back into the pod until the ship says whether the sleep pods are sound.", v.PodRefusalText(lin));
+        lin.Trust = 20;
+        Assert.Equal("Lin will not go back into the pod until the ship says whether the sleep pods are sound, and believes it only at 30 trust (now 20).",
+                     v.PodRefusalText(lin));
+        lin.RefusesSleep = false;
+        Assert.Null(v.PodRefusalText(lin));
+    }
 }
