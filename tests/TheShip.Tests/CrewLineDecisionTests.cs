@@ -30,7 +30,7 @@ public class CrewLineDecisionTests
     [Theory]
     [InlineData("promise", "You swore you wouldn't wake me again. What is the actual reason for this lockout?", false)]
     [InlineData("promise", "You swore you wouldn't wake me again. I'll hold you to it.", true)]
-    [InlineData("comply", "On it. Which valve is it?", false)]
+    [InlineData("comply", "On it. Which of the valves in that bay is it that you want me to look at?", false)]
     [InlineData("small", "I'm fine. And you, can you even feel anything?", true)]
     public void A_line_that_is_not_a_question_decision_asks_nothing_new(string kind, string line, bool accepted)
     {

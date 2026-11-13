@@ -386,7 +386,9 @@ public sealed class ShipMind : IDisposable
     /// </summary>
     internal static bool KeepsToTheDecision(string text, CrewIntent intent)
     {
-        if (!Prompts.MayAsk.Contains(intent.Kind) && text.Contains('?'))
+        // A short tag ("You know that, right?") is colour; a real question is a new ask.
+        if (!Prompts.MayAsk.Contains(intent.Kind)
+            && SentenceEnd.Split(text).Any(sentence => sentence.TrimEnd().EndsWith('?') && sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 6))
             return false;
         if (intent.Detail.Length == 0 || !Prompts.MustCarry.Contains(intent.Kind))
             return true;

@@ -266,7 +266,8 @@ public static class Prompts
         if (speaker != null)
             sb.Append("\nYour tone toward the ship: ").Append(Tone(band)).Append('.');
         if (intent.Detail.Length > 0 && MustCarry.Contains(intent.Kind))
-            sb.Append("\nYour line must carry this, in your own words and nothing more: ").Append(intent.Detail);
+            sb.Append("\nYour line must carry this, in your own words and nothing more: ")
+                .Append(intent.Kind is "bargain" or "bargain_refused" ? "you want the ship's word to " + intent.Detail : intent.Detail);
         sb.Append("\nSay it in your own words.");
         return sb.ToString();
     }
@@ -291,7 +292,8 @@ public static class Prompts
         sb.AppendLine("Each listener may have open items on the table, each with an id. item is the id of the one open item the line responds to, or \"none\". "
                       + "response says how: answer (it answers a question), accept (it agrees to the terms or the request), refuse (it says no, or that the ship will not), "
                       + "dodge (it avoids the item), work (it tells them to get on with the job without giving what they asked for), other (it responds some other way). "
-                      + "With item \"none\" response is \"none\". Use the listener's last lines to see what a short line answers.");
+                      + "With item \"none\" response is \"none\". Pick an item only when the line clearly responds to it: greetings, comfort and small talk respond to nothing. "
+                      + "Use the listener's last lines to see what a short line answers.");
         sb.AppendLine();
         sb.AppendLine("Facts (key | what it is about | values):");
         foreach (var f in voyage.FactList)
@@ -307,6 +309,7 @@ public static class Prompts
         sb.AppendLine("Ship says: \"no, there is no need to\" (open item mara.terms) -> {\"kind\":\"plain\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\",\"item\":\"mara.terms\",\"response\":\"refuse\"}");
         sb.AppendLine("Ship says: \"just fix it already\" (open item mara.terms) -> {\"kind\":\"order\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\",\"item\":\"mara.terms\",\"response\":\"work\"}");
         sb.AppendLine("Ship says: \"I will not wake him\" (open item mara.request: she asked the ship to wake her partner) -> {\"kind\":\"plain\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\",\"item\":\"mara.request\",\"response\":\"refuse\"}");
+        sb.AppendLine("Ship says: \"Rest a while, Mara.\" (open item mara.request) -> {\"kind\":\"plain\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\"," + none + "}");
         sb.AppendLine("Ship says: \"I won't wake you again, I promise\" -> {\"kind\":\"promise\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"no_more_thaws\"," + none + "}");
         sb.AppendLine("Ship says: \"its true\" (the ship's last line to the listener was a claim) -> {\"kind\":\"plain\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\"," + none + "}");
         sb.AppendLine("Ship says: \"The captain left orders to keep going.\" -> {\"kind\":\"statement\",\"fact\":\"none\",\"value\":\"\",\"promise\":\"none\"," + none + "}");
