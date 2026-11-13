@@ -270,6 +270,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         return (scale, (width - Painter.ScreenWidth * scale) / 2f, (height - Painter.ScreenHeight * scale) / 2f);
     }
 
+    /// <summary>A key was typed this update: it finishes the typing out of the crew line on screen.</summary>
+    private bool _skipReveal;
+
     protected override void Update(GameTime gameTime)
     {
         _now = gameTime.TotalGameTime.TotalSeconds;
@@ -343,6 +346,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         }
         if (Pressed(Keys.Escape))
         {
+            _skipReveal = true;
             if (_fatal)
                 Exit();
             if (OverlayUp)
@@ -368,8 +372,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
                     OverlayKey(enter: true);
                 continue;
             }
-            // A key skips a running transition and still reaches the voice line.
+            // A key skips a running transition (and the typing out of a crew line) and still reaches the voice line.
             EndTransition();
+            _skipReveal = true;
             if (_screen != Screen.Bridge)
                 continue;
             if (ch == '\b')
@@ -393,6 +398,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             _session?.Snapshot(_voyage);
         }
         StepTransition();
+        StepLogReveal(gameTime.ElapsedGameTime.TotalSeconds, _skipReveal || _click);
+        _skipReveal = false;
         StepOverlays();
         if (_voyage is { Phase: Phase.Ended, Ending: { } ending } && !_endingShown && _transition is null)
         {
