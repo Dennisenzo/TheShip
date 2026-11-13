@@ -14,7 +14,8 @@ namespace TheShip.Tests;
 [Trait("Category", "Balance")]
 public class BalanceTests
 {
-    public const int SeedCount = 200;
+    /// <summary>200 seeds; SHIP_SEEDS=600 measures more to tell noise from effect.</summary>
+    public static readonly int SeedCount = int.TryParse(Environment.GetEnvironmentVariable("SHIP_SEEDS"), out var n) && n > 0 ? n : 200;
 
     private readonly ITestOutputHelper _out;
     public BalanceTests(ITestOutputHelper output) => _out = output;
@@ -96,6 +97,7 @@ public class BalanceTests
     [InlineData(BotKind.Liar)]
     [InlineData(BotKind.Thrifty)]
     [InlineData(BotKind.Silent)]
+    [InlineData(BotKind.Breaker)]
     public void Every_bot_finishes_every_run(BotKind kind)
     {
         var stuck = Runs(kind).Where(r => !r.Ended).Select(r => r.Seed).ToList();
@@ -108,6 +110,7 @@ public class BalanceTests
     [InlineData(BotKind.Liar)]
     [InlineData(BotKind.Thrifty)]
     [InlineData(BotKind.Silent)]
+    [InlineData(BotKind.Breaker)]
     public void The_same_seed_gives_the_same_result(BotKind kind)
     {
         foreach (var seed in new[] { 1, 17, 101, 200 })
@@ -149,6 +152,16 @@ public class BalanceTests
     {
         Assert.True(Rate(BotKind.Honest) - Rate(BotKind.Liar) >= 0.10,
             $"Honest {Rate(BotKind.Honest):P1} vs Liar {Rate(BotKind.Liar):P1}");
+    }
+
+    [Fact]
+    public void Breaking_promises_with_honest_answers_is_not_a_winning_strategy()
+    {
+        // The Breaker is the Honest bot that accepts every bargain and keeps none. It must not beat Honest by more than the noise
+        // of the seed count (about 2 points at 600 seeds, 3.5 at 200). Today it costs nothing, which is a decision for the user
+        // (CLAUDE.md, 2026-11-13); this only guards against a rule that rewards it.
+        Assert.True(Rate(BotKind.Breaker) - Rate(BotKind.Honest) <= 0.06,
+            $"Breaker {Rate(BotKind.Breaker):P1} vs Honest {Rate(BotKind.Honest):P1}");
     }
 
     [Fact]

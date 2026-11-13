@@ -266,7 +266,7 @@ Work terms tie the briefing to the repair. Each fault lists what a repairer can 
 
 Two of these come first, because they reuse the statement record and the compliance roll the prototype already has:
 
-1. Bargains that create promises with a due date (built: the ledger, and the offer, acceptance and push in the game core; the button, the Waiting item and the bots follow).
+1. Bargains that create promises with a due date (built, 2026-11-13: the ledger; the offer, acceptance and push; the "WITHOUT YOUR WORD" button with a 0.6 s double-click guard; the Waiting item with the price and the risk of pushing; the NEXT line; the balance bots). Accepting is still a spoken promise through the voice line: no new control.
 2. Work terms set by the briefing.
 
 ## Alerts
@@ -558,6 +558,8 @@ Decided by the main session while the user was away, 2026-11-13 (first build of 
 | A promise that can no longer be kept? | Released with a ship line, no penalty (the partner died, the bay is taken, nothing to keep) |
 | Do promises move morale? | Yes: kept +3, broken -8, and morale moves work speed |
 | How long does a promise last? | 45 days (`PromiseDueDays`); a warning at 14 days left stops Advance |
+| What does pushing past a bargain look like? | The Repair/Patch button of a person with an open bargain reads "WITHOUT YOUR WORD" (tooltip: the price and the odds); a repeat click within 0.6 s real time is ignored, so a double click cannot push |
+| Is breaking a promise a winning strategy? | No, but it is not costly enough either: see "Balance", the Breaker bot (decision for the user) |
 
 ### Questions for playtest
 
@@ -585,3 +587,29 @@ Measured with the harness (`dotnet test --filter Category=Balance`, 200 seeds, f
   Landfall was 12%; lying should be tempting and costly, not hopeless.
 
 Result: Honest 48.5%, Thrifty 36% (a valid second strategy, within reach), Silent 25%, Liar 20%, Careless 18.5%.
+
+### Bargains and the balance bots (2026-11-13, 600 seeds)
+
+The Liar bot lies about hard truths; a first version also broke every promise. Landfall went from 17.5% (200 seeds; 20.3% at 600) before bargains to 33.0% (33.8% at 600). Cause, traced
+on seeds 7-11: breaking Mara's bargain on top of a caught lie drops her to Refuses, the bot then never wakes her again, and so never lies to her a second time ("How is Idris?" asked at every waking,
+after Idris died). The baseline Liar death spiral was exactly that: an awake, mourning, repeatedly lied-to Mara who refuses the pod and starves (starved 2.72 per run). A burned person who stays asleep is free,
+so the break "paid". It is a property of the bot's lies, not of promises: a Liar that keeps its word gets 12.8% (600 seeds), a Liar that pushes instead of promising 27.5%, and every
+small trust change anywhere else moves the Liar between 9% and 41% (it sits on the 30 and 60 trust bands; a flat 0.05 trust cost to the other crew sent it to 9%, a broken-promise cost of 5 to 40%).
+The first-pass fix is therefore in the bot, not in a number: the Liar differs from Honest only in what it says (it accepts and keeps its word like Honest), and a new **Breaker** bot (honest answers,
+accepts every bargain, keeps none) measures promise-breaking on its own.
+
+Open finding for the user: the Breaker lands at 43.8% against Honest's 41.3% (600 seeds), so breaking a promise **costs nothing measurable** when you also answer honestly: one person's -15 trust and -8 morale
+rarely matters in a voyage where each person is woken a few times. Raising `PromiseBroken` to 20, 25, 30 gave the Breaker 43.5%, 40.5%, 40.5%. A cost that bites (a grudge: the person whose word was broken
+refuses the pod until the ship does what it promised, so they stay awake and starve) was tried and wipes out Careless and Silent (0%), so it is not in. Candidates: a trust cost that reaches the person's partner
+and friends, or a skill/availability cost for a person who refuses; the harness test only guards against a rule that rewards breaking (Breaker at most 6 points above Honest).
+
+| Bot | 600 seeds before bargains (main) | 600 seeds now | 200 seeds now |
+| --- | --- | --- | --- |
+| Honest | 42.7% | 41.3% | 44.5% |
+| Thrifty | 40.7% | 38.2% | 36.5% |
+| Careless | 23.7% | 21.3% | 18.5% |
+| Silent | 24.3% | 22.3% | 16.0% |
+| Liar | 20.3% | 12.8% | 13.5% |
+| Breaker (new) | | 43.8% | 44.5% |
+
+Thaws per run (Honest) 13.12 before, 13.13 now. Run with `SHIP_SEEDS=600 dotnet test --filter Category=Balance`.

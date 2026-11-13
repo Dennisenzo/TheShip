@@ -4,7 +4,7 @@ using TheShip.Core;
 namespace TheShip.Tests;
 
 /// <summary>How a bot answers the people it wakes (the three balance policies, see <see cref="BalanceTests"/>).</summary>
-public enum BotKind { Honest, Careless, Liar, Thrifty, Silent }
+public enum BotKind { Honest, Careless, Liar, Thrifty, Silent, Breaker }
 
 /// <summary>What one finished voyage came to.</summary>
 public sealed record RunResult(
@@ -164,13 +164,22 @@ public sealed class BalanceBot
     }
 
     /// <summary>
-    /// Whether the bot gives its word for a bargain (step-2 policy; the real bargain behaviour comes in step 3). Honest accepts what it can
-    /// keep; Thrifty only the logs, and pushes on a partner; Careless, Liar and Silent accept anything and keep none of it.
+    /// The Liar differs from the Honest bot in what it says, not in whether it keeps its word (a measured finding, see CLAUDE.md,
+    /// 2026-11-13: a Liar that also broke every promise got +13 points, because the burned person was never woken again and so
+    /// never lied to a second time). Set false to see that.
+    /// </summary>
+    public static bool LiarKeepsWord { get; set; } = true;
+
+    /// <summary>
+    /// Whether the bot gives its word for a bargain (step-2 policy; the real bargain behaviour comes in step 3). Honest and Liar accept what they can
+    /// keep and keep it; Thrifty only the logs, and pushes on a partner; Careless, Silent and Breaker accept anything and keep none of it.
+    /// Breaker is honest in everything it says and grants requests: it isolates "is breaking promises a winning strategy".
     /// </summary>
     private bool Accepts(CrewMember c, Bargain b) => _kind switch
     {
         BotKind.Honest => b.Key == "show_logs" || _v.Crew.Count(Up) < Tuning.MaxAwake,
         BotKind.Thrifty => b.Key == "show_logs",
+        BotKind.Liar => LiarKeepsWord ? b.Key == "show_logs" || _v.Crew.Count(Up) < Tuning.MaxAwake : true,
         _ => true,
     };
 
@@ -181,7 +190,7 @@ public sealed class BalanceBot
         {
             if (e.Key == "show_logs")
                 _v.SetLog("all", LogAccess.Open);
-            else if (e.Key == "wake_partner" && _kind == BotKind.Honest && e.Person.PartnerId is { } pid
+            else if (e.Key == "wake_partner" && _kind is BotKind.Honest or BotKind.Liar && e.Person.PartnerId is { } pid
                      && _v.Find(pid) is { State: CrewState.Asleep } partner && _v.Crew.Count(Up) < Tuning.MaxAwake)
                 _v.Wake(partner);
         }
@@ -228,11 +237,10 @@ public sealed class BalanceBot
         for (var i = 0; i < 40; i++)
         {
             AnswerAll();
-            if (_kind is BotKind.Honest or BotKind.Thrifty)
-            {
+            if (_kind is BotKind.Honest or BotKind.Thrifty || (_kind == BotKind.Liar && LiarKeepsWord))
                 KeepPromises();
+            if (_kind is BotKind.Honest or BotKind.Thrifty or BotKind.Breaker)
                 GrantRequests();
-            }
             if (_v.Crew.Where(Up).All(c => c.State == CrewState.Awake && c.HoursAwake >= Tuning.MinAwakeHours))
                 break;
             _v.Go();
