@@ -139,4 +139,22 @@ public class ReunionTests
         v.Wake(v.Find("lin")!);
         Assert.Contains(v.Log, e => e.Text.Contains("short of a three-month waking", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void Thawing_the_partner_again_in_the_same_aftermath_pays_the_thaw_wear_without_a_second_pod_care()
+    {
+        var (v, _, idris) = PairUp();
+        // Empty stores waive the three-month minimum, so Idris can go back at once.
+        v.Stores = 0;
+        v.AskSleep(idris);
+        Assert.Equal(CrewState.Asleep, idris.State);
+        v.Stores = 1000;
+        var wear = v.PodWear;
+        v.Wake(idris);
+        ThawThrough(v, idris);
+        Assert.Equal(CrewState.Awake, idris.State);
+        Assert.Equal(2, v.Reunions);
+        // Before: each re-thaw cleared ReunionPodCare (2) against the thaw's 1, so wear fell by one a cycle.
+        Assert.Equal(wear + 1, v.PodWear);
+    }
 }

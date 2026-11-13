@@ -387,8 +387,14 @@ public sealed partial class Voyage
                 Speak(a, "reunion", "Your partner " + b.Name + " is awake with you. You are together again, and it lifts you.", b.Name);
             }
             Reunions++;
-            PodWear = Math.Max(0, PodWear - Tuning.ReunionPodCare);
-            SyncFacts();
+            // Their care of the pod bank counts once per pair per alert (with its aftermath): sending one back and thawing them again
+            // pays the thaw's wear and gets no second care.
+            var pair = string.CompareOrdinal(c.Id, mate.Id) < 0 ? c.Id + "+" + mate.Id : mate.Id + "+" + c.Id;
+            if (_podCare.Add((pair, AlertIndex)))
+            {
+                PodWear = Math.Max(0, PodWear - Tuning.ReunionPodCare);
+                SyncFacts();
+            }
         }
         // Meeting the partner (or this thaw itself) may keep a promise to wake them.
         ResolveCommitments();
@@ -411,6 +417,9 @@ public sealed partial class Voyage
         Speak(c, "wake_question", "You have just been thawed. You ask the ship: " + question, question);
         Clamp(c);
     }
+
+    /// <summary>Pairs whose reunion already cleared pod wear, by alert index.</summary>
+    private readonly HashSet<(string Pair, int Alert)> _podCare = new();
 
     private void Meet(CrewMember who, CrewMember sees)
     {
