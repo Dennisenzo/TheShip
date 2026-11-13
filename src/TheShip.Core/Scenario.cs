@@ -200,17 +200,17 @@ public static class Scenario
             foreach (var f in alerts[i].Faults)
                 f.ClockHours = Tuning.ThawHours + f.Hours + v.SlackHours[i];
         if (v.Alert3SideFault is { } side3)
-            alerts[2].Faults.Add(SideFault(side3, v.SlackHours[2], "side3", critical: false));
+            alerts[2].Faults.Add(SideFault(side3, v.SlackHours[2], "side3"));
         if (v.Alert5SideFault is { } side5)
-            alerts[4].Faults.Add(SideFault(side5, v.SlackHours[4], "side5", critical: true));
+            alerts[4].Faults.Add(SideFault(side5, v.SlackHours[4], "side5"));
         return alerts;
     }
 
     /// <summary>
     /// A side fault of alert 3 or 5 (<see cref="Variation.Blight"/> or <see cref="Variation.PowerSag"/>), with its clock of thaw + work + slack.
-    /// Only one fault per alert is Critical: the sag is the critical one in alert 5, where navigation is not. Power sag is temporary: until power routing exists it is an engineering repair in the reactor (DESIGN.md, fault catalogue).
+    /// The power sag is Critical wherever it appears (it is the deadliest side fault), so alert 3 can hold two Critical faults. Power sag is temporary: until power routing exists it is an engineering repair in the reactor (DESIGN.md, fault catalogue).
     /// </summary>
-    public static Fault SideFault(string kind, int slackHours, string id, bool critical) => kind == Variation.Blight
+    public static Fault SideFault(string kind, int slackHours, string id) => kind == Variation.Blight
         ? new Fault
         {
             Id = id, Kind = "blight", Name = "Hydroponics blight", Skill = Skill.Botany, Level = 2, Hours = Tuning.BlightHours,
@@ -220,7 +220,7 @@ public static class Scenario
         : new Fault
         {
             Id = id, Kind = "powersag", Name = "Power sag", Skill = Skill.Engineering, Level = 2, Hours = Tuning.PowerSagHours,
-            ClockHours = Tuning.ThawHours + Tuning.PowerSagHours + slackHours, Critical = critical,
+            ClockHours = Tuning.ThawHours + Tuning.PowerSagHours + slackHours, Critical = true,
             IfIgnored = "the power stays low and the sleepers are at risk", Section = "reactor",
         };
 
@@ -279,7 +279,7 @@ public static class Scenario
         new Alert
         {
             Number = 5, Year = 52, Title = "Pod controller fault",
-            Report = "The controller of the pod bank is resetting itself. One fault.",
+            Report = "The controller of the pod bank is resetting itself.",
             Faults =
             {
                 new Fault

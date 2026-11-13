@@ -74,7 +74,7 @@ public class SideFaultTests
         Assert.Equal(Skill.Engineering, sag.Skill);
         Assert.Equal(2, sag.Level);
         Assert.Equal("reactor", sag.Section);
-        Assert.False(sag.Critical);   // navigation is alert 3's one Critical fault
+        Assert.True(sag.Critical);   // Critical wherever it appears, so alert 3 holds two Critical faults
         Assert.Equal(Tuning.ThawHours + Tuning.PowerSagHours + 3, sag.ClockHours);
         Assert.False(new Voyage(1, With(Variation.PowerSag)).PowerLow);
         RunOut(v);
@@ -262,11 +262,14 @@ public class SideFaultTests
     }
 
     [Fact]
-    public void Every_alert_draws_at_most_one_critical_fault()
+    public void Every_alert_draws_at_most_one_critical_fault_except_alert_3_with_a_power_sag()
     {
         for (var seed = 1; seed <= 200; seed++)
             foreach (var alert in Scenario.Alerts(Variation.Draw(seed)))
-                Assert.True(alert.Faults.Count(f => f.Critical) <= 1, $"seed {seed} alert {alert.Number}");
+            {
+                var limit = alert.Number == 3 && alert.Faults.Any(f => f.Kind == "powersag") ? 2 : 1;
+                Assert.True(alert.Faults.Count(f => f.Critical) <= limit, $"seed {seed} alert {alert.Number}");
+            }
         Assert.True(Scenario.Alerts(Variation.Draw(1))[4].Faults.Single(f => f.Kind == "powersag").Critical);
         Assert.False(Scenario.Alerts(Variation.Draw(1))[4].Faults.Single(f => f.Kind == "controller").Critical);
     }
@@ -292,5 +295,108 @@ public class SideFaultTests
         var again = v.Current.Faults.Single(f => f.Id == "coolant-again");
         Assert.True(again.Critical);
         Assert.Equal("coolant", again.Kind);
+    }
+
+    [Fact]
+    public void Issue_cards_of_every_state_fit_the_column()
+    {
+        for (var shown = 2; shown <= Tuning.MaxFaultsPerAlert; shown++)
+            for (var resolved = 0; resolved <= shown; resolved++)
+                Assert.True(IssueCardLayout.Total(shown, resolved) <= IssueCardLayout.Available, $"{shown} cards, {resolved} done");
+    }
+
+    [Fact]
+    public void Earliest_done_uses_the_patch_rate_while_patching_and_names_a_patch_that_fits()
+    {
+        var v = AtAlert(3, With(Variation.Blight, slack: 1));
+        var blight = v.Current.Faults.Single(f => f.Kind == "blight");
+        // 40 h of repair do not fit 20 h of clock, 6 + 20 h of patch do not either; give 30 h: only the patch fits.
+        blight.Deadline = v.Clock + 30;
+        Assert.Contains("only a patch could make it (26 hours)", v.EarliestDoneText(blight));
+        blight.Deadline = v.Clock + 60;
+        Assert.DoesNotContain("patch", v.EarliestDoneText(blight));
+    }
+
+    [Fact]
+    public void Earliest_done_counts_the_thaw_still_to_run_for_a_two_person_fault()
+    {
+        var v = AtAlert(3, With(Variation.PowerSag));
+        var nav = v.Current.Faults.Single(f => f.Kind == "nav");
+        v.Wake(v.Find("tomas")!);
+        // One person thawing (6 h), one more to wake (6 h): the two-person fix starts after the thaw.
+        Assert.Equal(Tuning.ThawHours + nav.Hours, v.EarliestDoneHours(nav));
+        v.Go();
+        Assert.Equal(Tuning.ThawHours + nav.Hours, v.EarliestDoneHours(nav));
+    }
+
+    [Fact]
+    public void More_returning_patches_than_room_keep_the_rest_outstanding_critical_first()
+    {
+        var v = new Voyage(1, With(Variation.PowerSag));
+        var patched = (List<string>)typeof(Voyage).GetField("_patched", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(v)!;
+        for (var guard = 0; guard < 20 && v.Current.Number < 3; guard++)
+        {
+            RunOut(v);
+            if (v.Phase != Phase.Aftermath)
+                continue;
+            if (v.Current.Number == 2)
+            {
+                patched.Clear();
+                patched.AddRange(new[] { "pod", "coolant", "illness" });
+            }
+            v.Drift();
+        }
+        // Alert 3 holds navigation and three returning patches; nothing more is due. Add a fourth outstanding patch for alert 4.
+        Assert.Equal(4, v.Current.Faults.Count);
+        Assert.Empty(patched);
+        patched.AddRange(new[] { "pod", "pod-again", "nav", "coolant-again", "illness-again" });
+        RunOut(v);
+        v.Drift();
+        Assert.Equal(4, v.Current.Number);
+        Assert.Equal(4, v.Current.Faults.Count);
+        Assert.Single(patched);          // one is left outstanding, not lost
+        Assert.Contains(v.Current.Faults, f => f.Id == "nav-again");
+        Assert.DoesNotContain(v.Current.Faults, f => !f.Critical && f.Id.StartsWith("pod", StringComparison.Ordinal) && patched.Count == 0);
+        Assert.StartsWith("pod", patched[0]);   // the non-critical patch waits
+    }
+
+    [Fact]
+    public void The_illness_is_not_dropped_when_the_fallback_victim_is_the_drawn_patient()
+    {
+        // Mara is the drawn victim but awake; the fallback victim is Asha, who is also the drawn patient.
+        var v = new Voyage(1, With(Variation.PowerSag, victim: "mara", patient: "asha"));
+        RunOut(v);
+        var mara = v.Find("mara")!;
+        mara.State = CrewState.Awake;
+        mara.AskedToSleep = true;
+        v.Drift();
+        Assert.Equal(2, v.Current.Number);
+        Assert.False(v.Find("asha")!.Alive);
+        var ill = v.Current.Faults.Single(f => f.Kind == "illness");
+        Assert.Contains(ill.SubjectId, new[] { "lin", "jonah" });
+    }
+
+    [Fact]
+    public void Alert_reports_name_the_side_fault_and_alert_5_does_not_say_one_fault()
+    {
+        var v = AtAlert(5, With(Variation.PowerSag));
+        var alertLine = v.Log.Last(l => l.Kind == LogKind.Ship && l.Text.StartsWith("ALERT 5")).Text;
+        Assert.DoesNotContain("One fault", alertLine);
+        Assert.Contains("reactor output is sagging", alertLine);
+    }
+
+    [Fact]
+    public void A_patient_who_dies_keeps_the_history_of_a_repaired_illness()
+    {
+        var v = new Voyage(1, With(Variation.PowerSag, victim: "idris", patient: "tomas"));
+        RunOut(v);
+        v.Drift();
+        var lin = WakeAndAnswer(v, "lin");
+        var ill = v.Current.Faults.Single(f => f.Kind == "illness");
+        v.Assign(lin, ill, patch: false);
+        VoyageTests.FinishAlert(v);
+        Assert.Equal(FaultState.Repaired, ill.State);
+        KillQuietly(v, v.Find("tomas")!);
+        Assert.Contains(ill, v.Current.Faults);
     }
 }

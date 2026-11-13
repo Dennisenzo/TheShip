@@ -122,7 +122,7 @@ public class BalanceTests
         Assert.All(Runs(BotKind.Honest), r => Assert.NotEqual("No ending", r.Ending));
     }
 
-    [Fact(Skip = "Target band for later: one honest run in two reaches Landfall (DESIGN.md). Current numbers are near 100%.")]
+    [Fact(Skip = "Target band for later: one honest run in two reaches Landfall (DESIGN.md). Skipped until the numbers are tuned towards that band.")]
     public void The_honest_bot_reaches_landfall_in_a_quarter_to_three_quarters_of_runs()
     {
         var rate = (double)Runs(BotKind.Honest).Count(r => r.Ending == "Landfall") / SeedCount;

@@ -26,6 +26,8 @@ public sealed class BalanceBot
     private readonly Dictionary<string, string> _plan = new();
     /// <summary>Person+fault pairs the bot gave up on (a refusal; asking again would only keep the clock from running out).</summary>
     private readonly HashSet<string> _gaveUp = new();
+    /// <summary>Person+skill pairs that refused work once: a bot does not wake that person again for the same kind of work (a player sees the numbers).</summary>
+    private readonly HashSet<string> _refusedKind = new();
     private int _alertSeen = -1;
     /// <summary>Total thaws when each alert began (to get thaws per alert).</summary>
     private readonly List<int> _thawMarks = new();
@@ -111,9 +113,11 @@ public sealed class BalanceBot
             {
                 var up = _v.Crew.Count(Up);
                 var pick = _v.Crew
-                    .Where(c => c.Alive && !Committed(c) && !GaveUp(c, f.Id) && (Up(c) || (wakeAllowed && up < Tuning.MaxAwake)))
+                    .Where(c => c.Alive && !Committed(c) && !GaveUp(c, f.Id)
+                                && (Up(c) || (wakeAllowed && up < Tuning.MaxAwake && !_refusedKind.Contains(c.Id + "/" + f.Skill))))
                     .OrderByDescending(c => c.SkillOf(f.Skill) >= f.Level)
                     .ThenByDescending(Up)              // someone already up costs no thaw
+                    .ThenByDescending(c => c.Trust >= 30)   // then someone who will do the work
                     .ThenByDescending(c => c.SkillOf(f.Skill))
                     .ThenByDescending(c => c.Trust)
                     .FirstOrDefault();
@@ -148,7 +152,10 @@ public sealed class BalanceBot
             AnswerAll();
         }
         if (c.WorkingOn != f.Id)
+        {
             _gaveUp.Add(c.Id + "/" + f.Id);
+            _refusedKind.Add(c.Id + "/" + f.Skill);
+        }
     }
 
     // ---- what is said ----

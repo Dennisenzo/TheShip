@@ -174,7 +174,7 @@ An alert is one event that breaks several things at once, and the player can rar
 
 ### The clock rule
 
-Every fault's clock is the thaw (6 hours) + the work + the run's slack for that alert (`Variation.SlackHours`, 1 to 6 hours; alert 1 keeps its loose clock). A plan that wakes every needed person at once and starts at once saves every fault; one worker cannot save them all. An event draws at most one Critical fault; a returning patch keeps its own Critical flag even beside it (it is the player's shortcut coming due, one severity higher). An alert holds at most four faults, returning patches included; returning patches fill first and the drawn side fault is dropped if the total would pass four. The issue card shows "earliest done if started now": the thaw if nobody who qualifies is awake, plus the work at the current rate, and says when that is too late for the clock.
+Every fault's clock is the thaw (6 hours) + the work + the run's slack for that alert (`Variation.SlackHours`, 1 to 6 hours; alert 1 keeps its loose clock). A plan that wakes every needed person at once and starts at once saves every fault; one worker cannot save them all. An event draws at most one Critical fault (the prototype's alert 3 is the exception: navigation drift and a power sag are both Critical); a returning patch keeps its own Critical flag even beside it (it is the player's shortcut coming due, one severity higher). An alert holds at most four faults, returning patches included; returning patches fill first and the drawn side fault is dropped if the total would pass four. If more patches are due than fit, the Critical ones return first, then the shortest clock; the rest stay outstanding and return in the next alert (or give way at the last drift). The issue card shows "earliest done if started now": the thaw if nobody who qualifies is awake, plus the work at the current rate, and says when that is too late for the clock.
 
 ### How an event plays
 
@@ -227,7 +227,7 @@ An event draws two to four faults from the tables below. A few rows, such as a s
 | Navigation drift | Navigation, two at the helm | Arrival slips by decades | The navigator sees the date and Earth's position |
 | Pod failure | Medicine, 2 hours | That sleeper dies | An unplanned waking of someone you didn't choose |
 | Fire | Any two people, minutes | Spreads section by section | You can seal a door. Who is behind it? |
-| Power sag | Nobody (prototype, until power routing: Engineering 2, 14 hours in the reactor, side fault of alert 5, where it is the Critical one, and sometimes of alert 3, where navigation is) | A system of your choice goes dark (prototype: power stays low, sleepers risk death each drift) | Solved with controls alone; someone later asks why |
+| Power sag | Nobody (prototype, until power routing: Engineering 2, 14 hours in the reactor, side fault of alert 5 and sometimes of alert 3; Critical wherever it appears, so the prototype's alert 3 can hold two Critical faults) | A system of your choice goes dark (prototype: power stays low, sleepers risk death each drift) | Solved with controls alone; someone later asks why |
 | Memory fault | Engineering 3 | You lose a block of your own records | The engineer who restores it reads your statement history |
 
 ### People

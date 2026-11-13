@@ -185,11 +185,14 @@ public sealed partial class Voyage
     {
         // Only alerts that have started: a later alert's patient is still to be chosen.
         foreach (var alert in Alerts.Take(AlertIndex + 1))
-            foreach (var f in alert.Faults.Where(f => f.Kind == "illness" && f.SubjectId == c.Id && f.State != FaultState.Lost).ToList())
+            foreach (var f in alert.Faults.Where(f => f.Kind == "illness" && f.SubjectId == c.Id).ToList())
             {
+                // History stays (repaired, patched, lost); only a patch that would return and work still open go.
+                _patched.Remove(f.Id);
+                if (f.Resolved)
+                    continue;
                 foreach (var w in Crew.Where(w => w.WorkingOn == f.Id))
                     w.WorkingOn = null;
-                _patched.Remove(f.Id);
                 alert.Faults.Remove(f);
             }
         if (Phase == Phase.Alert)
@@ -234,7 +237,7 @@ public sealed partial class Voyage
         if (Doable(f))
             return;
         var slack = Variation.SlackHours[alert.Number - 1];
-        var other = Scenario.SideFault(f.Kind == "blight" ? Variation.PowerSag : Variation.Blight, slack, f.Id, f.Critical);
+        var other = Scenario.SideFault(f.Kind == "blight" ? Variation.PowerSag : Variation.Blight, slack, f.Id);
         alert.Faults.Remove(f);
         if (Doable(other))
             alert.Faults.Add(other);
@@ -251,13 +254,18 @@ public sealed partial class Voyage
         // An earlier patch gives way inside a later event (DESIGN.md, "How alerts are scheduled").
         if (alert.Number >= 2 && _patched.Count > 0)
         {
-            foreach (var id in _patched)
+            // The alert holds four faults at most and the drawn side fault gives way to a returning patch; when more patches are due than
+            // there is room for, the Critical ones come first, then the shortest clock, and the rest stay outstanding for the next alert
+            // (or the last drift).
+            var room = Tuning.MaxFaultsPerAlert - alert.Faults.Count(f => !IsSide(f));
+            var due = _patched.Select(id => Alerts.SelectMany(a => a.Faults).First(f => f.Id == id))
+                .OrderByDescending(f => f.Critical).ThenBy(f => f.ClockHours).Take(Math.Max(0, room)).ToList();
+            foreach (var old in due)
             {
-                var old = Alerts.SelectMany(a => a.Faults).First(f => f.Id == id);
-                // A returning patch keeps its Critical flag, even beside a drawn Critical fault: it is the player's own shortcut coming due.
-                alert.Faults.Add(old.Again(id + "-again", old.Name, Variation.SlackHours[alert.Number - 1]));
+                // A returning patch keeps its Critical flag: it is the player's own shortcut coming due.
+                alert.Faults.Add(old.Again(old.Id + "-again", old.Name, Variation.SlackHours[alert.Number - 1]));
+                _patched.Remove(old.Id);
             }
-            _patched.Clear();
         }
 
         if (alert.Number is 3 or 5)
@@ -267,11 +275,16 @@ public sealed partial class Voyage
             alert.Faults.Remove(extra);
 
         var report = alert.Report;
+        if (alert.Faults.FirstOrDefault(IsSide) is { } sideFault)
+            report += sideFault.Kind == "blight" ? " The hydroponics crop is failing." : " The reactor output is sagging.";
         if (alert.Number == 2)
         {
             // Scripted: the death in sleep takes someone with a partner aboard if it can.
             var victim = Crew.FirstOrDefault(c => c.State == CrewState.Asleep && c.Id == Variation.Alert2Victim)
                          ?? Crew.Where(c => c.State == CrewState.Asleep).OrderBy(c => c.Id).FirstOrDefault();
+            // The illness fault's patient is chosen after the victim is gone; until then it names nobody, so the victim's death cannot drop it.
+            foreach (var ill in alert.Faults.Where(x => x.Kind == "illness"))
+                ill.SubjectId = null;
             if (victim != null)
             {
                 Kill(victim, "died in sleep when the pod failed");

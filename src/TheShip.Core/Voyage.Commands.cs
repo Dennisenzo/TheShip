@@ -73,43 +73,47 @@ public sealed partial class Voyage
     }
 
     /// <summary>
-    /// Hours until the fault is done if the work started now: the thaw first if nobody who qualifies is awake (or a person more must be woken),
-    /// then the remaining work at the rate the team would work (DESIGN.md, "Alerts": the clock rule). Ignores that someone may be busy elsewhere.
+    /// Hours until the fault is done if the work started now: the thaw of whoever is still thawing or must be woken to reach the people it needs
+    /// (the thaw of a qualified sleeper if nobody qualified is up), then the remaining work at the rate that team would work
+    /// (DESIGN.md, "Alerts": the clock rule). Ignores that someone may be busy elsewhere.
     /// </summary>
     public double EarliestDoneHours(Fault f, bool patch = false)
     {
-        var up = Crew.Where(c => c.State is CrewState.Awake or CrewState.Thawing).ToList();
-        var qualifiedUp = up.Where(c => c.SkillOf(f.Skill) >= f.Level).ToList();
-        double wait;
-        bool skilled;
-        if (qualifiedUp.Count > 0)
+        bool Qualified(CrewMember c) => c.SkillOf(f.Skill) >= f.Level;
+        double Thaw(CrewMember c) => c.State == CrewState.Thawing ? Math.Max(0, c.ThawDoneAt - Clock) : 0;
+        var team = Crew.Where(c => c.State is CrewState.Awake or CrewState.Thawing)
+            .OrderByDescending(Qualified).ThenBy(Thaw).Take(f.People).ToList();
+        var wait = team.Count == 0 ? 0 : team.Max(Thaw);
+        var skilled = team.Any(Qualified);
+        if (!skilled && Crew.Any(c => c.State == CrewState.Asleep && Qualified(c)))
         {
-            skilled = true;
-            wait = qualifiedUp.Any(c => c.State == CrewState.Awake) ? 0 : qualifiedUp.Min(c => Math.Max(0, c.ThawDoneAt - Clock));
-        }
-        else if (Crew.Any(c => c.State == CrewState.Asleep && c.SkillOf(f.Skill) >= f.Level))
-        {
+            // Someone qualified is woken to lead the team.
             skilled = true;
             wait = Tuning.ThawHours;
         }
-        else
-        {
-            skilled = false;
-            wait = up.Count > 0 && up.Any(c => c.State == CrewState.Awake) ? 0 : Tuning.ThawHours;
-        }
-        if (up.Count < f.People)
+        if (team.Count < f.People)
             wait = Math.Max(wait, Tuning.ThawHours);
         var rate = (skilled ? 1 : Tuning.UnskilledRate) * (patch ? Tuning.PatchRate : 1);
         var done = f.Patching == patch ? f.Progress : 0;
         return wait + Math.Max(0, f.Hours - done) / rate;
     }
 
-    /// <summary>The issue card's line: when the fault could be done, and whether the clock allows it.</summary>
+    /// <summary>
+    /// The issue card's line: when the fault could be done at the rate it is being worked at (a repair, or a patch while it is being patched),
+    /// and whether the clock allows it; a fault only a patch can still save says so.
+    /// </summary>
     public string EarliestDoneText(Fault f)
     {
-        var hours = EarliestDoneHours(f);
+        var patching = f.State == FaultState.InRepair && f.Patching;
+        var hours = EarliestDoneHours(f, patching);
+        var left = f.Deadline - Clock + 0.001;
         var text = "Earliest done if started now: " + Hours(Math.Ceiling(hours));
-        return hours > f.Deadline - Clock + 0.001 ? text + " - too late for the clock" : text;
+        if (hours <= left)
+            return text;
+        var patchHours = EarliestDoneHours(f, true);
+        return !patching && patchHours <= left
+            ? text + " - only a patch could make it (" + Hours(Math.Ceiling(patchHours)) + ")"
+            : text + " - too late for the clock";
     }
 
     private void GoAlert()
@@ -144,9 +148,10 @@ public sealed partial class Voyage
 
         Pass(Math.Max(0, next - Clock));
         FinishThaws();
-        foreach (var f in open.Where(f => f.State == FaultState.InRepair && Staffed(f) && f.Progress >= f.Hours - 0.001).ToList())
+        // A fault dropped meanwhile (a sick person died) is no longer on the alert.
+        foreach (var f in open.Where(f => Current.Faults.Contains(f) && f.State == FaultState.InRepair && Staffed(f) && f.Progress >= f.Hours - 0.001).ToList())
             CompleteRepair(f);
-        foreach (var f in open.Where(f => !f.Resolved && f.Deadline <= Clock + 0.001).ToList())
+        foreach (var f in open.Where(f => Current.Faults.Contains(f) && !f.Resolved && f.Deadline <= Clock + 0.001).ToList())
             Lose(f);
         CheckAlertOver();
     }
