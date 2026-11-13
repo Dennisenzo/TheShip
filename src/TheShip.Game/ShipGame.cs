@@ -53,6 +53,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     private SessionLog? _session;
     /// <summary>The person selected on the bridge: who you speak to alone, and who repair requests go to.</summary>
     private CrewMember? _target;
+    /// <summary>The selected person was up at the last update: when they are asleep now, they went back to sleep.</summary>
+    private bool _targetWasUp;
     private CrewMember? _dossier;
     private Screen _screen = Screen.Bridge;
     private bool _endingShown;
@@ -286,9 +288,10 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             }
         }
         _main.Drain();
-        // A person who died is no longer selected.
-        if (_target is { Alive: false })
+        // A person who died, or who went back to sleep, is no longer selected (a sleeper selected on purpose stays).
+        if (_target is { Alive: false } || _target is { State: CrewState.Asleep } && _targetWasUp)
             _target = null;
+        _targetWasUp = _target is { State: CrewState.Awake or CrewState.Thawing };
 
         if (_actions.Count > 0)
         {

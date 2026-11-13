@@ -638,10 +638,12 @@ public sealed partial class ShipGame
                 _p.Frame(card, Painter.Bright, 2);
                 _p.Fill(new Rectangle(card.X, card.Y, 4, card.Height), Painter.Accent);
             }
-            var ink = !c.Alive ? Painter.Dim : c.State == CrewState.Awake ? Painter.Bright : Painter.Ink;
+            // While the years roll the card keeps the state from before the drift, as the pod does (ShownState).
+            var shown = ShownState(c);
+            var ink = shown == CrewState.Dead ? Painter.Dim : shown == CrewState.Awake ? Painter.Bright : Painter.Ink;
             _p.Text(_p.Body, c.Name, x + 12, y + 8, ink);
             _p.Text(_p.Small, c.Role + ", " + N(ShownAge(c)), x + 20 + c.Name.Length * _p.BodyWidth, y + 10, Painter.Dim);
-            var state = c.State switch
+            var state = shown switch
             {
                 CrewState.Asleep => "asleep, " + c.Thaws + (c.Thaws == 1 ? " thaw" : " thaws"),
                 CrewState.Thawing => "thawing, " + Voyage.Hours(ShownThawLeft(v, c)),
@@ -649,7 +651,7 @@ public sealed partial class ShipGame
                 _ => "dead",
             };
             _p.Text(_p.Small, state, x + 12, y + 36, ink);
-            if (c.Alive)
+            if (shown != CrewState.Dead)
             {
                 // A change flashes and shows its size, but not before the line that explains it is in the log.
                 var hold = _transition is not null || LinePending(v, c);
