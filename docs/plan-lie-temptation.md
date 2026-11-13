@@ -25,7 +25,9 @@ Each step is one commit. Numbers go in `Tuning.cs`.
 2. **Relief (Core, the one rule change).** The good answer to a question a person asked, or that matters to them, lifts morale by `Tuning.ReliefMorale` (6)
    when it is news and they believe it. A true good answer earns it; a lie borrows it, and pays the hard truth's morale back on discovery (already built).
 3. **Honesty credited at the drift (Core).** The drift report is followed by one line per person whose pending hard-truth trust arrived,
-   naming what they were told.
+   naming what they were told. *Withdrawn after validation (user decision, 2026-11-13):* only a true statement earns that trust, so the line
+   told the player which statements were true. The trust still arrives at the drift, but no line names it; "the player never sees whether a
+   statement is true" wins.
 4. **Bridge (Game).** "Waiting on you" shows the stakes for the selected person (or the only person asking); the Repair button shows the
    repair odds for the selected person; the opening notes state the goal, the cost of a thaw, the spare parts and where the stakes and the record are.
 5. **Tests and documents.** `LieTemptationTests.cs`; DESIGN.md (Trust, Knowledge and statements, Prototype scope); CLAUDE.md Progress.

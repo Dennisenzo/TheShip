@@ -5,7 +5,7 @@ namespace TheShip.Tests;
 
 /// <summary>
 /// The stakes of an answer are known before it is given, a believed good answer is a relief (true or not), and a hard truth
-/// is credited by name when its trust arrives (docs/plan-lie-temptation.md).
+/// is credited at the next drift with no line that names it (docs/plan-lie-temptation.md).
 /// </summary>
 public class LieTemptationTests
 {
@@ -95,7 +95,6 @@ public class LieTemptationTests
         Assert.Equal(StatementKind.False, v.Statements[^1].Kind);
         Assert.Equal(morale + Tuning.ReliefMorale, mara.Morale);
         Assert.Equal(0, mara.PendingTrust);
-        Assert.Empty(mara.PendingTruths);
     }
 
     [Fact]
@@ -136,22 +135,22 @@ public class LieTemptationTests
     }
 
     [Fact]
-    public void A_hard_truth_is_credited_by_name_after_the_drift_report()
+    public void A_hard_truth_is_credited_at_the_drift_without_a_line_that_names_it()
     {
         var v = new Voyage(1);
         var mara = VoyageTests.HonestFirstAlert(v);
-        Assert.Single(mara.PendingTruths);
+        Assert.Equal(Tuning.HardTruthTrust, mara.PendingTrust);
         VoyageTests.SleepWhenAllowed(v, mara);
         var trust = mara.Trust;
         var from = v.Log.Count;
         v.Drift();
         Assert.Equal(Math.Min(100, trust + Tuning.HardTruthTrust), mara.Trust);
-        Assert.Empty(mara.PendingTruths);
-        var report = v.Log.FindIndex(from, l => l.Text.StartsWith("DRIFT:"));
-        var credit = v.Log.FindIndex(from, l => l.Kind == LogKind.Ship && l.Text.StartsWith("Mara thinks better of you"));
-        Assert.True(report >= 0 && credit > report);
-        Assert.Contains("radiation dose", v.Log[credit].Text);
-        Assert.Contains("trust +8", v.Log[credit].Text);
+        Assert.Equal(0, mara.PendingTrust);
+        // What the player sees never says whether a statement was true: no line names the credit, the truth or the trust.
+        var after = v.Log.Skip(from).ToList();
+        Assert.Contains(after, l => l.Text.StartsWith("DRIFT:"));
+        Assert.DoesNotContain(after, l => l.Text.Contains("thinks better") || l.Text.Contains("hard truth")
+                                          || l.Text.Contains("radiation dose") || l.Text.Contains("trust +"));
     }
 
     [Fact]
