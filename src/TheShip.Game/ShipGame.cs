@@ -167,6 +167,12 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         if (_session.FilePath is { } file)
             Note("This run is recorded in " + file + ".");
         _session.Snapshot(_voyage);
+        Note("Landfall needs " + Tuning.LandfallAlive + " of the " + _voyage.Crew.Count + " alive on arrival in year " + Scenario.ArrivalYear + ", "
+             + Tuning.LandfallWorkingAge + " of them under " + Tuning.WorkingAge.ToString("0") + ". Every thaw ages a person " + Tuning.ThawAgeMin + " to "
+             + Tuning.ThawAgeMax + " years and keeps them awake for at least three months.");
+        Note("You have " + Tuning.StartParts + " spare parts. A repair uses one and can fail (the Repair button shows the odds for the selected person); "
+             + "a patch uses none and gives way later.");
+        Note("What you say is recorded. Select a person to see what answering them costs; RECORD AND LOGS shows how each statement can be found out.");
         Note("Wake someone from the crew list, then advance the clock. Type to speak to whoever is awake; select a person to speak to them alone.");
     }
 

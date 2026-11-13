@@ -111,7 +111,7 @@ public sealed partial class ShipGame
                 var who = _target is { State: CrewState.Awake } ? _target : null;
                 var half = (inner - 8) / 2;
                 var fault = f;
-                if (_p.Button(new Rectangle(ix, y, half, 40), who is null ? "SELECT SOMEONE" : "REPAIR: " + who.Name.ToUpperInvariant(), who != null) && who != null)
+                if (_p.Button(new Rectangle(ix, y, half, 40), who is null ? "SELECT SOMEONE" : RepairLabel(v, who, fault), who != null) && who != null)
                     Act("repair " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: false));
                 if (_p.Button(new Rectangle(ix + half + 8, y, half, 40), "PATCH", who != null) && who != null)
                     Act("patch " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: true));
@@ -219,7 +219,7 @@ public sealed partial class ShipGame
         var half = (inner - 8) / 2;
         var fault = f;
         var buttons = cardTop + height - 8 - 34;
-        if (_p.Button(new Rectangle(ix, buttons, half, 34), who is null ? "SELECT SOMEONE" : "REPAIR: " + who.Name.ToUpperInvariant(), who != null) && who != null)
+        if (_p.Button(new Rectangle(ix, buttons, half, 34), who is null ? "SELECT SOMEONE" : RepairLabel(v, who, fault), who != null) && who != null)
             Act("repair " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: false));
         if (_p.Button(new Rectangle(ix + half + 8, buttons, half, 34), "PATCH", who != null) && who != null)
             Act("patch " + fault.Name + " by " + who.Name, () => v.Assign(who, fault, patch: true));
@@ -458,6 +458,10 @@ public sealed partial class ShipGame
         DrawHoldNote(new Rectangle(rect.X, inputTop, rect.Width, rect.Bottom - inputTop));
     }
 
+    /// <summary>"REPAIR: MARA 97%": the chance the repair holds if this person takes it on now (a patch always holds, and comes back).</summary>
+    private static string RepairLabel(Voyage v, CrewMember who, Fault f) =>
+        "REPAIR: " + who.Name.ToUpperInvariant() + " " + N(Math.Round(v.RepairChanceWith(who, f) * 100)) + "%";
+
     // ---- The crew ----
 
     private void DrawCrew(Voyage v, int x, int top, int width, int bottom)
@@ -518,9 +522,13 @@ public sealed partial class ShipGame
             return;
         _p.Box(waiting, Painter.Edge);
         _p.Text(_p.Small, "WAITING ON YOU", x + 12, waiting.Y + 10, Painter.Dim);
+        // With several people asking, the stakes of an answer are shown for the selected one.
+        var asking = v.Awake.Where(a => v.StakesOf(a) != null).ToList();
+        if (asking.Count > 1 && (_target is null || !asking.Contains(_target)))
+            _p.TextRight(_p.Small, "select a person for stakes", x + width - 12, waiting.Y + 10, Painter.Dim);
         var wy = waiting.Y + 36;
         var limit = waiting.Bottom - 22;
-        foreach (var item in Waiting(v))
+        foreach (var item in Waiting(v, _target))
         {
             if (wy + _p.Lines(item, width - 24) * 19 > limit)
                 break;
@@ -529,12 +537,17 @@ public sealed partial class ShipGame
     }
 
     /// <summary>Questions nobody has answered, things people asked for, doubts, and promises still open.</summary>
-    private static IEnumerable<string> Waiting(Voyage v)
+    /// <remarks>
+    /// The selected person comes first. Their open question (or the only open question) is shown with its stakes: what the true
+    /// answer costs and earns, what a reassuring one buys, and where the answer can be checked (<see cref="Voyage.StakesText"/>).
+    /// </remarks>
+    private static IEnumerable<string> Waiting(Voyage v, CrewMember? selected)
     {
-        foreach (var c in v.Awake)
+        var asking = v.Awake.Count(a => v.StakesOf(a) != null);
+        foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {
             if (c.PendingQuestion != null && v.HasFact(c.PendingQuestion))
-                yield return c.Name + " asked: " + v.GetFact(c.PendingQuestion).Question;
+                yield return c == selected || asking == 1 ? v.StakesText(c) : c.Name + " asked: " + v.GetFact(c.PendingQuestion).Question;
             if (c.RequestMade && !c.RequestGranted)
                 yield return c.Name + " asked you " + (c.Want == Want.WakePartner ? "to wake their partner." : "to open the logs.");
             foreach (var doubt in c.Doubts)
