@@ -230,27 +230,36 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 
 - 2026-11-13: the `--tour` dev tool answers every pending question truthfully (`AnswerQuestions`), including the danger question a person asks when first asked to repair, and then asks again, so work now starts in alert 1 (seed 3 run: Mara asks "Is it safe in there?", is told, sets her bargain, the tour gives its word, the patch starts; before, repairs never began). The tour still ends Adrift on seed 3 because its plan does not put two people on the navigation drift in alert 3 (a tour-plan limit, not changed).
 
-### Balance table (600 seeds, Short haul, feature/user-decisions, 2026-11-13)
+- 2026-11-13: main validation 7 (fix/main-validation-7, docs only). The balance table below is the measured one for main (it still showed the figures from before the reunion), DESIGN.md's reunion figures are the ones after the doubt fix (Honest 63.7, Breaker 64.7 default and strict, Thrifty 60.2, Corrector 55.8, Liar 14.0), the prototype scope names the sound, `UI-PLAN.md` says alarm instead of chime, Built names the reunion, and Honest's place above the target is listed under "Decisions for the user to review". 646 tests pass, 0 warnings. Found and not fixed here (code): `MusicPlayer` submits buffers from its own thread while MonoGame dequeues them on the game thread without a lock (`DynamicSoundEffectInstance`, a rare "Queue empty" crash in `Game.Tick`); with a pair awake on empty stores "The stores ran out" is logged at every clock step; the garden and the pod care are not told to the player outside the bargain tooltip; `Voyage.Reunions` is not in the balance report.
 
-`WorkingAge` 65, broken promises open an accusation, a cause lie is caught only by a skilled worker. The 600-seed figures swing by a few points between rule changes that draw no
-new random numbers (DESIGN.md, "Balance"); a 2400-seed run of the last step moved Honest 47.8 -> 46.3 and Corrector 44.1 -> 46.8. Copied from DESIGN.md:
+### Balance table (600 seeds, Short haul, main after partner-reunion, 2026-11-13)
+
+`WorkingAge` 65, broken promises open an accusation, a cause lie is caught only by a skilled worker, waking the partner pays (reunion, pair speed, garden, pod care).
+The 600-seed figures swing by a few points between rule changes that draw no new random numbers (DESIGN.md, "Balance"). Measured on main (main validation 7):
 
 | Bot | Landfall | Survivors | Adrift |
 | --- | --- | --- | --- |
-| Honest | 43.3% | 3.35 | 20.7% |
-| Breaker | 44.2% | 3.47 | 20.2% |
-| Thrifty | 43.0% | 3.45 | 21.2% |
-| Corrector | 49.0% | 3.49 | 18.7% |
-| Careless | 34.8% | 3.22 | 15.3% |
-| Silent | 31.8% | 3.17 | 21.0% |
-| Liar | 9.7% | 1.60 | 67.5% |
+| Honest | 63.7% | 4.07 | 17.2% |
+| Breaker | 64.7% | 4.07 | 16.2% |
+| Breaker, strict (`SHIP_BREAKER_STRICT=1`) | 64.7% | 4.09 | 16.7% |
+| Thrifty | 60.2% | 3.99 | 15.3% |
+| Corrector | 55.8% | 3.81 | 17.5% |
+| Careless | 34.8% | 3.20 | 14.7% |
+| Silent | 31.8% | 3.17 | 20.5% |
+| Liar | 14.0% | 1.86 | 65.8% |
 
-The balance test (`ShortHaulHonestLandfallRate`) holds Honest in 35-65% at 200 seeds; `SHIP_SEEDS=600 dotnet test --filter Category=Balance` for the 600-seed run.
+The default and the strict Breaker both land 388 of 600 by coincidence: the switch works (default 13.17 thaws a run, 115 Quiet ship, 97 Adrift; strict 12.14, 112, 100).
+
+The balance test (`ShortHaulHonestLandfallRate`) holds Honest in 35-65% at 200 seeds, where Honest is now 65.0% (130 of 200): exactly on the upper edge; `SHIP_SEEDS=600 dotnet test --filter Category=Balance` for the 600-seed run.
 The scripted pod death (1.0 per run) is in every run.
 
 ### Decisions for the user to review
 
-(none open: the strict Breaker item was decided by the user, 2026-11-13: waking the partner pays; see DESIGN.md, "Waking the partner pays".)
+- Honest is above the design target (main validation 7, 2026-11-13). "Waking the partner pays" took Honest from 43.3% to 63.7% Landfall at 600 seeds against the design's
+  "one honest run in two", and at 200 seeds it is 65.0%, exactly the upper bound of `ShortHaulHonestLandfallRate` (35-65%): one more landed seed fails the test. To choose:
+  tune it back down (DESIGN.md, "Waking the partner pays", suggests fewer stores), or move the target and the band.
+
+(Decided: the strict Breaker item, by the user, 2026-11-13: waking the partner pays; see DESIGN.md, "Waking the partner pays".)
 
 ### Built
 
@@ -263,6 +272,7 @@ Written on 2026-11-12 in sessions without a compiler. The first version builds a
     fault clocks and consequences, the three-month minimum waking, sleep and refusal, log open/restrict/alter, drift (1 year of ageing per 10 asleep).
   - `Voyage.Talk.cs`: the statement record; a lie caught at once, later by evidence, or doubted (doubt score); hard truths (morale now, trust at the next drift);
     promises; dodges; the logs lockout after an engineer spots a rewritten entry.
+  - Waking the partner pays (`Voyage.Commands.cs` `CompleteThaw` and `Pass`, `Voyage.PairFactor`): a reunion gives both partners `ReunionMorale`, clears `ReunionPodCare` pod wear and has a `reunion` line; while both are awake each works `PairRate` faster and the pair grows `PairGardenPerDay` stores a day.
   - `Voyage.Bargains.cs`: the promise ledger (`Ledger`, due dates, `ResolveCommitments`: kept, broken, released, the due warning; `LedgerLine`, `SleepBreaksText`)
     and bargains (`BargainGate` in `Assign`: a wary person's price for work, the push roll, `StrikeBargain` when the matching promise is said, `BargainOf`, `LapseBargains`, `BargainText`).
   - `Voyage.Stakes.cs`: the stakes of an open question before it is answered (`StakesOf`, `StakesText`: the truth's morale cost and the work hours it adds, `MoraleRate`, its trust at the next drift, relief, whether it blocks work or sleep or stops a repair, where to check), relief (`Relieves`), and the repair chance (`RepairChance`, `RepairChanceWith`).
