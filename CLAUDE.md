@@ -219,6 +219,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-13: the user's decisions, step 5 (feature/user-decisions): a cause lie is caught at completion only by a worker with the fault's skill at `Tuning.CauseSeenSkill` (2) or more (`Voyage.Commands.cs`, the completion `Learn`); no chance roll, no new rng draws; a less skilled worker keeps what the ship told them. Terms/stakes texts never promised it. 600 seeds, Landfall before -> after: Honest 46.7 -> 43.3, Thrifty 42.8 -> 43.0, Careless 34.5 -> 34.8, Silent 30.8 -> 31.8, Liar 12.0 -> 9.7, Breaker 43.2 -> 44.2, Corrector 43.0 -> 49.0; at 2400 seeds (old rule vs new) Honest 47.8 -> 46.3, Liar 11.3 -> 11.1, Corrector 44.1 -> 46.8: small, and the Liar is not helped because the bots send the best-qualified person. The Corrector guard allows 10 points at 200 seeds (6 at 600+). Tests: `CauseSeenTests`.
 - 2026-11-13: the user's decisions, steps 6 and 7 (docs only, feature/user-decisions): the Record screen and dossier keep their TRUE / LIE tags; DESIGN.md ("Trust") now states the rule's scope (the log, crew-facing lines and the Waiting/terms/stakes texts; the Record and the dossier are the ship's own record). UI-PLAN.md decisions 1 (repair picker), 2 (trust deltas after the explaining line) and 4 (the briefing never mentions lying) are marked confirmed. "Decisions for the user to review" now holds one item: a promise never kept at all wins (strict Breaker 63.8%).
 
+- 2026-11-13: waking the partner pays (feature/partner-reunion, the user's decision). A reunion (the thaw that completes it finds the partner awake) gives both `Tuning.ReunionMorale` 8 once and clears `ReunionPodCare` 2 pod wear; while partners are both awake each works `PairRate` 1.10 faster (`Voyage.PairFactor`, in `TeamFactor` and the stakes hours) and the pair grows `PairGardenPerDay` 1.2 person-days of stores a day (`Pass`). Crew line `reunion` (Lines, `Prompts.Feeling`), `Voyage.Reunions`, and the bargain text says "Waking Idris lifts them both". The strict Breaker's edge was starvation (a second person awake for three months), not the thaw alone. 600 seeds, Landfall before -> after: Honest 43.3 -> 64.0, Breaker (default) 44.2 -> 64.5, strict Breaker 63.8 -> 64.8, Thrifty 43.0 -> 60.0, Corrector 49.0 -> 56.2, Careless 34.8 and Silent 31.8 unchanged, Liar 9.7 -> 14.8; thaws per run unchanged (Honest 13.18). Full sweep in DESIGN.md ("Waking the partner pays"). Honest is now above the design's one run in two. Tests: `ReunionTests`.
+
 ### Balance table (600 seeds, Short haul, feature/user-decisions, 2026-11-13)
 
 `WorkingAge` 65, broken promises open an accusation, a cause lie is caught only by a skilled worker. The 600-seed figures swing by a few points between rule changes that draw no
@@ -239,10 +241,7 @@ The scripted pod death (1.0 per run) is in every run.
 
 ### Decisions for the user to review
 
-- A promise that is never kept at all wins (broken promises, 2026-11-13). The accusation the user chose is built, and the Breaker that grants requests (so it keeps the promise
-  late when the person asks) lands 43.2% against Honest 46.7%. But a strict Breaker, which also refuses the request that is the promise, lands 63.8% (survivors 4.10 against
-  3.49): not waking the partner saves a thaw, and thaws are what age and wear the crew. An accusation costs a person -4 trust and an audit, far less. Needs a cost that bites
-  (DESIGN.md, "Broken promises open an accusation, and the Breaker"). To choose.
+(none open: the strict Breaker item was decided by the user, 2026-11-13: waking the partner pays; see DESIGN.md, "Waking the partner pays".)
 
 ### Built
 

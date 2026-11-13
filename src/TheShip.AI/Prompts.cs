@@ -199,6 +199,7 @@ public static class Prompts
         "accusation_closed" or "caught" or "left_behind" or "takeover_warning" or "refuse_trust" or "altered" or "gap" or "locked" or "promise_broken" or "dodge" => "angry, hurt or suspicious",
         "corrected" => "guarded, relieved to be told, still stung that it was said wrong first",
         "accusation_admitted" => "guarded, grudgingly glad of the truth, not forgiving",
+        "reunion" => "warm, relieved and steadier, glad to have your partner beside you",
         "bay_returned" => "guarded, but willing to trust the ship again",
         "hard_truth" or "found" or "noticed_dose" => "shaken",
         "witnessed" => "shaken, having just watched someone die",

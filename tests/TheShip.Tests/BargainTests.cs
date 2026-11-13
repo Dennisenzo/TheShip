@@ -326,6 +326,7 @@ public class BargainTests
         var text = v.BargainText(mara)!;
         Assert.Contains("Mara will start the coolant leak if you promise to wake Idris within 40 days", text);
         Assert.Contains("Kept +10 trust, broken -15", text);
+        Assert.Contains("Waking Idris lifts them both", text);
         Assert.Contains("%", text);
         foreach (var word in new[] { "true", "false", "lie", "lying" })
             Assert.DoesNotContain(word, text, StringComparison.OrdinalIgnoreCase);

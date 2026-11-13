@@ -73,6 +73,10 @@ public sealed partial class Voyage
     private double TeamFactor(Fault f, IEnumerable<CrewMember> team)
     {
         var list = team.ToList();
-        return list.Count == 0 ? 1 : list.Average(w => TermsOf(w, f).Speed);
+        return list.Count == 0 ? 1 : list.Average(w => TermsOf(w, f).Speed * PairFactor(w));
     }
+
+    /// <summary>Work speed from having the partner awake too (<see cref="Tuning.PairRate"/>), 1 otherwise.</summary>
+    internal double PairFactor(CrewMember w) =>
+        w.PartnerId is { } p && Crew.First(x => x.Id == p).State == CrewState.Awake && w.State == CrewState.Awake ? Tuning.PairRate : 1;
 }
