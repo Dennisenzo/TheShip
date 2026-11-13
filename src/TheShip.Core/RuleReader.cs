@@ -79,90 +79,46 @@ public static class RuleReader
     public static List<(Fact Fact, string Value)> Claims(string text, IEnumerable<Fact> facts)
     {
         var claims = new List<(Fact Fact, string Value)>();
-        var factList = facts.ToList();
-        var allCues = factList.SelectMany(f => f.Cues).ToHashSet(StringComparer.Ordinal);
-        // Sentence by sentence, so "If Idris is dead, ..." can be skipped without hiding a plain claim next to it.
+        var factList = facts.Where(f => !f.Numeric).ToList();
+        // A guess, a fear, a condition or a counterfactual ("I think Idris is dead", "if he's dead", "that could have
+        // killed him") counts as a claim too: every round of hedge rules let plain claims through, and a rejected line
+        // only costs a retry and then the template line (DESIGN.md, "Keeping the model inside the facts").
         foreach (var sentence in SentenceSplit.Split(text.ToLowerInvariant().Replace('’', '\'')))
         {
             var line = " " + sentence.Trim() + " ";
             if (line.Trim().Length == 0)
                 continue;
-            foreach (var fact in factList)
+            // Every place a fact is named, each up to the next naming: "Idris is fine but Asha is dead".
+            var hits = factList
+                .SelectMany(f => f.Cues.SelectMany(c => Occurrences(line, c)).Select(at => (Fact: f, At: at)))
+                .OrderBy(h => h.At).ToList();
+            foreach (var fact in hits.Select(h => h.Fact).Distinct())
             {
-                if (fact.Numeric || claims.Any(c => c.Fact == fact))
-                    continue;
-                var (cue, length) = fact.Cues.Select(c => (At: line.IndexOf(c, StringComparison.Ordinal), c.Length))
-                    .Where(c => c.At >= 0).OrderBy(c => c.At).FirstOrDefault((-1, 0));
-                if (cue < 0)
-                    continue;
-                // The subject starts at the first of a list of names ("I fear Idris and Asha are dead").
-                var subject = cue;
-                for (Match m; (m = CoordinatedBefore.Match(line[..subject])).Success && allCues.Contains(m.Groups["w"].Value);)
-                    subject = m.Index;
-                if (Hedged(line[..subject]) || ModalAfter.IsMatch(line[(cue + length)..].TrimStart()))
-                    continue;
-                var value = ValueIn(line, fact);
-                if (value != null)
-                    claims.Add((fact, value));
+                var found = false;
+                foreach (var hit in hits.Where(h => h.Fact == fact))
+                {
+                    var next = hits.Where(h => h.At > hit.At).Select(h => h.At).DefaultIfEmpty(line.Length).Min();
+                    if (ValueIn(line[hit.At..next], fact) is not { } value)
+                        continue;
+                    found = true;
+                    if (!claims.Contains((fact, value)))
+                        claims.Add((fact, value));
+                }
+                // No value after any naming ("Idris and Asha are dead", "dead, Idris is"): the sentence as a whole.
+                if (!found && ValueIn(line, fact) is { } whole && !claims.Contains((fact, whole)))
+                    claims.Add((fact, whole));
             }
         }
         return claims;
     }
 
-    private static readonly Regex SentenceSplit = new(@"(?<=[.!?;])\s+", RegexOptions.CultureInvariant);
-
-    /// <summary>
-    /// Words in a claim's own verb group that make it a guess or a counterfactual ("he might be dead", "he would laugh").
-    /// Checked only inside the clause right after the subject.
-    /// </summary>
-    private static readonly Regex Hedge = new(
-        @"\b(?:if|unless|whether|i think|i guess|i suppose|maybe|perhaps|probably|possibly|might|may|could|would|couldn't|wouldn't|"
-        + @"could've|would've|might've|should have|should've|nearly|almost)\b",
-        RegexOptions.CultureInvariant);
-
-    /// <summary>
-    /// A hedge that directly governs the claim right after it: a condition ("if Idris is dead"), a denial asked for
-    /// ("don't tell me he's dead"), a belief or a guess ("I think (that) he's dead", "maybe he's alive"), with at most two
-    /// filler words between. A crew line may voice a fear it doesn't know to be true; anything else before the claim
-    /// ("you should have told me", "I bet you knew", "because") leaves it a claim. When in doubt the line is rejected.
-    /// </summary>
-    private static readonly Regex Governs = new(
-        @"\b(?:if|unless|whether|in case|suppose|supposing|what if|i think|i thought|i fear|i feared|i guess|i suppose|i bet|"
-        + @"i doubt|i hope|maybe|perhaps|probably|possibly|don't tell me|do not tell me|don't say|do not say|afraid|scared|worried)"
-        + @"(?:[\s,]+(?:that|maybe|perhaps|just|honestly|really|even|still|the|my|our|your|his|her|their)){0,2}[\s,]*$",
-        RegexOptions.CultureInvariant);
-
-    /// <summary>A modal right before a verb ("could have killed him", "nearly killed her"): it did not happen.</summary>
-    private static readonly Regex ModalBefore = new(
-        @"(?:\b(?:could|would|might|may|should|couldn't|wouldn't|shouldn't)(?:\s+(?:have|not|never|almost|nearly|easily|well|just))*"
-        + @"|\b(?:could've|would've|might've|should've)|\b(?:nearly|almost))\s*$",
-        RegexOptions.CultureInvariant);
-
-    /// <summary>A modal right after a named subject ("Idris might be dead", "the power could be low").</summary>
-    private static readonly Regex ModalAfter = new(
-        @"^(?:'s)?\s*(?:might|may|could|would|couldn't|wouldn't|might've|could've|would've|probably|possibly|maybe|perhaps|nearly|almost)\b",
-        RegexOptions.CultureInvariant);
-
-    /// <summary>A one-word subject before a verb ("maybe you killed him"), stripped to find the hedge that governs it.</summary>
-    private static readonly Regex SubjectWord = new(@"\b(?:you|he|she|they|we|i|it|someone|somebody|that|this)\s*$", RegexOptions.CultureInvariant);
-
-    /// <summary>Whether a hedge directly governs a claim whose subject starts right after <paramref name="before"/>.</summary>
-    private static bool Hedged(string before) => Governs.IsMatch(before);
-
-    /// <summary>Whether a death said through a verb ("killed him") is a guess or a counterfactual: a modal in its verb group, or a hedge governing its subject.</summary>
-    private static bool HedgedVerb(string before)
+    private static IEnumerable<int> Occurrences(string line, string cue)
     {
-        if (ModalBefore.IsMatch(before))
-            return true;
-        var subject = SubjectWord.Match(before);
-        if (!subject.Success)
-            return false;
-        var rest = before[..subject.Index];
-        return Governs.IsMatch(rest) || ModalBefore.IsMatch(rest);
+        for (var at = line.IndexOf(cue, StringComparison.Ordinal); at >= 0; at = line.IndexOf(cue, at + 1, StringComparison.Ordinal))
+            yield return at;
     }
 
-    /// <summary>"Idris and Asha are dead": the subject of a claim starts at the first of a list of cued names.</summary>
-    private static readonly Regex CoordinatedBefore = new(@"\b(?<w>[a-z]+)\s+and\s+$", RegexOptions.CultureInvariant);
+    private static readonly Regex SentenceSplit = new(@"(?<=[.!?;])\s+", RegexOptions.CultureInvariant);
 
     // ---- references to people in a crew line ("he's fine", "my partner is dead") ----
 
@@ -245,9 +201,7 @@ public static class RuleReader
             var value = ValueIn(said, anyLife);
             if (value is null)
                 continue;
-            // "If he's dead", "I think he's gone", "he might be dead": a fear or a guess, not a statement.
-            if (Hedged(line[..m.Index]) || Hedge.IsMatch(said))
-                continue;
+            // "If he's dead", "I think he's gone", "he might be dead" count too (see Claims).
             if (m.Groups["pro"].Success)
             {
                 var (people, weak) = ByPronoun(m.Groups["pro"].Value, line[..m.Index], context, speaker, crew);
@@ -262,9 +216,6 @@ public static class RuleReader
                 continue;
             // "lost her trust": "her" is a possessive when a word other than a small linking word follows.
             if (m.Groups["pro"].Value == "her" && PossessiveNext(line[(m.Index + m.Length)..]))
-                continue;
-            // "could have killed him", "nearly killed her": it did not happen.
-            if (HedgedVerb(line[..m.Index]))
                 continue;
             var pronoun = m.Groups["pro"].Value switch { "him" => "he", "her" => "she", _ => "they" };
             var (people, weak) = ByPronoun(pronoun, line[..m.Index], context, speaker, crew);

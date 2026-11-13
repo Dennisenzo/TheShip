@@ -166,7 +166,7 @@ public static class Prompts
         sb.AppendLine();
         sb.AppendLine("Rules: you are speaking aloud to the ship's voice (say \"you\" to it), never to other crew, unless \"What happens now\" says otherwise. Say what \"What happens now\" describes, "
                       + "in your own voice, with some feeling or a small personal touch. Do not state anything about the ship, the date, Earth "
-                      + "or other crew that is not in the list above. One to three spoken sentences. Avoid stock filler such as \"let me check the diagnostics\". "
+                      + "or other crew that is not in the list above. Don't say or guess whether anyone is alive, dead, safe or hurt unless it is in your list; ask the ship instead. One to three spoken sentences. Avoid stock filler such as \"let me check the diagnostics\". "
                       + "No stage directions, no name before the line.");
         return sb.ToString().TrimEnd();
     }
