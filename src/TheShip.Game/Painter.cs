@@ -216,14 +216,59 @@ internal sealed class Painter
         }, color, thickness);
     }
 
-    /// <summary>A small solid triangle pointing up: an awake person.</summary>
+    private const int GlyphSize = 14;
+    private const int GlyphScale = 4;
+    private Texture2D? _person;
+
+    /// <summary>A small person: a round head over rounded shoulders, symmetric about the centre. An awake person.</summary>
     public void Marker(Vector2 centre, Color color)
     {
-        for (var row = 0; row < 12; row++)
+        _person ??= MakePersonGlyph();
+        var box = new Rectangle((int)MathF.Round(centre.X) - GlyphSize / 2, (int)MathF.Round(centre.Y) - GlyphSize / 2, GlyphSize, GlyphSize);
+        _batch.Draw(_person, box, color);
+    }
+
+    /// <summary>The glyph, drawn once at 4x with 4x4 sub-pixel coverage, as a premultiplied white mask; the batch tints it and scales it smoothly.</summary>
+    private Texture2D MakePersonGlyph()
+    {
+        const int size = GlyphSize * GlyphScale;
+        var data = PersonGlyphCoverage();
+        var texels = new Color[size * size];
+        for (var i = 0; i < texels.Length; i++)
         {
-            var half = row * 0.6f;
-            Fill(new Rectangle((int)(centre.X - half), (int)(centre.Y - 6 + row), (int)Math.Max(1, half * 2), 1), color);
+            var a = (byte)Math.Round(data[i] * 255f);
+            texels[i] = new Color(a, a, a, a);
         }
+        var texture = new Texture2D(_pixel.GraphicsDevice, size, size);
+        texture.SetData(texels);
+        return texture;
+    }
+
+    /// <summary>Coverage 0..1 of the glyph at GlyphScale x its size (also used by the tests/preview).</summary>
+    internal static float[] PersonGlyphCoverage()
+    {
+        const int size = GlyphSize * GlyphScale;
+        const int sub = 4;
+        var data = new float[size * size];
+        const float mid = GlyphSize / 2f;
+        for (var y = 0; y < size; y++)
+        for (var x = 0; x < size; x++)
+        {
+            var hit = 0;
+            for (var sy = 0; sy < sub; sy++)
+            for (var sx = 0; sx < sub; sx++)
+            {
+                var px = (x + (sx + 0.5f) / sub) / GlyphScale - mid;
+                var py = (y + (sy + 0.5f) / sub) / GlyphScale;
+                // Head: circle r 3.2 centred at y 3.4. Shoulders: upper half of an ellipse 12 wide, 6.2 tall, base at y 14.
+                var head = px * px + (py - 3.4f) * (py - 3.4f) <= 3.2f * 3.2f;
+                var ey = (py - 14f) / 6.2f;
+                var body = py <= 14f && (px / 6f) * (px / 6f) + ey * ey <= 1f;
+                if (head || body) hit++;
+            }
+            data[y * size + x] = hit / (float)(sub * sub);
+        }
+        return data;
     }
 
     public void Text(SpriteFontBase font, string text, float x, float y, Color color) =>
