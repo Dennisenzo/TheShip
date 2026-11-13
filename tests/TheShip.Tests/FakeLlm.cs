@@ -15,6 +15,10 @@ public sealed class FakeLlm : ILlmProvider
     /// <summary>What the yes/no judgement returns (the "judge" kind).</summary>
     public string Judge { get; set; } = "no";
 
+    /// <summary>The system prompt and turns of the last crew line call (the "reply" kind).</summary>
+    public string? LastReplySystem { get; private set; }
+    public IReadOnlyList<ChatTurn>? LastReplyTurns { get; private set; }
+
     public string Name => "fake (unit tests)";
     public string Backend => "none";
 
@@ -23,6 +27,11 @@ public sealed class FakeLlm : ILlmProvider
     public Task<string> ChatAsync(string system, IReadOnlyList<ChatTurn> turns, LlmOptions options,
         Action<string>? onToken = null, CancellationToken cancellationToken = default)
     {
+        if (options.Kind == "reply")
+        {
+            LastReplySystem = system;
+            LastReplyTurns = turns;
+        }
         var reply = options.Kind switch
         {
             "read" => Read,

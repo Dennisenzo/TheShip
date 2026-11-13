@@ -369,12 +369,16 @@ public sealed partial class Voyage
             if (_rng.NextDouble() > chance)
             {
                 f.Progress = f.Hours * 0.5;
-                if (Tuning.FailedRepairSpendsPart && Parts > 0)
+                var spent = Tuning.FailedRepairSpendsPart && Parts > 0;
+                if (spent)
                     Parts--;
                 SyncFacts();
                 if (Parts <= 0)
                     // The redo needs a part like a fresh repair; with none left the work stops and the fault can only be patched.
-                    StopRepairNoParts(f, lead, "The repair of the " + name + " failed and used up the last spare part. You stop work: it can only be patched now.");
+                    // When another repair already took the last part, this failure spent none.
+                    StopRepairNoParts(f, lead, "The repair of the " + name + (spent
+                        ? " failed and used up the last spare part."
+                        : " failed, and no spare parts are left for a second try.") + " You stop work: it can only be patched now.");
                 else
                     Speak(lead, "work_failed", "The repair of the " + name + " failed and you have to redo half of it.", "the " + name);
                 if (_rng.NextDouble() < Tuning.RepairInjuryChance)

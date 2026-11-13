@@ -6,22 +6,42 @@ public sealed partial class Voyage
     /// <summary>
     /// Step 4 and after: one line from the player, already sorted by the reading pass. The effects are the game's:
     /// the statement record, beliefs, trust and morale. There is no taking it back: the reading is settled before
-    /// this is called (DESIGN.md, "Reading").
+    /// this is called (DESIGN.md, "Reading"). False when the line was dropped: the voyage had ended or nobody who
+    /// heard it is awake.
     /// </summary>
-    public void Say(string text, Reading reading, IReadOnlyList<CrewMember> hearers)
+    public bool Say(string text, Reading reading, IReadOnlyList<CrewMember> hearers, LogEntry? entry = null)
     {
+        if (entry is not null)
+            entry.Unread = false;
         if (Phase == Phase.Ended)
-            return;
+            return false;
         var listeners = hearers.Where(h => h.State == CrewState.Awake).ToList();
         if (listeners.Count == 0)
         {
             Ship("Nobody is awake to hear you.");
-            return;
+            return false;
         }
-        Log.Add(new LogEntry(LogKind.You, "YOU", text));
+        if (entry is null)
+            Log.Add(new LogEntry(LogKind.You, "YOU", text) { Hearers = listeners.Select(l => l.Id).ToList() });
         Apply(text, reading, listeners);
         foreach (var l in listeners)
             Clamp(l);
+        return true;
+    }
+
+    /// <summary>
+    /// The player pressed Enter: the line is in the log at once, marked unread, and nobody reacts yet. Those of
+    /// <paramref name="hearers"/> who are awake now heard it (the entry carries them, so only their crew prompts see the line).
+    /// Pass the entry to <see cref="Say"/> when the model's reading arrives.
+    /// </summary>
+    public LogEntry BeginSay(string text, IReadOnlyList<CrewMember> hearers)
+    {
+        var entry = new LogEntry(LogKind.You, "YOU", text)
+        {
+            Unread = true, Hearers = hearers.Where(h => h.State == CrewState.Awake).Select(h => h.Id).ToList(),
+        };
+        Log.Add(entry);
+        return entry;
     }
 
     private Statement NewStatement(string text, StatementKind kind, List<string> hearers, string? promiseKey = null) => new()
@@ -55,7 +75,7 @@ public sealed partial class Voyage
                     FactKey = f.Key, Value = value, TruthThen = f.Truth, Hearers = ids,
                 };
                 Statements.Add(s);
-                Recorded("Recorded: you told " + names + " that " + f.Say(value) + ". (" + (truth ? "true" : "false") + ")");
+                Recorded("Recorded: you told " + names + " that " + f.Say(value) + ".", truth ? "true" : "false");
                 foreach (var l in listeners)
                     Hear(l, f, value, truth, s);
                 break;

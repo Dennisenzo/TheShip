@@ -19,6 +19,12 @@ public sealed record Belief(string Value, string Source, double Year)
     public bool Firsthand => Source is "evidence" or "witness";
 }
 
+/// <summary>
+/// Fixed character content for the crew-speech prompt (DESIGN.md, "Personal colour"): how a person talks, where they come
+/// from, a quirk or two and how they stand to the others. Words only; it never changes state.
+/// </summary>
+public sealed record CrewSheet(string Voice, string Background, string Details, IReadOnlyDictionary<string, string> Bonds);
+
 public sealed class CrewMember
 {
     public required string Id { get; init; }
@@ -28,6 +34,10 @@ public sealed class CrewMember
     public required Trait[] Traits { get; init; }
     public required Want Want { get; init; }
     public string? PartnerId { get; init; }
+    /// <summary>"he" or "she": who a crew line's pronoun can mean (<see cref="RuleReader.PersonClaims"/>). Null matches either.</summary>
+    public string? Pronoun { get; init; }
+    /// <summary>How this person talks and who they are; null for a crew member made without one (tests).</summary>
+    public CrewSheet? Sheet { get; init; }
 
     public double Age { get; set; }
     public double Health { get; set; } = 100;
@@ -214,6 +224,10 @@ public sealed class Fault
     public string Section { get; set; } = "";
     /// <summary>The fact about the harm the repair does to whoever does it.</summary>
     public string? DangerFact { get; init; }
+    /// <summary>Ignoring it ends or cripples the voyage (coolant: power and pods; navigation: the course); a pod or controller fault only wears the ship.</summary>
+    public bool Critical { get; init; }
+    /// <summary>The crew member the fault is about (the person in a failed pod, a sick patient), if any.</summary>
+    public string? SubjectId { get; set; }
 
     public FaultState State { get; set; } = FaultState.Open;
     public double Progress { get; set; }
@@ -235,14 +249,14 @@ public sealed class Fault
     public Fault Again(string id, string name) => new()
     {
         Id = id, Kind = Kind, Name = Prefix + Plain(name).ToLowerInvariant(), Skill = Skill, Level = Level, People = People, Hours = Hours,
-        ClockHours = ClockHours / 2, IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact, Section = Section
+        ClockHours = ClockHours / 2, IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact, Section = Section, Critical = Critical, SubjectId = SubjectId
     };
 }
 
 public sealed class Alert
 {
     public required int Number { get; init; }
-    public required int Year { get; init; }
+    public required int Year { get; set; }
     public required string Title { get; init; }
     public required string Report { get; init; }
     public List<Fault> Faults { get; init; } = new();
@@ -268,8 +282,14 @@ public sealed class LogEntry
     public string Text { get; set; }
     public string? CrewId { get; init; }
     public CrewIntent? Intent { get; init; }
+    /// <summary>For a line the player said: the ids of the crew who heard it (awake when it was said). Null for other lines.</summary>
+    public IReadOnlyList<string>? Hearers { get; init; }
     /// <summary>The model is still wording this line; show a placeholder until it is done.</summary>
     public bool Pending { get; set; }
+    /// <summary>A line you said that the model has not read yet: it is in the log, its effects come when the reading arrives.</summary>
+    public bool Unread { get; set; }
+    /// <summary>What the player is never shown (whether a recorded statement was true); the session log appends it.</summary>
+    public string? Secret { get; init; }
 }
 
 public enum Phase { Alert, Aftermath, Ended }

@@ -14,10 +14,6 @@ public sealed partial class ShipGame
     private void DrawBridge(Voyage v)
     {
         Header(v, "THE SHIP", back: false);
-        // While the list of readings is open, nothing under it takes a click.
-        var click = _p.Click;
-        if (_picker && _pendingText != null)
-            _p.Click = false;
         var right = Painter.ScreenWidth - 16;
         if (_p.Button(new Rectangle(right - 80, 8, 80, 40), "QUIT"))
             Do(Exit);
@@ -31,99 +27,6 @@ public sealed partial class ShipGame
         DrawPlan(v, new Rectangle(358, 72, 864, 432));
         DrawLog(v, new Rectangle(358, 516, 864, Painter.ScreenHeight - 16 - 516));
         DrawCrew(v, 1234, 72, 350, Painter.ScreenHeight - 16);
-
-        _p.Click = click;
-        if (_picker && _pendingText != null)
-            DrawPicker(v, new Rectangle(358, 72, 864, Painter.ScreenHeight - 16 - 72));
-    }
-
-    // ---- Choosing how the waiting line is recorded ----
-
-    /// <summary>
-    /// Every way the waiting line can be recorded: the kinds, the promises, and each ship fact with its values. It
-    /// lists what a line can claim, never what is true, and it closes before anyone has heard the line.
-    /// </summary>
-    private void DrawPicker(Voyage v, Rectangle rect)
-    {
-        _p.Fill(rect, Painter.Ground);
-        _p.Frame(rect, Painter.Accent);
-        _p.Text(_p.Small, "RECORD THE WAITING LINE AS ...", rect.X + 14, rect.Y + 12, Painter.Accent);
-        if (_p.Button(new Rectangle(rect.Right - 14 - 110, rect.Y + 6, 110, 30), "BACK (Esc)"))
-            Do(() => _picker = false);
-
-        void Pick(Reading reading) => Do(() =>
-        {
-            _session?.Line("reading", "changed by you to " + Describe(v, reading));
-            _pendingReading = reading;
-            _pendingFailed = false;
-            _picker = false;
-        });
-
-        var y = rect.Y + 46;
-        var x = rect.X + 14;
-        (string Label, Reading Reading)[] kinds =
-        {
-            ("PLAIN TALK", Reading.Plain), ("A DODGE", new Reading(LineKind.Dodge)), ("A QUESTION", new Reading(LineKind.Question)),
-            ("AN ORDER", new Reading(LineKind.Order)), ("A STATEMENT THAT FITS NO FACT", new Reading(LineKind.Statement)),
-        };
-        foreach (var (label, reading) in kinds)
-        {
-            var w = (int)(label.Length * _p.SmallWidth) + 24;
-            if (_p.Button(new Rectangle(x, y, w, 30), label))
-                Pick(reading);
-            x += w + 8;
-        }
-        y += 40;
-        x = rect.X + 14;
-        _p.Text(_p.Small, "A PROMISE", x, y + 7, Painter.Dim);
-        x += 100;
-        foreach (var key in Reading.PromiseKeys)
-        {
-            var label = Voyage.PromiseText(key);
-            var w = (int)(label.Length * _p.SmallWidth) + 24;
-            if (_p.Button(new Rectangle(x, y, w, 30), label))
-                Pick(new Reading(LineKind.Promise, PromiseKey: key));
-            x += w + 8;
-        }
-        y += 44;
-        _p.Text(_p.Small, "A STATEMENT ABOUT ...", rect.X + 14, y, Painter.Dim);
-        y += 24;
-
-        // A number comes from the line itself: the first number typed in it.
-        var digits = System.Text.RegularExpressions.Regex.Match(_pendingText ?? "", "[0-9]{1,4}");
-        foreach (var fact in v.FactList)
-        {
-            if (y + 30 > rect.Bottom - 6)
-                break;
-            _p.Text(_p.Small, fact.Label, rect.X + 14, y + 7, Painter.Ink);
-            var bx = rect.Right - 14;
-            if (fact.Numeric)
-            {
-                if (digits.Success)
-                {
-                    var label = "is " + digits.Value;
-                    var w = (int)(label.Length * _p.SmallWidth) + 24;
-                    if (_p.Button(new Rectangle(bx - w, y, w, 28), label))
-                        Pick(new Reading(LineKind.Statement, fact.Key, digits.Value));
-                }
-                else
-                {
-                    _p.TextRight(_p.Small, "type the number in your line", bx, y + 7, Painter.Dim);
-                }
-            }
-            else
-            {
-                foreach (var value in Enumerable.Reverse(fact.Values))
-                {
-                    var w = (int)(value.Length * _p.SmallWidth) + 24;
-                    bx -= w;
-                    if (_p.Button(new Rectangle(bx, y, w, 28), value))
-                        Pick(new Reading(LineKind.Statement, fact.Key, value));
-                    bx -= 8;
-                }
-            }
-            y += 32;
-        }
     }
 
     // ---- Issues at hand ----
@@ -380,9 +283,8 @@ public sealed partial class ShipGame
         _p.Fill(new Rectangle(rect.X + 1, rect.Y + 34, rect.Width - 2, 1), Painter.Edge);
 
         var inputTop = rect.Bottom - 44;
-        var previewHeight = _pendingText != null ? 92 : 0;
         var areaTop = rect.Y + 42;
-        var areaBottom = inputTop - previewHeight - 6;
+        var areaBottom = inputTop - 6;
         var columns = (int)((rect.Width - 28) / _p.SmallWidth);
         const int step = 20;
         var visible = Math.Max(1, (areaBottom - areaTop) / step);
@@ -401,7 +303,7 @@ public sealed partial class ShipGame
             {
                 LogKind.Ship => "SHIP - " + entry.Text,
                 LogKind.Crew => entry.Speaker + " - " + (entry.Pending ? "..." : entry.Text),
-                LogKind.You => "YOU - " + entry.Text,
+                LogKind.You => "YOU - " + entry.Text + (entry.Unread ? "  ..." : ""),
                 LogKind.Recorded => "    " + entry.Text,
                 _ => entry.Text,
             };
@@ -416,33 +318,6 @@ public sealed partial class ShipGame
             _p.Text(_p.Small, lines[i].Text, rect.X + 14, y, lines[i].Color);
         if (_scroll > 0)
             _p.TextRight(_p.Small, "scrolled back " + _scroll + " lines (PageDown)", rect.Right - 14, areaTop - 4, Painter.Dim);
-
-        if (_pendingText != null)
-        {
-            // The line is read before it is said. The reading is shown, never whether it is true; nobody has heard it yet.
-            var py = inputTop - previewHeight;
-            _p.Fill(new Rectangle(rect.X + 1, py, rect.Width - 2, 1), Painter.Accent);
-            var names = string.Join(" and ", _pendingHearers.Select(h => h.Name));
-            _p.Text(_p.Small, Painter.Wrap("NOT YET SAID, to " + names + ": \"" + _pendingText + "\"", columns)[0], rect.X + 14, py + 8, Painter.Bright);
-            if (_pendingReading is null)
-            {
-                _p.Text(_p.Small, "The model is reading it ...", rect.X + 14, py + 30, Painter.Dim);
-            }
-            else
-            {
-                var reading = (_pendingFailed ? "The model could not read it. " : "") + "It will be recorded as " + Describe(v, _pendingReading) + ".";
-                _p.Text(_p.Small, Painter.Wrap(reading, columns)[0], rect.X + 14, py + 30, Painter.Accent);
-            }
-            var bx = rect.X + 14;
-            var by = py + 54;
-            var ready = _pendingReading != null;
-            if (_p.Button(new Rectangle(bx, by, 150, 32), "SAY IT (Enter)", ready, primary: true))
-                Do(SayPending);
-            if (_p.Button(new Rectangle(bx + 158, by, 150, 32), "RECORD AS ...", ready))
-                Do(() => _picker = true);
-            if (_p.Button(new Rectangle(bx + 316, by, 150, 32), "DROP IT (Esc)"))
-                Do(CancelPending);
-        }
 
         _p.Fill(new Rectangle(rect.X + 1, inputTop, rect.Width - 2, 1), Painter.Edge);
         var room = Math.Max(10, (int)((rect.Width - 28) / _p.BodyWidth) - 10);

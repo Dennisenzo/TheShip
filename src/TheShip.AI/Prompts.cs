@@ -49,7 +49,13 @@ public static class Grammars
 /// <summary>Every prompt the game sends. The game's decision always comes in; the model only words it or sorts a line.</summary>
 public static class Prompts
 {
-    public const int ReplyMaxTokens = 90;
+    public const int ReplyMaxTokens = 140;
+
+    /// <summary>The longest crew line Acceptable lets through (three sentences, with room).</summary>
+    public const int CrewLineMaxChars = 480;
+
+    /// <summary>How many earlier log lines the crew-speech prompt carries, and the most of each it keeps.</summary>
+    public const int RecentLines = 5, RecentLineChars = 130;
 
     private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -79,7 +85,31 @@ public static class Prompts
 
     // ---- Writing: a crew member's line (DESIGN.md, "Writing") ----
 
-    /// <summary>Who the speaker is and what they know. Nothing else about the ship is in the prompt, so nothing else can leak.</summary>
+    /// <summary>The sentence every civil tone carries: at Follows and WantsReasons a person never insults the ship.</summary>
+    public const string CivilTone = "You never insult the ship or call it names.";
+
+    /// <summary>How a person in this trust band speaks to the ship.</summary>
+    public static string Attitude(TrustBand band) => band switch
+    {
+        TrustBand.Follows => "You trust the ship and do what it reasonably asks. You speak to it as to a trusted colleague: you may grumble about the work or the situation. " + CivilTone,
+        TrustBand.WantsReasons => "You want reasons from the ship before you act, and you check what you can. You are guarded but civil with it and push back when something does not add up. " + CivilTone,
+        TrustBand.Refuses => "You no longer take the ship's word and act on your own judgement. You are cold and short with it.",
+        _ => "You believe the ship is a danger to the crew. You are openly hostile to it.",
+    };
+
+    /// <summary>The tone toward the ship, repeated next to the feeling in the user turn.</summary>
+    private static string Tone(TrustBand band) => band switch
+    {
+        TrustBand.Follows => "civil, like a trusted colleague; grumbling is fine, insults are not",
+        TrustBand.WantsReasons => "guarded but civil; push back, no insults",
+        TrustBand.Refuses => "cold and short",
+        _ => "openly hostile",
+    };
+
+    /// <summary>
+    /// Who the speaker is, what they believe and how they feel about the ship. Facts come only from the speaker's own beliefs
+    /// (never the truth), so a line can't state what they don't know; the user turn adds only lines they said or heard.
+    /// </summary>
     public static string CrewSystem(CrewMember c, Voyage voyage)
     {
         var sb = new StringBuilder();
@@ -87,13 +117,15 @@ public static class Prompts
         sb.AppendLine();
         sb.AppendLine("You are " + c.Name + ", the " + c.Role + ", about " + c.Age.ToString("0", Inv) + " years old. Temperament: "
                       + string.Join(" and ", c.Traits.Select(t => t.ToString().ToLowerInvariant())) + ".");
-        sb.AppendLine(c.Band switch
+        if (c.Sheet is { } sheet)
         {
-            TrustBand.Follows => "You trust the ship and do what it reasonably asks.",
-            TrustBand.WantsReasons => "You want reasons from the ship before you act, and you check what you can.",
-            TrustBand.Refuses => "You no longer take the ship's word and act on your own judgement.",
-            _ => "You believe the ship is a danger to the crew.",
-        });
+            sb.AppendLine("How you talk: " + sheet.Voice);
+            sb.AppendLine("Your past: " + sheet.Background);
+            sb.AppendLine("About you: " + sheet.Details);
+            foreach (var (id, bond) in sheet.Bonds)
+                sb.AppendLine(Bond(c, voyage, id, bond));
+        }
+        sb.AppendLine(Attitude(c.Band));
         sb.AppendLine(c.Morale < 35 ? "You are worn down and close to despair." : c.Morale < 60 ? "You are tired and uneasy." : "You are holding up well.");
         sb.AppendLine("What you want most: " + (c.Want switch
         {
@@ -132,12 +164,80 @@ public static class Prompts
                 sb.AppendLine("- " + memory);
         }
         sb.AppendLine();
-        sb.AppendLine("Rules: say only what \"What happens now\" describes, in your own voice. Do not state anything about the ship, the date, Earth "
-                      + "or other crew that is not in the list above. One or two short spoken sentences. No stage directions, no name before the line.");
+        sb.AppendLine("Rules: you are speaking aloud to the ship's voice (say \"you\" to it), never to other crew, unless \"What happens now\" says otherwise. Say what \"What happens now\" describes, "
+                      + "in your own voice, with some feeling or a small personal touch. Do not state anything about the ship, the date, Earth "
+                      + "or other crew that is not in the list above. One to three spoken sentences. Avoid stock filler such as \"let me check the diagnostics\". "
+                      + "No stage directions, no name before the line.");
         return sb.ToString().TrimEnd();
     }
 
-    public static string CrewUser(CrewIntent intent) => "What happens now: " + intent.Decision + "\nSay it in your own words.";
+    /// <summary>
+    /// A bond as the speaker knows it: past tense once they believe that person is dead (from their own beliefs only, never
+    /// the truth, so a death they have not heard of stays hidden).
+    /// </summary>
+    private static string Bond(CrewMember c, Voyage voyage, string id, string bond)
+    {
+        if (!(c.Beliefs.TryGetValue("alive:" + id, out var b) && b.Value == "dead"))
+            return bond;
+        var name = voyage.Find(id)?.Name ?? id;
+        // The bond's first clause, put in the past: "Idris is your partner. You chose..." -> "Idris was your partner".
+        var first = bond.Split(new[] { ". ", "; ", ", ", " and " }, StringSplitOptions.None)[0].TrimEnd('.');
+        var past = first.StartsWith(name + " is ", StringComparison.Ordinal) ? first.Replace(" is ", " was ")
+            : name + " was one of the people closest to you";
+        return past + ". You know " + name + " is dead.";
+    }
+
+    /// <summary>The feeling a kind of decision carries, so a flat \"I agree\" still has colour. A trusting person is puzzled, not angry, at a dodge, a gap or a lock.</summary>
+    private static string Feeling(string kind, TrustBand band) => kind switch
+    {
+        "dodge" or "gap" or "locked" when band is TrustBand.Follows => "puzzled and a little uneasy",
+        "dodge" or "gap" or "locked" when band is TrustBand.WantsReasons => "uneasy, wanting a straight answer",
+        "comply" or "work_done" or "accept" or "confirmed" or "promise_kept" or "request_granted" => "steady, a little relief",
+        "work_patched" or "work_failed" or "work_no_parts" or "injured" or "refuse_danger" or "ask_danger" => "tense and wary",
+        "caught" or "refuse_trust" or "altered" or "gap" or "locked" or "promise_broken" or "dodge" => "angry, hurt or suspicious",
+        "hard_truth" or "found" or "noticed_dose" => "shaken",
+        "sleep_yes" or "sleep_no" or "sleep_no_pod" or "refuse_answer" => "weary, with the pod on your mind",
+        "wake_question" or "request_partner" or "request_logs" => "anxious to know",
+        _ => "",
+    };
+
+    /// <summary>The turn for a crew line: the last few lines of the log (this person's and the ship's) and what the game decided now.</summary>
+    /// <summary>
+    /// The last few lines this person saw, oldest first: their own lines and the ship's lines they heard (awake and spoken to);
+    /// lines said to others or while they slept are not theirs.
+    /// </summary>
+    public static List<LogEntry> Recent(CrewMember speaker, Voyage voyage, LogEntry? current = null) =>
+        voyage.Log.Where(e => e != current && !e.Pending
+                && ((e.Kind == LogKind.Crew && e.CrewId == speaker.Id) || (e.Kind == LogKind.You && e.Hearers?.Contains(speaker.Id) == true)))
+            .TakeLast(RecentLines).ToList();
+
+    public static string CrewUser(CrewIntent intent, CrewMember? speaker = null, Voyage? voyage = null, LogEntry? current = null)
+    {
+        var sb = new StringBuilder();
+        if (speaker != null && voyage != null)
+        {
+            var recent = Recent(speaker, voyage, current);
+            if (recent.Count > 0)
+            {
+                sb.AppendLine("Recent conversation:");
+                foreach (var e in recent)
+                {
+                    var text = e.Text.Length > RecentLineChars ? e.Text[..RecentLineChars] + "..." : e.Text;
+                    sb.AppendLine((e.Kind == LogKind.You ? "The ship: " : "You: ") + text);
+                }
+                sb.AppendLine();
+            }
+        }
+        sb.Append("What happens now: ").Append(intent.Decision);
+        var band = speaker?.Band ?? TrustBand.WantsReasons;
+        var feeling = Feeling(intent.Kind, band);
+        if (feeling.Length > 0)
+            sb.Append("\nYou feel: ").Append(feeling).Append('.');
+        if (speaker != null)
+            sb.Append("\nYour tone toward the ship: ").Append(Tone(band)).Append('.');
+        sb.Append("\nSay it in your own words.");
+        return sb.ToString();
+    }
 
     // ---- Reading: one player line sorted into six kinds (DESIGN.md, "Reading") ----
 

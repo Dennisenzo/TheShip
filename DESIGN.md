@@ -354,6 +354,8 @@ Modes, missions and modifiers are chosen by the player. The seed varies everythi
 | Rare events | One or two per run from a large pool: a stowaway, a derelict, a birth, a crew member's discovery | No single run shows everything |
 | Hidden causes | The same fault can come from wear, an old patch or a person | A familiar alert can't be read from its faults alone |
 
+The prototype draws a small part of this (`Variation.cs`, from a random generator of its own so a seed draws the same whatever the player does): who dies in alert 2 (Idris weighted 3, else Tomas, Asha or Jonah, never Mara or Lin), a bank neighbour of the victim as the alert-2 patient, a side fault for alerts 3 and 5 (alert 3: blight or power sag; alert 5: always power sag, also after a sag in alert 3), clock slack per alert (1 to 6 hours, none for alert 1) and a year jitter of up to 2 years per alert (order kept, arrival stays year 60). Filters that depend on who is alive belong to the steps that use the draws. `Variation.Classic` is the fixed scenario of the unit tests. Faults carry `Critical` (ignoring it ends or cripples the voyage: coolant, navigation) and a `SubjectId`.
+
 Notes on the rows:
 
 - **Hidden truth and Sealed orders.** With the Sealed orders modifier the player knows the secret from the start. With a hidden truth the player learns it when the crew could, and has to decide on the spot.
@@ -385,7 +387,7 @@ The model does two jobs, writing what the crew say and reading what the player s
 
 After each player line, a constrained pass sorts it into one of six kinds: a statement about a ship fact, a promise, an order, a question, a dodge, or plain talk. A statement is matched to a fact on the list and marked true or false against the game state. A vague answer to a direct question is recorded as a dodge. A statement that fits no fact is kept as text; when related evidence appears, the model judges yes or no whether it was a lie, leaning towards missing a lie over a false accusation. Everything else is plain talk and records nothing.
 
-The player sees the reading before the line is said, for example "It will be recorded as a statement that Idris is alive", and can change it or drop the line then. The reading never says whether the statement is true, and nobody has heard the line yet. Once it is said it stays said: there is no correction afterwards, so a lie that goes badly can't be taken back.
+The line is said when the player presses Enter: it appears in the log at once (with a small marker while the model is still reading it), and the reading is applied as soon as it arrives. The player no longer sees or corrects the reading before the line is said (decided 2026-11-13: the confirmation step killed the pacing). Lines are read and applied in the order they were typed. A line counts at the moment it was said: it is read against the state at Enter, and a click that changes the game (wake, sleep, repair, advance, drift, doors, logs) made while a line is still being read is accepted at once but takes effect right after that reading is applied, about half a second later. Screen and selection clicks are not held. If the model takes longer than five seconds, the line is applied as plain talk and the held clicks run. A reading the model could not make is applied as plain talk and records nothing. The trade-off: a misreading goes straight into the record, for example a lie read as plain talk is never a lie. The log's "Recorded" line says what was recorded but never whether it was true; that stays in the session log. Once a line is said it stays said: there is no correction afterwards, so a lie that goes badly can't be taken back.
 
 ### What the game decides
 
@@ -400,7 +402,10 @@ The player sees the reading before the line is said, for example "It will be rec
 ### Keeping the model inside the facts
 
 - **Ship state.** A reply that states something about the ship that isn't in that person's facts is rejected and written again.
-- **Personal colour.** A crew member may invent small memories of home. These are saved to their sheet so they stay the same next time.
+- **People by reference.** The check reads "he", "she", "they" and "my partner" too: a reference stands for the person it most likely means (named earlier in the line, then named in the game's decision or asked after by the speaker, then last named in the recent lines, then the speaker's partner; a relation word goes by the speaker's bonds, then by role), and "he's fine" or "you killed him" must match what the speaker believes of that person. When it can't tell between several, the line has to be right for each of them. Questions stay free ("Is he alright?").
+- **Only what they heard.** The prompt for a crew line carries the speaker's own beliefs and the ship's lines they heard (awake and spoken to), never lines said to others or while they slept. A bond to someone the speaker believes dead is put in the past tense; a death they have not learned of stays hidden.
+- **Tone follows trust.** At "follows" a person talks to the ship as a trusted colleague, at "wants reasons" guarded but civil; neither insults the ship (grumbling and swearing at the work are fine). At "refuses" they are cold and short, at "against" openly hostile.
+- **Personal colour.** A crew member may invent small memories of home. These are saved to their sheet so they stay the same next time. Built so far: a fixed sheet per person (voice, background, quirks, bonds) that is always in the prompt; the model's own invented memories are not saved yet.
 - **Small cast.** One to three people are awake at once, so prompts stay short enough for a local model.
 - **Idle time.** The years between alerts are when the game writes notes and summaries in the background.
 - **A model is required.** The game does not run without one. A templated line is shown only when the model's line was rejected twice.
@@ -417,7 +422,7 @@ The first build is the Short haul mode in text only, smaller than the mode table
 - **One lockout:** the logs.
 - **One ending screen:** survivors and the full record of what you said.
 - **Ship plan:** a wireframe schematic with sections, doors (only locking has an effect), coolant and power lines, pods and fault markers.
-- **Left out:** cameras, factions, children, signals from ahead, all modes and modifiers, run variation.
+- **Left out:** cameras, factions, children, signals from ahead, all modes and modifiers, run variation except: the alert-2 victim and patient, side-fault draws, clock slack, year jitter.
 
 The prototype passes if, across three playthroughs, the player lies at least once without being prompted and calls a discovered lie fair.
 
@@ -435,7 +440,7 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 
 ### Questions for playtest
 
-- [ ] How often does a small model misread a lie as plain talk? Count the readings the player corrects in each prototype playthrough; a first target is under one in ten.
+- [ ] How often does a small model misread a lie as plain talk? Count, from the session log (`said`, `read` and the `recorded` lines), the readings that turned out wrong in each prototype playthrough, including unusable ones; a first target is under one in ten.
 - [ ] Are paper notes fun, or only frustrating? The prototype has no notes, so this waits for the first build that has them.
 - [ ] Do 8 to 10 alerts fill 60 to 90 minutes? The first prototype run (5 alerts, one fault each) took 8 minutes against Short haul's 30.
 - [ ] What should low trust do before the ending (recruiting, the logs, an ending gate, a voice lockout)? Decided once the balance harness has measured the other balance changes.

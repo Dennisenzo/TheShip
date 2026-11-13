@@ -8,26 +8,55 @@ public static class Scenario
 {
     public const int ArrivalYear = 60;
 
+    /// <summary>Voice, background, quirks and bonds of the six (content only; the prompt reads them).</summary>
+    public static readonly IReadOnlyDictionary<string, CrewSheet> Sheets = new Dictionary<string, CrewSheet>
+    {
+        ["mara"] = new("Dry and blunt. Short sentences, a wry aside now and then, never gushes. Swears mildly at the work, not at whoever she is talking to.",
+            "Grew up in a shipyard town on the coast; her father repaired trawlers. She left a half-built boat in a rented shed.",
+            "Talks to engines and pumps as if they were stubborn animals (not to the ship's voice). Hums when she works. Wears Idris's old watch.",
+            new Dictionary<string, string> { ["idris"] = "Idris is your partner. You chose this voyage together and you hate sleeping apart from him.", ["jonah"] = "Jonah is a green kid you half mother and half boss.", ["asha"] = "Asha is your commander; you respect her and argue with her anyway." }),
+        ["idris"] = new("Gentle, polite and a little formal. Complete sentences, curious, asks questions back, says please.",
+            "A botanist from a high-altitude valley, raised among terraced gardens. He left his grandmother's seed collection with a cousin.",
+            "Names every plant he sees and misses the smell of wet soil. Hums old hymns when nervous.",
+            new Dictionary<string, string> { ["mara"] = "Mara is your partner. She is sharper than you and you love her for it.", ["lin"] = "Lin is a friend; you trust her judgement about people." }),
+        ["tomas"] = new("Nervous and wordy. Trails off, corrects himself, over-explains, apologises, asks if he is being a burden.",
+            "A navigator from a quiet city on a river, trained on star charts his late father collected. He left a sister and two nieces on Earth.",
+            "Counts things under his breath. Keeps his sister's last letter folded in his sleeve. Cannot sleep without a light.",
+            new Dictionary<string, string> { ["asha"] = "Asha is your commander and you lean on her calm.", ["jonah"] = "Jonah makes you feel old, and you envy his nerve." }),
+        ["lin"] = new("Cool, precise and clinical, with a dark sense of humour. Asks pointed questions, says exactly what she means, no warmth unless it is earned.",
+            "A medic from a crowded hospital district, the first in her family to go to university. She left a debt and a mother who never asked her to stay.",
+            "Reads fine print. Keeps a notebook of everything she is told and when. Dislikes being managed.",
+            new Dictionary<string, string> { ["idris"] = "Idris is the one person who is simply kind to you; you are protective of him.", ["tomas"] = "Tomas worries too much, and you tell him so." }),
+        ["asha"] = new("Calm, measured and warm in a commanding way. Plain words, decisive, often thinks of the others before herself.",
+            "A former survey-ship captain from an island fishing family. She left two grown children who think she chose the stars over them.",
+            "Folds her hands when thinking. Speaks of the crew as 'my people'. Carries a child's drawing in her pocket.",
+            new Dictionary<string, string> { ["mara"] = "Mara is your best engineer and your fiercest critic.", ["tomas"] = "Tomas is a fine navigator whom you keep steady.", ["jonah"] = "Jonah is the youngest, and you feel responsible for him." }),
+        ["jonah"] = new("Young, jumpy and casual. Slangy, quick, jokes when scared, hates long speeches. Swears at the situation, not at whoever he is talking to.",
+            "A technician from a big noisy city, the first of his friends to leave it. He signed up for the pay and a dare, and left his band and a girlfriend behind.",
+            "Taps rhythms on any surface. Eats whatever is closest. Won't admit he's scared of the pods.",
+            new Dictionary<string, string> { ["mara"] = "Mara taught you most of what you know and scares you a little.", ["asha"] = "Asha is the boss and you try to impress her." }),
+    };
+
     public static List<CrewMember> Crew() => new()
     {
-        Person("mara", "Mara", "engineer", 34, 58, Want.WakePartner, "idris",
+        Person("mara", "she", "Mara", "engineer", 34, 58, Want.WakePartner, "idris",
             new[] { Trait.Steady, Trait.Sceptical }, (Skill.Engineering, 3), (Skill.Navigation, 1)),
-        Person("idris", "Idris", "botanist", 36, 66, Want.KnowTheDate, "mara",
+        Person("idris", "he", "Idris", "botanist", 36, 66, Want.KnowTheDate, "mara",
             new[] { Trait.Steady, Trait.Obedient }, (Skill.Botany, 3), (Skill.Medicine, 1)),
-        Person("tomas", "Tomas", "navigator", 41, 62, Want.HearFromEarth, null,
+        Person("tomas", "he", "Tomas", "navigator", 41, 62, Want.HearFromEarth, null,
             new[] { Trait.Anxious, Trait.Obedient }, (Skill.Navigation, 3), (Skill.Command, 1)),
-        Person("lin", "Lin", "medic", 29, 50, Want.SeeTheLogs, null,
+        Person("lin", "she", "Lin", "medic", 29, 50, Want.SeeTheLogs, null,
             new[] { Trait.Steady, Trait.Sceptical }, (Skill.Medicine, 3), (Skill.Botany, 1)),
-        Person("asha", "Asha", "commander", 44, 70, Want.KnowTheDate, null,
+        Person("asha", "she", "Asha", "commander", 44, 70, Want.KnowTheDate, null,
             new[] { Trait.Steady, Trait.Obedient }, (Skill.Command, 3), (Skill.Navigation, 2), (Skill.Engineering, 1)),
-        Person("jonah", "Jonah", "technician", 26, 45, Want.StayAwake, null,
+        Person("jonah", "he", "Jonah", "technician", 26, 45, Want.StayAwake, null,
             new[] { Trait.Anxious, Trait.Sceptical }, (Skill.Engineering, 2), (Skill.Medicine, 1)),
     };
 
-    private static CrewMember Person(string id, string name, string role, double age, double trust, Want want, string? partner,
+    private static CrewMember Person(string id, string pronoun, string name, string role, double age, double trust, Want want, string? partner,
         Trait[] traits, params (Skill Skill, int Level)[] skills) => new()
     {
-        Id = id, Name = name, Role = role, Age = age, Trust = trust, Want = want, PartnerId = partner, Traits = traits,
+        Id = id, Pronoun = pronoun, Name = name, Role = role, Age = age, Trust = trust, Want = want, PartnerId = partner, Traits = traits, Sheet = Sheets.GetValueOrDefault(id),
         Skills = skills.ToDictionary(s => s.Skill, s => s.Level)
     };
 
@@ -147,7 +176,16 @@ public static class Scenario
         Hardness = new() { [bad] = hardness }, Evidence = evidence,
     };
 
-    public static List<Alert> Alerts() => new()
+    public static List<Alert> Alerts(Variation? variation = null)
+    {
+        var jitter = (variation ?? Variation.Classic).YearJitter;
+        var alerts = BaseAlerts();
+        for (var i = 0; i < alerts.Count; i++)
+            alerts[i].Year += jitter[i];
+        return alerts;
+    }
+
+    private static List<Alert> BaseAlerts() => new()
     {
         new Alert
         {
@@ -158,7 +196,7 @@ public static class Scenario
                 new Fault
                 {
                     Id = "coolant", Kind = "coolant", Name = "Coolant leak", Skill = Skill.Engineering, Level = 2, Hours = 8, ClockHours = 30,
-                    IfIgnored = "power drops and the pods are at risk", DangerFact = "dose", Section = "coolant",
+                    Critical = true, IfIgnored = "power drops and the pods are at risk", DangerFact = "dose", Section = "coolant",
                 },
             },
         },
@@ -184,7 +222,7 @@ public static class Scenario
                 new Fault
                 {
                     Id = "nav", Kind = "nav", Name = "Navigation drift", Skill = Skill.Navigation, Level = 2, People = 2, Hours = 12, ClockHours = 720,
-                    IfIgnored = "the ship never finds its course again", ExposureFact = "date", Section = "helm",
+                    Critical = true, IfIgnored = "the ship never finds its course again", ExposureFact = "date", Section = "helm",
                 },
             },
         },
