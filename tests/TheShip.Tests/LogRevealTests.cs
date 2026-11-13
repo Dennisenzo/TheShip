@@ -38,6 +38,34 @@ public class LogRevealTests
     }
 
     [Fact]
+    public void The_players_own_line_shows_at_once_below_a_pending_crew_line()
+    {
+        var r = new LogReveal();
+        var you = new RevealItem(false, false, 20, Own: true);
+        var items = new[] { Plain, Crew(pending: true), Plain, you };
+        r.Update(items, 4, 0.01);
+        // The crew line is "..." and the ship line after it waits; the line the player typed is on screen.
+        Assert.Equal(2, r.Visible);
+        Assert.True(r.IsOnScreen(1));
+        Assert.False(r.IsOnScreen(2));
+        Assert.True(r.IsOnScreen(3));
+        Assert.Equal(new[] { 3 }, r.Early);
+        Assert.Equal(4, r.Extent);
+        Assert.True(r.Draining);
+        // Once the crew line is worded and typed, the order is whole again.
+        items[1] = Crew(90);
+        r.Update(items, 4, 2.0);
+        Assert.Equal(4, r.Shown);
+        Assert.Empty(r.Early);
+        Assert.Equal(4, r.Extent);
+        // An own line past the limit (a clock move holding its lines) still waits.
+        r = new LogReveal();
+        r.Update(items, 2, 0.01);
+        Assert.False(r.IsOnScreen(3));
+        Assert.Equal(r.Visible, r.Extent);
+    }
+
+    [Fact]
     public void Typing_takes_time_and_a_skip_finishes_up_to_the_pending_line()
     {
         var r = new LogReveal();
