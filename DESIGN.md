@@ -244,6 +244,8 @@ Work terms tie the briefing to the repair. Each fault lists what a repairer can 
 
 **Work terms as built (step 1, the risk axis).** The terms are fixed per worker when they start (`Voyage.TermsFor`, stored in `CrewMember.Terms`, kept while they stay on the fault) and come from beliefs only, true or false: nothing on screen or in the log reveals whether a statement was true. *Briefed* means they believe the hard value of the fault's danger fact (today only the coolant leak's `dose`); *Reassured* the benign one; *Unaware* no belief at all (a Follower who was never asked or told is Unaware). The team's work rate is multiplied by the average of the workers' `RateFactor`, in the clock, the card verdict (`EarliestDoneHours`) and the stakes hours alike. At completion the dose is `DangerDose` x `HarmShare`; a failed repair rolls `RepairInjuryChance` x `HarmShare` (one dice roll as before, so seeds stay stable) and its `HurtByOrder` falls only on an Unaware lead (a Reassured one learns the truth by evidence instead and pays the caught-lie cost). The aftermath's notice charges `HurtByOrder` and says `noticed_dose` only to a worker who started Unaware (`CrewMember.HurtUnbriefed`, set at completion, not re-read at the beat). A briefed start puts one Recorded line in the log ("Mara starts the coolant leak knowing ...: precautions, work 10% slower, dose and injury chance halved"): it states what she believes, never whether it is true.
 
+**Where the terms are shown (step 3).** `Voyage.TermsText(c, f)` words the terms from belief and fault only ("If Mara starts now: Mara knows the dose: precautions, work 10% slower, half the dose, no trust lost if hurt. Mara has not been told the cause; telling them: 3% faster, +8% odds."), numbers read from `Tuning`, never whether anything told was true. It is in the Repair and Patch button tooltips for the selected person, in "Waiting on you" for the selected idle person whose likely job (`WorkFor`) has a risk or cause (after the stakes, bargain and bay items; dropped if it does not fit), and the issue cards show "Cause: ..." (what the ship knows, `Voyage.CauseKnown`, only once the fault's alert has started) beside "Known to you:". The Repair % is the terms-aware `RepairChanceWith`. No new control: a briefing is a spoken line.
+
 ### Pressure
 
 - **Clock.** During an alert, every exchange takes 5 minutes off each running fault clock. With a slack of 1 to 6 hours ("The clock rule"), a long briefing is a real trade.
@@ -270,7 +272,7 @@ Work terms tie the briefing to the repair. Each fault lists what a repairer can 
 Two of these come first, because they reuse the statement record and the compliance roll the prototype already has:
 
 1. Bargains that create promises with a due date (built, 2026-11-13: the ledger; the offer, acceptance and push; the "WITHOUT YOUR WORD" button with a 0.6 s double-click guard; the Waiting item with the price and the risk of pushing; the NEXT line; the balance bots). Accepting is still a spoken promise through the voice line: no new control.
-2. Work terms set by the briefing (built 2026-11-13: step 1 the risk axis and the hurt rule, step 2 the cause facts, step 4 the balance bots and counters; the UI is step 3).
+2. Work terms set by the briefing (built 2026-11-13: step 1 the risk axis and the hurt rule, step 2 the cause facts, step 3 the terms shown in the Repair/Patch tooltip, Waiting on you and the issue cards, step 4 the balance bots and counters).
 
 ## Alerts
 
