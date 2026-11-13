@@ -326,6 +326,25 @@ public sealed partial class ShipGame
                 _p.Dashed(points[i], points[i + 1], Painter.Blue, offset: Motion.Still ? 0f : (float)(_now * 10 % 12));
         }
 
+        // Where the people who are up stand, worked out before the doors: a marker can sit over a door's click area
+        // (the idle spot in the corridor does), and then the marker wins.
+        var markers = new List<(CrewMember Person, Vector2 At, string Name, Rectangle Backing)>();
+        var placed = new Dictionary<string, int>();
+        foreach (var c in v.Awake)
+        {
+            var where = v.LocationOf(c);
+            var n = placed.TryGetValue(where, out var count) ? count : 0;
+            placed[where] = n + 1;
+            Vector2 at;
+            if (v.GetSection(where) is { } s)
+                at = s.Id.StartsWith("pod", StringComparison.Ordinal) ? P((s.Id == "podA" ? 400 : 580) + n * 80, 235) : P(s.Spot.X - 44, s.Spot.Y + 38 + n * 18);
+            else
+                at = P(290 + n * 90, 235);
+            var name = c.Name.ToUpperInvariant();
+            markers.Add((c, at, name, new Rectangle((int)at.X - 8, (int)at.Y - 9, (int)(_p.Small.MeasureString(name).X + 28), 18)));
+        }
+        var overMarker = markers.Any(m => _p.Over(m.Backing));
+
         // Doors: outlined = open, grey = closed, amber = locked. A click steps to the next state.
         foreach (var s in v.Sections)
         {
@@ -353,15 +372,17 @@ public sealed partial class ShipGame
                 DoorState.Closed => DoorState.Locked,
                 _ => DoorState.Open,
             };
-            var doorHot = _p.Ease("door:" + s.Id, _p.Over(reach) ? 1f : 0f);
+            var overDoor = _p.Over(reach) && !overMarker;
+            var doorHot = _p.Ease("door:" + s.Id, overDoor ? 1f : 0f);
             if (doorHot > 0.01f)
                 _p.Frame(reach, Painter.Fade(Painter.Bright, doorHot));
-            if (_p.Over(reach) && v.Phase != Phase.Ended)
+            if (overDoor && v.Phase != Phase.Ended)
                 _p.Hand = true;
-            _p.Tip(reach, "Door to the " + s.Name.ToLowerInvariant() + ": " + s.DoorState.ToString().ToLowerInvariant() + "."
+            if (!overMarker)
+                _p.Tip(reach, "Door to the " + s.Name.ToLowerInvariant() + ": " + s.DoorState.ToString().ToLowerInvariant() + "."
                           + (v.Phase == Phase.Ended ? "" : " Click: " + (next == DoorState.Locked ? "lock" : next == DoorState.Closed ? "close" : "open") + ".")
                           + (s.DoorState == DoorState.Locked ? " A locked door stops work behind it, and whoever tries it sees it is locked." : ""));
-            if (_p.Hit(reach) && v.Phase != Phase.Ended)
+            if (overDoor && _p.Click && v.Phase != Phase.Ended)
             {
                 var id = s.Id;
                 Act("door " + id + " to " + next, () => v.SetDoor(id, next));
@@ -471,22 +492,11 @@ public sealed partial class ShipGame
             }
         }
 
-        // Who is up, and where.
-        var placed = new Dictionary<string, int>();
-        foreach (var c in v.Awake)
+        // Who is up, and where (placed above, before the doors).
+        foreach (var (c, at, name, backing) in markers)
         {
-            var where = v.LocationOf(c);
-            var n = placed.TryGetValue(where, out var count) ? count : 0;
-            placed[where] = n + 1;
-            Vector2 at;
-            if (v.GetSection(where) is { } s)
-                at = s.Id.StartsWith("pod", StringComparison.Ordinal) ? P((s.Id == "podA" ? 400 : 580) + n * 80, 235) : P(s.Spot.X - 44, s.Spot.Y + 38 + n * 18);
-            else
-                at = P(290 + n * 90, 235);
             // Drawn after the fault leaders, on a panel-coloured backing, so no leader runs through a name.
-            var name = c.Name.ToUpperInvariant();
-            _p.Fill(new Rectangle((int)at.X - 8, (int)at.Y - 9, (int)(_p.Small.MeasureString(name).X + 28), 18), Painter.Panel);
-            var backing = new Rectangle((int)at.X - 8, (int)at.Y - 9, (int)(_p.Small.MeasureString(name).X + 28), 18);
+            _p.Fill(backing, Painter.Panel);
             if (_p.Over(backing))
             {
                 _hotCrewNext = c.Id;
