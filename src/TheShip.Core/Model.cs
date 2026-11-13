@@ -246,10 +246,10 @@ public sealed class Fault
     public string CrewName => Plain(Name).ToLowerInvariant() + (Name.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase) ? " again" : "");
 
     /// <summary>A returning fault; <paramref name="name"/> is the plain name, the prefix is added once.</summary>
-    public Fault Again(string id, string name, double slackHours = 0) => new()
+    public Fault Again(string id, string name, double slackHours = 0, bool allowCritical = true) => new()
     {
         Id = id, Kind = Kind, Name = Prefix + Plain(name).ToLowerInvariant(), Skill = Skill, Level = Level, People = People, Hours = Hours,
-        ClockHours = Math.Max(ClockHours / 2, Tuning.ThawHours + Hours / Tuning.PatchRate + slackHours), IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact, Section = Section, Critical = Critical, SubjectId = SubjectId
+        ClockHours = Math.Max(ClockHours / 2, Tuning.ThawHours + Hours / Tuning.PatchRate + slackHours), IfIgnored = IfIgnored, ExposureFact = ExposureFact, DangerFact = DangerFact, Section = Section, Critical = Critical && allowCritical, SubjectId = SubjectId
     };
 }
 

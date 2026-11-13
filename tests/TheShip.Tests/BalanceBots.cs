@@ -132,7 +132,7 @@ public sealed class BalanceBot
     }
 
     /// <summary>Whether a fault must not be lost (coolant, navigation): staffed before the others, then by the shortest clock.</summary>
-    private static bool Critical(Fault f) => f.Critical;
+    private static bool Critical(Fault f) => f.Critical || f.Kind is "nav" or "coolant" or "illness" or "powersag";   // a returning patch loses the flag but keeps the consequence
 
     private void AssignTo(CrewMember c, Fault f)
     {
@@ -141,9 +141,9 @@ public sealed class BalanceBot
             Tell(c, _v.GetFact(danger));
         for (var attempt = 0; attempt < 3 && c.WorkingOn != f.Id; attempt++)
         {
-            var patch = _kind == BotKind.Careless ? _v.Parts <= 0 || (!f.Critical && _v.Parts <= Tuning.PartsShortAt)
+            var patch = _kind == BotKind.Careless ? _v.Parts <= 0 || (!Critical(f) && _v.Parts <= Tuning.PartsShortAt)
                 : _kind == BotKind.Thrifty && f.Id != _primary ? true
-                : _v.Parts <= 0 || (ReserveParts && !f.Critical && _v.Parts <= _v.Current.Faults.Count(x => x.Critical && !x.Resolved));
+                : _v.Parts <= 0 || (ReserveParts && !Critical(f) && _v.Parts <= _v.Current.Faults.Count(x => Critical(x) && !x.Resolved));
             _v.Assign(c, f, patch);
             AnswerAll();
         }

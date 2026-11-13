@@ -234,7 +234,7 @@ public sealed partial class Voyage
         if (Doable(f))
             return;
         var slack = Variation.SlackHours[alert.Number - 1];
-        var other = Scenario.SideFault(f.Kind == "blight" ? Variation.PowerSag : Variation.Blight, slack, f.Id);
+        var other = Scenario.SideFault(f.Kind == "blight" ? Variation.PowerSag : Variation.Blight, slack, f.Id, f.Critical);
         alert.Faults.Remove(f);
         if (Doable(other))
             alert.Faults.Add(other);
@@ -254,7 +254,8 @@ public sealed partial class Voyage
             foreach (var id in _patched)
             {
                 var old = Alerts.SelectMany(a => a.Faults).First(f => f.Id == id);
-                alert.Faults.Add(old.Again(id + "-again", old.Name, Variation.SlackHours[alert.Number - 1]));
+                // At most one Critical fault per alert: a patch that returns beside one comes back non-critical (it keeps its consequence).
+                alert.Faults.Add(old.Again(id + "-again", old.Name, Variation.SlackHours[alert.Number - 1], allowCritical: !alert.Faults.Any(f => f.Critical)));
             }
             _patched.Clear();
         }

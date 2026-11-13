@@ -74,7 +74,7 @@ public class SideFaultTests
         Assert.Equal(Skill.Engineering, sag.Skill);
         Assert.Equal(2, sag.Level);
         Assert.Equal("reactor", sag.Section);
-        Assert.True(sag.Critical);
+        Assert.False(sag.Critical);   // navigation is alert 3's one Critical fault
         Assert.Equal(Tuning.ThawHours + Tuning.PowerSagHours + 3, sag.ClockHours);
         Assert.False(new Voyage(1, With(Variation.PowerSag)).PowerLow);
         RunOut(v);
@@ -259,5 +259,38 @@ public class SideFaultTests
         Assert.False(v.Find("tomas")!.Alive);
         Assert.Contains("Deaths:", drift);
         Assert.Contains("Tomas", drift);
+    }
+
+    [Fact]
+    public void Every_alert_has_at_most_one_critical_fault()
+    {
+        for (var seed = 1; seed <= 200; seed++)
+            foreach (var alert in Scenario.Alerts(Variation.Draw(seed)))
+                Assert.True(alert.Faults.Count(f => f.Critical) <= 1, $"seed {seed} alert {alert.Number}");
+        Assert.True(Scenario.Alerts(Variation.Draw(1))[4].Faults.Single(f => f.Kind == "powersag").Critical);
+        Assert.False(Scenario.Alerts(Variation.Draw(1))[4].Faults.Single(f => f.Kind == "controller").Critical);
+    }
+
+    [Fact]
+    public void A_returning_patch_beside_a_critical_fault_comes_back_non_critical()
+    {
+        var v = new Voyage(1, With(Variation.PowerSag));
+        var patched = (List<string>)typeof(Voyage).GetField("_patched", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(v)!;
+        for (var guard = 0; guard < 20 && v.Current.Number < 3; guard++)
+        {
+            RunOut(v);
+            if (v.Phase != Phase.Aftermath)
+                continue;
+            if (v.Current.Number == 2)
+            {
+                patched.Clear();
+                patched.AddRange(new[] { "coolant", "illness" });
+            }
+            v.Drift();
+        }
+        Assert.Equal(1, v.Current.Faults.Count(f => f.Critical));
+        var again = v.Current.Faults.Single(f => f.Id == "coolant-again");
+        Assert.False(again.Critical);
+        Assert.Equal("coolant", again.Kind);
     }
 }

@@ -227,7 +227,7 @@ An event draws two to four faults from the tables below. A few rows, such as a s
 | Navigation drift | Navigation, two at the helm | Arrival slips by decades | The navigator sees the date and Earth's position |
 | Pod failure | Medicine, 2 hours | That sleeper dies | An unplanned waking of someone you didn't choose |
 | Fire | Any two people, minutes | Spreads section by section | You can seal a door. Who is behind it? |
-| Power sag | Nobody (prototype, until power routing: Engineering 2, 14 hours in the reactor, Critical, side fault of alert 5 and sometimes 3) | A system of your choice goes dark (prototype: power stays low, sleepers risk death each drift) | Solved with controls alone; someone later asks why |
+| Power sag | Nobody (prototype, until power routing: Engineering 2, 14 hours in the reactor, side fault of alert 5, where it is the Critical one, and sometimes of alert 3, where navigation is) | A system of your choice goes dark (prototype: power stays low, sleepers risk death each drift) | Solved with controls alone; someone later asks why |
 | Memory fault | Engineering 3 | You lose a block of your own records | The engineer who restores it reads your statement history |
 
 ### People
