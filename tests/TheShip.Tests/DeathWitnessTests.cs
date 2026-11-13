@@ -116,7 +116,7 @@ public class DeathWitnessTests
         Assert.True(b.Firsthand);
         var maraLines = v.Log.Where(l => l.CrewId == "mara" && l.Intent is { } it && it.Kind is "found" or "left_behind"
                                          && l.Intent!.Decision.Contains(patient.Name)).ToList();
-        Assert.Single(maraLines.Where(l => l.Intent!.Kind == "left_behind"));
+        Assert.Single(maraLines, l => l.Intent!.Kind == "left_behind");
         Assert.DoesNotContain(maraLines, l => l.Intent!.Kind == "found");
     }
 }
