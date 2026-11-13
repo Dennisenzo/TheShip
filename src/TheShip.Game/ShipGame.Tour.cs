@@ -156,6 +156,7 @@ public sealed partial class ShipGame
                 _target = null;
                 // The scripted lie is for these shots only: the rest of the tour plays on from where the person stood before it.
                 Act("tour: restore " + liar.Name, () => v.TourRestore(liar, trust, morale, caught));
+                foreach (var w in Settle()) yield return w;
             }
 
             // Answer the first question truthfully, the way Enter does it.
