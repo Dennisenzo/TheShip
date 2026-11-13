@@ -897,7 +897,8 @@ public sealed partial class ShipGame
         {
             if (c != staked && c.PendingQuestion != null && v.HasFact(c.PendingQuestion) && v.JobText(c) is null)
                 yield return (c, c.Name + " asked: " + v.GetFact(c.PendingQuestion).Question);
-            if (c.RequestMade && !c.RequestGranted)
+            // A request the ship said no to is settled: it leaves the list.
+            if (c.RequestOpen)
                 yield return (c, c.Name + " asked you " + (c.Want == Want.WakePartner ? "to wake their partner." : "to open the logs."));
             // What the ship owes them comes before their doubts.
             foreach (var e in owed.Where(e => e.Person == c))

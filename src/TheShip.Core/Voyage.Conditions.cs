@@ -226,7 +226,7 @@ public sealed partial class Voyage
                 var f = Current.Faults.First(x => x.Id == b.FaultId);
                 items.Add(new OpenItem(c, who + ".terms", "terms", "will start " + TaskText(f, b.Patch) + " only if the ship gives its word to " + CommitmentText(c, b.Key)));
             }
-            if (c.RequestMade && !c.RequestGranted && !c.RequestDeclined)
+            if (c.RequestOpen)
                 items.Add(new OpenItem(c, who + ".request", "request", "asked the ship " + (c.Want == Want.WakePartner ? "to wake their partner" : "to open the logs")));
             if (OpenAccusation(c) is not null)
                 items.Add(new OpenItem(c, who + ".accusation", "accusation", "caught the ship in a lie and waits for an answer"));

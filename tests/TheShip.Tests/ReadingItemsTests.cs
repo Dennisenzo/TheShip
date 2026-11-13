@@ -166,6 +166,7 @@ public class ReadingItemsTests
         Assert.DoesNotContain(v.Ledger(), e => e.Key == "no_more_thaws");
         // Declining is not charged again at sleep, and the request leaves "Waiting on you".
         Assert.DoesNotContain(v.OpenItems(new[] { mara }), i => i.Kind == "request");
+        Assert.False(mara.RequestOpen);
     }
 
     [Fact]
