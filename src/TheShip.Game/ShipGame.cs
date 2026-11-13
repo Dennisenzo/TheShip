@@ -56,6 +56,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     private CrewMember? _dossier;
     private Screen _screen = Screen.Bridge;
     private bool _endingShown;
+    /// <summary>The ending is in the session log (written when the voyage ends, before the ending screen shows).</summary>
+    private bool _endingLogged;
     /// <summary>No model could be loaded: the window only shows why.</summary>
     private bool _fatal;
 
@@ -369,18 +371,23 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
                 _input.Append(ch);
         }
 
+        // The session log records the ending when the voyage ends (the click), so closing the window during the last
+        // drift's report does not lose it; the ending screen waits for the report to be closed.
+        if (_voyage is { Phase: Phase.Ended, Ending: { } ended } && !_endingLogged)
+        {
+            _endingLogged = true;
+            _session?.Follow(_voyage);
+            _session?.Ending(ended);
+            _session?.Snapshot(_voyage);
+        }
         StepTransition();
         StepOverlays();
-        // The ending waits for the last drift's report to be closed.
         if (_voyage is { Phase: Phase.Ended, Ending: { } ending } && !_endingShown && _transition is null)
         {
             _endingShown = true;
             _screen = Screen.Ending;
             _scroll = int.MaxValue / 2;
             ShowEnding(ending);
-            _session?.Follow(_voyage);
-            _session?.Ending(ending);
-            _session?.Snapshot(_voyage);
         }
         StepTour();
         base.Update(gameTime);
