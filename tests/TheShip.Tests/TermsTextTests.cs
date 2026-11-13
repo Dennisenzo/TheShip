@@ -102,6 +102,61 @@ public class TermsTextTests
         Assert.Null(v.TermsItem(idris));
     }
 
+    /// <summary>Rows of the "Waiting on you" panel a text takes: word wrap at 45 columns (326 px at 7.19 px a character, as <c>Painter.Wrap</c>).</summary>
+    internal static int WaitingRows(string text)
+    {
+        const int columns = 45;
+        var rows = 0;
+        var line = 0;
+        foreach (var word in text.Split(' '))
+        {
+            if (line > 0 && line + 1 + word.Length > columns)
+            {
+                rows++;
+                line = 0;
+            }
+            line += (line > 0 ? 1 : 0) + word.Length;
+        }
+        return rows + (line > 0 ? 1 : 0);
+    }
+
+    [Fact]
+    public void The_short_terms_fit_two_rows_of_waiting_for_every_person_fault_and_belief()
+    {
+        // The panel holds 158 px of items (19 px a row, 4 px between items): a six-row stakes item or a four-row bargain leaves two rows.
+        var seen = 0;
+        // The text names the person, not the fault, so a few runs' fault sets (side faults vary) are enough.
+        for (var seed = 0; seed < 20; seed++)
+        {
+            var v = new Voyage(seed, Variation.Draw(seed));
+            foreach (var f in v.Alerts.SelectMany(a => a.Faults).Concat(v.Alerts.SelectMany(a => a.Faults).Select(f => f.Again(f.Id + "-again", f.Name, 0))))
+                foreach (var c in v.Crew)
+                    foreach (var dose in new string?[] { null, "safe", "dosed" })
+                        foreach (var cause in new[] { false, true })
+                        {
+                            c.Beliefs.Clear();
+                            if (dose != null) Tell(v, c, "dose", dose);
+                            if (cause && f.CauseFact is { } cf) Tell(v, c, cf, v.GetFact(cf).Values[0]);
+                            var text = v.TermsShort(c, f);
+                            if (text.Length == 0) continue;
+                            seen++;
+                            Assert.True(WaitingRows(text) <= 2, $"seed {seed}: {text}");
+                            NoTruthWording(text);
+                        }
+        }
+        Assert.True(seen > 0);
+    }
+
+    [Fact]
+    public void The_terms_item_is_short_with_the_full_text_as_its_tip()
+    {
+        var (v, mara, f) = Ready();
+        var item = v.TermsItem(mara)!.Value;
+        Assert.Equal(v.TermsShort(mara, f), item.Short);
+        Assert.Equal(v.TermsText(mara, f), item.Full);
+        Assert.StartsWith("Mara, unbriefed: full dose, hurt costs trust; cause untold", item.Short);
+    }
+
     [Fact]
     public void Repair_chance_shown_rises_by_the_cause_bonus_once_told()
     {

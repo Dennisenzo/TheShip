@@ -51,7 +51,32 @@ public sealed partial class Voyage
     public string? CauseKnown(Fault f) =>
         f.CauseFact is { } cf && _facts.TryGetValue(cf, out var fact) && InLog(fact) ? fact.Say(fact.Truth) : null;
 
-    /// <summary>The terms item for "Waiting on you": the selected idle person's likely job, when it has a risk or a cause; null otherwise.</summary>
-    public string? TermsItem(CrewMember c) =>
-        c.State == CrewState.Awake && Phase == Phase.Alert && c.WorkingOn is null && WorkFor(c) is { } job && TermsText(c, job) is { Length: > 0 } text ? text : null;
+    /// <summary>
+    /// The terms in two rows of "Waiting on you" (about 90 characters): "Mara, unbriefed: full dose, hurt costs trust; cause untold (+8% odds)."
+    /// The long form (<see cref="TermsText"/>) is its tooltip. From belief and fault only, like the long form. Empty when there are no terms.
+    /// </summary>
+    public string TermsShort(CrewMember c, Fault f)
+    {
+        var t = TermsOf(c, f);
+        var risk = t.Risk switch
+        {
+            RiskKnowledge.Briefed => "briefed: " + Num((1 - Tuning.PrecautionRate) * 100) + "% slower, " + HarmShareText() + " dose, no trust lost if hurt",
+            RiskKnowledge.Reassured => "expects no harm: full dose",
+            RiskKnowledge.Unaware => "unbriefed: full dose, hurt costs trust",
+            _ => null,
+        };
+        var cause = f.CauseFact is null ? null
+            : t.CauseBriefed ? "knows the cause"
+            : "cause untold (+" + Num(Tuning.CauseOddsBonus * 100) + "% odds)";
+        var parts = new[] { risk, cause }.Where(p => p != null).ToList();
+        return parts.Count == 0 ? "" : c.Name + ", " + string.Join("; ", parts) + ".";
+    }
+
+    /// <summary>
+    /// The terms item for "Waiting on you": the selected idle person's likely job, when it has a risk or a cause, as the short form shown
+    /// and the full text for its tooltip; null otherwise.
+    /// </summary>
+    public (string Short, string Full)? TermsItem(CrewMember c) =>
+        c.State == CrewState.Awake && Phase == Phase.Alert && c.WorkingOn is null && WorkFor(c) is { } job && TermsText(c, job) is { Length: > 0 } text
+            ? (TermsShort(c, job), text) : null;
 }

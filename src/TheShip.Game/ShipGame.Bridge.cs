@@ -766,6 +766,8 @@ public sealed partial class ShipGame
             _p.TextRight(_p.Small, "select a person for stakes", x + width - 12, waiting.Y + 10, Painter.Dim);
         var wy = waiting.Y + 36;
         var limit = waiting.Bottom - 22;
+        // The terms item is shown short (two rows); its full text is the tooltip.
+        var terms = _target != null ? v.TermsItem(_target) : null;
         foreach (var (who, item) in Waiting(v, _target))
         {
             // An item that doesn't fit is left out; a shorter one after it may still fit.
@@ -785,6 +787,8 @@ public sealed partial class ShipGame
                     Do(() => _target = person);
                 }
             }
+            if (terms is { } t && who == _target && item == t.Short)
+                _p.Tip(row, t.Full);
             wy = _p.Paragraph(item, x + 12, wy, width - 24, Painter.Ink) + 4;
         }
     }
@@ -824,9 +828,10 @@ public sealed partial class ShipGame
                 ? " The crew hold the logs too: no promise to them can be kept now."
                 : " Promise one of them to open the logs, have every log open when it falls due, and win their trust above "
                   + Tuning.BayReturnTrust.ToString("0") + " to get it back."));
-        // The terms the selected idle person would work their likely job on (dropped when it doesn't fit).
+        // The terms the selected idle person would work their likely job on, in two rows (the full text is the row's tooltip), so they
+        // still fit under a six-row stakes item or a four-row bargain.
         if (selected != null && v.TermsItem(selected) is { } terms)
-            yield return (selected, terms);
+            yield return (selected, terms.Short);
         var owed = v.Ledger().Where(e => e.State == "open").ToList();
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {
