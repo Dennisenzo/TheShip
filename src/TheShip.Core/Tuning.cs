@@ -63,6 +63,15 @@ public static class Tuning
     public const double PromiseMade = 2;
     public const double PromiseKept = 10;
     public const double PromiseBroken = 15;
+    /// <summary>A kept promise lifts morale; a broken one hurts more (and, through the morale rate, the work).</summary>
+    public const double PromiseKeptMorale = 3;
+    public const double PromiseBrokenMorale = 8;
+    /// <summary>Days from a keyed promise to its due date (wake the partner, open the logs).</summary>
+    public const double PromiseDueDays = 45;
+    /// <summary>Days from a bargain being struck to its due date (bargains come in a later step).</summary>
+    public const double BargainDueDays = 40;
+    /// <summary>A promise with this many days left or fewer is warned about once, and Advance stops.</summary>
+    public const double PromiseDueWarnDays = 14;
     public const double RequestGranted = 6;
     public const double RequestIgnored = 4;
     public const double HurtByOrder = 10;

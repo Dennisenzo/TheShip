@@ -83,13 +83,21 @@ public sealed partial class Voyage
             case LineKind.Promise:
             {
                 var key = reading.PromiseKey is { } pk && Reading.PromiseKeys.Contains(pk) ? pk : "other";
-                Statements.Add(NewStatement(text, StatementKind.Promise, ids, key));
+                var made = NewStatement(text, StatementKind.Promise, ids, key);
+                Statements.Add(made);
                 Recorded("Recorded: you promised " + names + " " + PromiseText(key) + ".");
                 foreach (var l in listeners)
                 {
-                    l.Trust += Tuning.PromiseMade;
+                    // The small gain is earned once per person per waking, so repeating a promise buys nothing more.
+                    if (!l.PromiseCredited)
+                    {
+                        l.PromiseCredited = true;
+                        l.Trust += Tuning.PromiseMade;
+                    }
+                    StartCommitment(made, l);
                     Speak(l, "promise", "The ship made you a promise: " + PromiseText(key) + ".");
                 }
+                ResolveCommitments();
                 break;
             }
             case LineKind.Dodge:

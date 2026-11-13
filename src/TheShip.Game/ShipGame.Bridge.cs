@@ -766,23 +766,29 @@ public sealed partial class ShipGame
         if (v.Lockouts.Bay)
             yield return (null, v.BayLockReason + " Keep a promise to one of them and win their trust above " + Tuning.BayReturnTrust.ToString("0") + " to get it back.");
         var asking = v.Awake.Count(a => v.StakesOf(a) != null);
+        var owed = v.Ledger().Where(e => e.State == "open").ToList();
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {
             if (c.PendingQuestion != null && v.HasFact(c.PendingQuestion))
                 yield return (c, c == selected || asking == 1 ? v.StakesText(c) : c.Name + " asked: " + v.GetFact(c.PendingQuestion).Question);
             if (c.RequestMade && !c.RequestGranted)
                 yield return (c, c.Name + " asked you " + (c.Want == Want.WakePartner ? "to wake their partner." : "to open the logs."));
+            // What the ship owes them comes before their doubts.
+            foreach (var e in owed.Where(e => e.Person == c))
+                yield return (c, LedgerLine(v, e));
             foreach (var doubt in c.Doubts)
                 if (v.HasFact(doubt))
                     yield return (c, c.Name + " doubts you on " + v.GetFact(doubt).Label + " and will check.");
             if (c.RefusesSleep)
                 yield return (c, c.Name + " will not go back into the pod.");
         }
-        foreach (var s in v.Statements.Where(s => s.Kind == StatementKind.Promise && s.PromiseKey != "other"))
-        {
-            var open = s.Hearers.Where(id => !s.PromiseKept.ContainsKey(id)).Select(id => v.Crew.First(c => c.Id == id)).Where(c => c.Alive).Select(c => c.Name).ToList();
-            if (open.Count > 0)
-                yield return (null, "Promise open, year " + N(Math.Floor(s.Year)) + ": " + Voyage.PromiseText(s.PromiseKey) + " (" + string.Join(", ", open) + ").");
-        }
+        // Promises to people who are asleep (never to thaw them again).
+        foreach (var e in owed.Where(e => e.Person.State != CrewState.Awake && e.Person.Alive))
+            yield return (e.Person, LedgerLine(v, e));
     }
+
+    /// <summary>"Promise to Mara: wake Idris, 12 days left." (a standing promise has no days.)</summary>
+    private static string LedgerLine(Voyage v, LedgerEntry e) =>
+        "Promise to " + e.Person.Name + ": " + e.Text
+        + (e.DueBy is { } due ? ", " + (v.DaysLeft(due) <= 0 ? "due now" : v.DaysLeft(due) + (v.DaysLeft(due) == 1 ? " day left" : " days left")) : ", until arrival") + ".";
 }

@@ -229,6 +229,8 @@ Every conversation closes with at least one outcome, shown in the log like the "
 | Spread | "Mara will tell Idris." | Knowers of the fact, at the next shared shift or in a note |
 | Stance | "Mara now doubts the pods." | One step towards or away from a faction's stance |
 
+**The promise ledger (built).** Every promise the game can check goes on a ledger (`Voyage.Ledger()`) with a due date, shown in "Waiting on you" ("Promise to Mara: wake Idris, 12 days left"), on the dossier's PROMISE note and in the ending record (due year). Today a promise to wake a partner or open the logs is due `Tuning.PromiseDueDays` (45) days after it is said (a bargain's will be `BargainDueDays`, 40). How one ends: wake the partner is kept at once when the partner is thawing or met, and broken at the due date; open the logs is kept at the due date (or when the person goes to sleep) if every log is open then, otherwise broken, never at once, so opening and closing logs earns nothing; going to sleep settles what is still open. A promise that can no longer be kept (the partner died, the crew hold the bay) is released with a ship line and no penalty, and so is one that was already true when it was said (no partner, partner already up). With 14 days left a ship line warns once and Advance stops. A kept promise gives `PromiseKept` trust and `PromiseKeptMorale`, a broken one `PromiseBroken` trust and `PromiseBrokenMorale` (morale moves work speed). Saying a promise gives `PromiseMade` trust once per person per waking. "Never thaw them again" has no date (kept at arrival, broken by a thaw); a promise the game can't check stays out of the ledger. A person is not asked for something the ship has already promised them.
+
 Work terms tie the briefing to the repair. Each fault lists what a repairer can be told before starting, and each item changes how the work goes:
 
 | Briefing | Effect on the work |
@@ -545,6 +547,16 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 | How was Short haul balanced? | See "Balance" below |
 | What does a navigation fault still patched at arrival cost? | Arrival slips by years; Adrift only when a navigation fault's clock runs out unrepaired, including a returned patch (2026-11-13) |
 | What is the consequence of low trust? | A bay takeover: two awake people under 15 trust with Engineering 2 between them warn for one beat, then take the cold-sleep bay; the ending can be "Landfall without you" (2026-11-13) |
+
+Decided by the main session while the user was away, 2026-11-13 (first build of "Conversations", step 1: the promise ledger):
+
+| Question | Decision |
+| --- | --- |
+| When is "open the logs" kept? | At its due date, or when the person goes to sleep, if every log is open then; not at once (no open and restrict farming) |
+| Does a promise earn trust every time it is said? | No: `PromiseMade` once per person per waking (it was farmable) |
+| A promise that can no longer be kept? | Released with a ship line, no penalty (the partner died, the bay is taken, nothing to keep) |
+| Do promises move morale? | Yes: kept +3, broken -8, and morale moves work speed |
+| How long does a promise last? | 45 days (`PromiseDueDays`); a warning at 14 days left stops Advance |
 
 ### Questions for playtest
 

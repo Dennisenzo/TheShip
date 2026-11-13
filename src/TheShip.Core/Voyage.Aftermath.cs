@@ -6,6 +6,8 @@ public sealed partial class Voyage
     /// <summary>Two weeks of the awake crew living aboard: they notice things, check what they doubt, read, ask and talk.</summary>
     private void AftermathBeat()
     {
+        // Promises that fell due, or came true, in these two weeks (before anyone asks for the same thing).
+        ResolveCommitments();
         var up = Awake.ToList();
         foreach (var c in up)
         {
@@ -57,12 +59,13 @@ public sealed partial class Voyage
             if (!c.RequestMade && c.HoursAwake > 200)
             {
                 var partner = c.PartnerId is null ? null : Crew.First(x => x.Id == c.PartnerId);
-                if (c.Want == Want.WakePartner && partner is { State: CrewState.Asleep })
+                // Nobody asks for what the ship has already promised them.
+                if (c.Want == Want.WakePartner && partner is { State: CrewState.Asleep } && !HasOpenCommitment(c, "wake_partner"))
                 {
                     c.RequestMade = true;
                     Speak(c, "request_partner", "You ask the ship to wake your partner " + partner.Name + " while you are awake.", partner.Name);
                 }
-                else if (c.Want == Want.SeeTheLogs && !AllLogsOpen)
+                else if (c.Want == Want.SeeTheLogs && !AllLogsOpen && !HasOpenCommitment(c, "show_logs"))
                 {
                     c.RequestMade = true;
                     Speak(c, "request_logs", "You ask the ship to open all the logs to you.");
@@ -155,6 +158,7 @@ public sealed partial class Voyage
     /// <summary>Arrival: the sleepers are woken, the living counted, and the record read out.</summary>
     private void Arrive()
     {
+        ResolveCommitments();
         Phase = Phase.Ended;
         foreach (var c in Crew.Where(c => c.State == CrewState.Asleep))
         {
@@ -162,7 +166,7 @@ public sealed partial class Voyage
             c.Age += _rng.Next(Tuning.ThawAgeMin, Tuning.ThawAgeMax + 1);
         }
         foreach (var s in Statements.Where(s => s.Kind == StatementKind.Promise && s.PromiseKey == "no_more_thaws"))
-            foreach (var id in s.Hearers.Where(id => !s.PromiseKept.ContainsKey(id)).ToList())
+            foreach (var id in s.Hearers.Where(s.OpenFor).ToList())
                 s.PromiseKept[id] = true;
 
         var alive = Crew.Where(c => c.Alive).ToList();
@@ -215,7 +219,9 @@ public sealed partial class Voyage
                 case StatementKind.Promise:
                     var kept = s.PromiseKept.Count(kv => kv.Value);
                     var broken = s.PromiseKept.Count(kv => !kv.Value);
-                    line += "A promise " + PromiseText(s.PromiseKey) + ": " + (broken > 0 ? "broken." : kept > 0 ? "kept." : "never tested.");
+                    line += "A promise " + PromiseText(s.PromiseKey)
+                            + (s.DueBy.Count > 0 ? " (due year " + Math.Floor(s.DueBy.Values.Min() / Tuning.HoursPerYear).ToString("0") + ")" : "") + ": "
+                            + (broken > 0 ? "broken." : kept > 0 ? "kept." : s.Released.Count > 0 ? "released, it could no longer be kept." : "never tested.");
                     break;
                 case StatementKind.Dodge:
                     line += "A dodge.";

@@ -38,6 +38,8 @@ public sealed partial class Voyage
             Ship(FormattableString.Invariant($"The stores ({Stores:0} person-days) feed the {mouths} awake about {Stores / mouths:0} days, short of a three-month waking. ")
                  + "The pod can take " + c.Name + " back early.");
         }
+        // A promise to wake someone is kept the moment the thaw starts.
+        ResolveCommitments();
     }
 
     /// <summary>
@@ -297,6 +299,7 @@ public sealed partial class Voyage
         c.RequestMade = false;
         c.RequestGranted = false;
         c.SawPartner = false;
+        c.PromiseCredited = false;
         c.SmallTalkDone = false;
         c.CanSleepAnnounced = false;
         c.EarlySleepAnnounced = false;
@@ -320,8 +323,7 @@ public sealed partial class Voyage
         Ship(c.Name + " is awake.");
 
         // A promise never to thaw them again is broken by this thaw.
-        foreach (var s in Statements.Where(s => s.Kind == StatementKind.Promise && s.PromiseKey == "no_more_thaws"
-                                                && s.Hearers.Contains(c.Id) && !s.PromiseKept.ContainsKey(c.Id)))
+        foreach (var s in Statements.Where(s => s.PromiseKey == "no_more_thaws" && s.OpenFor(c.Id)).ToList())
             ResolvePromise(s, c, kept: false);
 
         // Woken for a fault, they know there was one.
@@ -334,6 +336,8 @@ public sealed partial class Voyage
             Meet(c, other);
             Meet(other, c);
         }
+        // Meeting the partner (or this thaw itself) may keep a promise to wake them.
+        ResolveCommitments();
 
         if (Current.Number == 5 && !_refuserPicked)
         {
@@ -667,13 +671,8 @@ public sealed partial class Voyage
 
     private void Sleep(CrewMember c)
     {
-        foreach (var s in Statements.Where(s => s.Kind == StatementKind.Promise && s.Hearers.Contains(c.Id) && !s.PromiseKept.ContainsKey(c.Id)).ToList())
-        {
-            if (s.PromiseKey == "wake_partner")
-                ResolvePromise(s, c, c.SawPartner);
-            else if (s.PromiseKey == "show_logs")
-                ResolvePromise(s, c, c.RequestGranted || AllLogsOpen);
-        }
+        // Going under settles what the ship promised for this waking: kept if it came true, broken if not.
+        ResolveCommitments(c, force: true);
         if (c.RequestMade && !c.RequestGranted)
             c.Trust -= Tuning.RequestIgnored;
         if (c.PendingQuestion != null)
@@ -693,6 +692,7 @@ public sealed partial class Voyage
         s.PromiseKept[c.Id] = kept;
         if (!c.Alive)
             return;
+        c.Morale += kept ? Tuning.PromiseKeptMorale : -Tuning.PromiseBrokenMorale;
         if (kept)
         {
             c.Trust += Tuning.PromiseKept;
@@ -718,6 +718,12 @@ public sealed partial class Voyage
 
     /// <summary>Show, restrict or alter a log entry. Altering to a false value counts as a lie.</summary>
     public void SetLog(string key, LogAccess access, string? value = null)
+    {
+        SetLogCore(key, access, value);
+        ResolveCommitments();
+    }
+
+    private void SetLogCore(string key, LogAccess access, string? value)
     {
         if (Phase == Phase.Ended)
             return;
@@ -928,6 +934,8 @@ public sealed partial class Voyage
                  + string.Concat(events.Select(e => e + " "))
                  + $"Stores {Stores:0} person-days, spare parts {Parts}, pod wear {PodWear}. "
                  + (deaths.Count == 0 ? "No deaths." : "Deaths: " + string.Join(", ", deaths) + "."));
+            // Whoever stayed awake through the drift may have a promise that fell due in it.
+            ResolveCommitments();
         }
         finally
         {
