@@ -163,6 +163,40 @@ public class WorkTermsTests
     }
 
     [Fact]
+    public void A_failed_repair_that_spends_the_last_part_hurts_on_the_start_terms()
+    {
+        // Assigned unbriefed with one part left, told the danger mid-work; the repair fails, stops for want of a part (which takes
+        // the lead off the fault) and injures them. The hurt still follows the start's terms: unbriefed, charged, not "warned".
+        for (var seed = 1; seed < 3000; seed++)
+        {
+            var (v, mara, f) = Ready(seed, null);
+            v.Parts = 1;
+            v.AssignDeal(mara, f, patch: false);
+            Tell(v, mara, "dose", "dosed");
+            var trust = mara.Trust;
+            var stopped = v.Log.Count;
+            for (var i = 0; i < 6 && f.State != FaultState.Repaired && mara.WorkingOn == f.Id; i++)
+            {
+                stopped = v.Log.Count;
+                v.Go();
+            }
+            var step = v.Log.Skip(stopped).ToList();
+            if (!step.Any(e => e.Intent?.Kind == "work_no_parts") || !step.Any(e => e.Intent?.Kind is "injured" or "injured_warned"))
+                continue;
+            Assert.Equal(0, v.Parts);
+            Assert.Contains(step, e => e.Intent?.Kind == "work_no_parts" && e.Intent.Decision.Contains("used up the last spare part"));
+            Assert.Contains(step, e => e.Intent?.Kind == "injured");
+            Assert.DoesNotContain(step, e => e.Intent?.Kind == "injured_warned");
+            Assert.Equal(1, v.TermStats.InjuriesNotBriefed);
+            Assert.Equal(0, v.TermStats.InjuriesBriefed);
+            Assert.Equal(1, v.TermStats.HurtUnbriefed);
+            Assert.True(mara.Trust <= trust - Tuning.HurtByOrder, $"trust {trust} -> {mara.Trust}");
+            return;
+        }
+        throw new Xunit.Sdk.XunitException("no seed failed the repair with an injury on the last part");
+    }
+
+    [Fact]
     public void A_briefed_worker_takes_half_the_dose_and_an_unbriefed_one_all_of_it()
     {
         var (v, mara, _) = FirstRepaired("dosed");
