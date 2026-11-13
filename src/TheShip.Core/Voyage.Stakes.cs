@@ -33,6 +33,16 @@ public sealed partial class Voyage
         Math.Clamp(Tuning.RepairBaseChance + Tuning.RepairPerSkill * (lead.SkillOf(f.Skill) - f.Level) + (morale - 50) / Tuning.RepairMoraleSpan,
             Tuning.RepairChanceMin, Tuning.RepairChanceMax);
 
+    /// <summary>How fast a team works at its average morale: 1.0 at <see cref="Tuning.MoraleRateNeutral"/>, slower below, faster above, within limits.</summary>
+    public static double MoraleRate(IEnumerable<CrewMember> team)
+    {
+        var list = team.ToList();
+        return list.Count == 0 ? 1 : MoraleRate(list.Average(c => c.Morale));
+    }
+
+    public static double MoraleRate(double morale) =>
+        Math.Clamp(1 + (morale - Tuning.MoraleRateNeutral) / Tuning.MoraleRateSpan, Tuning.MoraleRateMin, Tuning.MoraleRateMax);
+
     /// <summary>Who would lead the repair if <paramref name="joining"/> took it on: the most skilled of them and those already on it.</summary>
     private CrewMember LeadWith(CrewMember joining, Fault f) =>
         Crew.Where(c => c == joining || (c.State == CrewState.Awake && c.WorkingOn == f.Id))

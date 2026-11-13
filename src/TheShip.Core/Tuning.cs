@@ -87,6 +87,12 @@ public static class Tuning
     /// </summary>
     public const double ReliefMorale = 6;
 
+    /// <summary>Work speed follows the team's average morale: 1 + (morale - neutral) / span, within min and max (<see cref="Voyage.MoraleRate"/>).</summary>
+    public const double MoraleRateNeutral = 70;
+    public const double MoraleRateSpan = 150;
+    public const double MoraleRateMin = 0.8;
+    public const double MoraleRateMax = 1.15;
+
     // Repairs
     public const double RepairBaseChance = 0.85;
     public const double RepairPerSkill = 0.12;

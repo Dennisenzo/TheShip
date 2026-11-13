@@ -70,8 +70,9 @@ public sealed partial class Voyage
 
     private static double Rate(Fault f, IEnumerable<CrewMember> team)
     {
-        var skilled = team.Any(w => w.SkillOf(f.Skill) >= f.Level);
-        return (skilled ? 1 : Tuning.UnskilledRate) * (f.Patching ? Tuning.PatchRate : 1);
+        var list = team.ToList();
+        var skilled = list.Any(w => w.SkillOf(f.Skill) >= f.Level);
+        return (skilled ? 1 : Tuning.UnskilledRate) * (f.Patching ? Tuning.PatchRate : 1) * MoraleRate(list);
     }
 
     /// <summary>
@@ -95,7 +96,7 @@ public sealed partial class Voyage
         }
         if (team.Count < f.People)
             wait = Math.Max(wait, Tuning.ThawHours);
-        var rate = (skilled ? 1 : Tuning.UnskilledRate) * (patch ? Tuning.PatchRate : 1);
+        var rate = (skilled ? 1 : Tuning.UnskilledRate) * (patch ? Tuning.PatchRate : 1) * MoraleRate(team);
         var done = f.Patching == patch ? f.Progress : 0;
         return wait + Math.Max(0, f.Hours - done) / rate;
     }
