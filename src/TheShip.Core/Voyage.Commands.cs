@@ -444,8 +444,16 @@ public sealed partial class Voyage
         }
         else
         {
-            var chance = RepairChance(lead, f, lead.Morale, TermsOf(lead, f).OddsBonus);
-            if (_rng.NextDouble() > chance)
+            var bonus = TermsOf(lead, f).OddsBonus;
+            var chance = RepairChance(lead, f, lead.Morale, bonus);
+            var roll = _rng.NextDouble();
+            if (bonus > 0)
+            {
+                TermStats.BonusRolls++;
+                if (roll <= chance && roll > RepairChance(lead, f, lead.Morale))
+                    TermStats.BonusFlips++;
+            }
+            if (roll > chance)
             {
                 f.Progress = f.Hours * 0.5;
                 var spent = Tuning.FailedRepairSpendsPart && Parts > 0;
@@ -466,6 +474,10 @@ public sealed partial class Voyage
                     lead.Health -= Tuning.RepairInjury;
                     Clamp(lead);
                     if (terms.Risk == RiskKnowledge.Briefed)
+                        TermStats.InjuriesBriefed++;
+                    else
+                        TermStats.InjuriesNotBriefed++;
+                    if (terms.Risk == RiskKnowledge.Briefed)
                         Speak(lead, "injured_warned", "You were hurt during the repair. The ship had warned you of the danger and you took precautions.");
                     else if (terms.Risk == RiskKnowledge.Reassured)
                     {
@@ -477,6 +489,7 @@ public sealed partial class Voyage
                     else
                     {
                         lead.Trust -= Tuning.HurtByOrder;
+                        TermStats.HurtUnbriefed++;
                         Speak(lead, "injured", "You were hurt during the repair the ship asked you to do.");
                     }
                     if (lead.Health <= 0)
@@ -504,6 +517,10 @@ public sealed partial class Voyage
             {
                 var terms = TermsOf(w, f);
                 w.Health -= Tuning.DangerDose * terms.HarmShare;
+                if (terms.RiskBriefed)
+                    TermStats.DosesBriefed++;
+                else
+                    TermStats.DosesNotBriefed++;
                 w.ToNotice.Add(danger);
                 if (terms.Risk == RiskKnowledge.Unaware)
                     w.HurtUnbriefed.Add(danger);

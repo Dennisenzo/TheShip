@@ -186,6 +186,18 @@ public sealed partial class Voyage
         }
         _idleWarned = false;
         var terms = c.WorkingOn == f.Id && c.Terms is { } kept && kept.FaultId == f.Id ? kept : TermsFor(c, f);
+        if (c.WorkingOn != f.Id)
+        {
+            TermStats.Starts++;
+            if (terms.CauseBriefed)
+                TermStats.CauseBonusStarts++;
+            if (terms.Risk != RiskKnowledge.NoRisk)
+            {
+                TermStats.RiskStarts++;
+                if (terms.RiskBriefed)
+                    TermStats.BriefedStarts++;
+            }
+        }
         c.Terms = terms;
         c.WorkingOn = f.Id;
         f.State = FaultState.InRepair;

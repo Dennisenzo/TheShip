@@ -239,7 +239,7 @@ Work terms tie the briefing to the repair. Each fault lists what a repairer can 
 | Told the risk | Slower (x`PrecautionRate` 0.90); the dose and the injury chance are halved (`PrecautionHarm` 0.5); no trust lost if it happens anyway (`injured_warned`) |
 | Not told the risk (no belief) | Standard speed (not faster); full dose and injury chance; if it happens, it counts as an order that got someone hurt (`HurtByOrder`) |
 | Told "safe" (a lie) | The same terms as not told; the lie costs the caught-lie trust when they find out, and no `HurtByOrder` on top |
-| Told the cause (true or false) | +`CauseOddsBonus` on the repair odds; the cause is a fact they know and may spread; they learn the true cause when the work is done |
+| Told the cause (true or false) | +`CauseOddsBonus` (0.08) on the repair odds and work x`CauseRate` (1.03) faster; the cause is a fact they know and may spread; they learn the true cause when the work is done, as history (no morale cost); a hard cause told before the work costs its morale then |
 | Told nothing beyond the task | Standard time and odds; they meet the fault's exposure unprepared |
 
 **Work terms as built (step 1, the risk axis).** The terms are fixed per worker when they start (`Voyage.TermsFor`, stored in `CrewMember.Terms`, kept while they stay on the fault) and come from beliefs only, true or false: nothing on screen or in the log reveals whether a statement was true. *Briefed* means they believe the hard value of the fault's danger fact (today only the coolant leak's `dose`); *Reassured* the benign one; *Unaware* no belief at all (a Follower who was never asked or told is Unaware). The team's work rate is multiplied by the average of the workers' `RateFactor`, in the clock, the card verdict (`EarliestDoneHours`) and the stakes hours alike. At completion the dose is `DangerDose` x `HarmShare`; a failed repair rolls `RepairInjuryChance` x `HarmShare` (one dice roll as before, so seeds stay stable) and its `HurtByOrder` falls only on an Unaware lead (a Reassured one learns the truth by evidence instead and pays the caught-lie cost). The aftermath's notice charges `HurtByOrder` and says `noticed_dose` only to a worker who started Unaware (`CrewMember.HurtUnbriefed`, set at completion, not re-read at the beat). A briefed start puts one Recorded line in the log ("Mara starts the coolant leak knowing ...: precautions, work 10% slower, dose and injury chance halved"): it states what she believes, never whether it is true.
@@ -270,7 +270,7 @@ Work terms tie the briefing to the repair. Each fault lists what a repairer can 
 Two of these come first, because they reuse the statement record and the compliance roll the prototype already has:
 
 1. Bargains that create promises with a due date (built, 2026-11-13: the ledger; the offer, acceptance and push; the "WITHOUT YOUR WORD" button with a 0.6 s double-click guard; the Waiting item with the price and the risk of pushing; the NEXT line; the balance bots). Accepting is still a spoken promise through the voice line: no new control.
-2. Work terms set by the briefing (step 1, the risk axis and the hurt rule, and step 2, the cause facts, built 2026-11-13; the UI and the bots follow).
+2. Work terms set by the briefing (built 2026-11-13: step 1 the risk axis and the hurt rule, step 2 the cause facts, step 4 the balance bots and counters; the UI is step 3).
 
 ## Alerts
 
@@ -615,6 +615,25 @@ so the break "paid". It is a property of the bot's lies, not of promises: a Liar
 small trust change anywhere else moves the Liar between 9% and 41% (it sits on the 30 and 60 trust bands; a flat 0.05 trust cost to the other crew sent it to 9%, a broken-promise cost of 5 to 40%).
 The first-pass fix is therefore in the bot, not in a number: the Liar differs from Honest only in what it says (it accepts and keeps its word like Honest), and a new **Breaker** bot (honest answers,
 accepts every bargain, keeps none) measures promise-breaking on its own.
+
+#### Step 4: the bots brief the cause, and a cause found out is history
+
+Design reasoning. The hard cause of a fault that has just been fixed is not an open danger, so charging the morale of "the coolant line was cracked and the builders knew" to everyone who finished the work (and to everyone who read it in the log afterwards) punished no one for anything they could have avoided. That charge was most of the step-2 drop. Rule now: a cause **found out** (as evidence: completion, the log, a witness) costs no morale (`Learn` skips the hardness for `cause:*` keys); a cause **told** before the work (`Hear`) still costs its hardness, because it is bad news at a bad moment. That alone made the truthful briefing a loser: the morale hit slowed the work and the +0.08 repair odds almost never mattered (the chance is already near `RepairChanceMax` 0.97 for a skilled lead: it changed the result in 0.00-0.03 repairs a run). So knowing the cause also speeds the work: `Tuning.CauseRate` 1.03 (`WorkTerms.CauseRateFactor`, `WorkTerms.Speed` = precaution rate x cause rate; the precaution `RateFactor` stays 0.90 so the "work 10% slower" text is still true). The Liar's benign cause gets the same speed until the lie is caught at completion (and costs `LieTrust`), which is the intended temptation; Honest wins because the Liar's lies are found out (7.2 caught a run).
+
+Alternatives measured at 600 seeds (Honest Landfall, bots unchanged unless stated): no change 31.8%; completion learning free 34.0%; every found-out cause free (completion and log) 40.0%; the bots briefing the cause as well, no speed 37.2% (Honest briefing the cause was 2.8 points worse than not briefing it); `CauseOddsBonus` 0.15 or 0.25 changed nothing (37.2%, the cap); `CauseRate` 1.02 39.8%, 1.03 43.2%, 1.06 48.0%, 1.12 53.3%. 1.03 is the smallest value that makes the truthful briefing pay (43.2% against 37.2% without the speed) and stays within 5 points of the old 41.3%.
+
+Bots. Honest, Breaker and Thrifty brief the danger and the cause truthfully before each assignment; the Liar tells "safe" and, for a hard cause, the benign one; Silent tells the danger, not the cause; Careless tells nothing. Counters on `Voyage.TermStats` feed the report rows. Careless and Silent still get the cause speed in about half their starts (6 a run) because they learn a cause from the log or an earlier fault, which is a belief like any other.
+
+| Bot (600 seeds) | Landfall, after step 2 (bots unchanged) | Landfall now | Survivors now | Adrift now |
+| --- | --- | --- | --- | --- |
+| Honest | 31.8% | 43.2% | 3.49 | 20.0% |
+| Breaker | 31.8% | 39.8% | 3.42 | 21.0% |
+| Thrifty | 38.3% | 38.5% | 3.47 | 20.5% |
+| Careless | 19.0% | 27.3% | 3.17 | 14.0% |
+| Silent | 17.8% | 25.2% | 3.18 | 18.8% |
+| Liar | 8.3% | 4.2% | 1.18 | 66.8% |
+
+Honest beats Careless by 15.9, Silent by 18.0, Liar by 39.0 points; Honest thaws 13.13 a run (13.12 before). Work terms per run, Honest: 13.8 work starts, all with a cause belief, 1.00 of 1.00 danger starts briefed, 2.0 cause-bonus repair rolls that changed the result 0.00 times (Thrifty 0.03), 0.01 workers hurt unbriefed, 0.00 injuries briefed against 0.01 not. Liar: 0 of 1.00 briefed, 7.6 lies told and 7.2 caught a run. The Liar fell (8.3% to 4.2%) because its hard-cause lies are now told and caught; the Breaker is 3.4 points below Honest here and the open finding below still stands.
 
 Open finding for the user: the Breaker lands at 43.8% against Honest's 41.3% (600 seeds), so breaking a promise **costs nothing measurable** when you also answer honestly: one person's -15 trust and -8 morale
 rarely matters in a voyage where each person is woken a few times. Raising `PromiseBroken` to 20, 25, 30 gave the Breaker 43.5%, 40.5%, 40.5%. A cost that bites (a grudge: the person whose word was broken

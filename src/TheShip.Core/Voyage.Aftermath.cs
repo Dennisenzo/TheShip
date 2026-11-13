@@ -18,6 +18,7 @@ public sealed partial class Voyage
                 {
                     // They started with no word on the danger: an order that got someone hurt (a worker told, or told "safe", pays nothing here).
                     c.Trust -= Tuning.HurtByOrder;
+                    TermStats.HurtUnbriefed++;
                     Speak(c, "noticed_dose", "You found out the repair hurt you and the ship never told you: " + _facts[key].Say(_facts[key].Truth) + ".");
                 }
                 Learn(c, key, _facts[key].Truth, "evidence");

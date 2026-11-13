@@ -238,7 +238,10 @@ public sealed partial class Voyage
         var hard = f.HardnessOf(value);
         if (hard > 0 && news)
         {
-            c.Morale -= hard;
+            // A cause found out for oneself (finishing the work, the log) is history, not a hazard: no morale cost. Told before the
+            // work (Hear) it still costs, which is the price of a truthful briefing (DESIGN.md, "Work terms").
+            if (!key.StartsWith("cause:", StringComparison.Ordinal))
+                c.Morale -= hard;
             // The dodge is found out only if it hid this: the answer was already this when the ship avoided the question.
             if (c.Dodged.TryGetValue(key, out var hidden) && hidden.Any(h => f.Same(h, value)))
                 c.Trust -= Tuning.Dodge;
