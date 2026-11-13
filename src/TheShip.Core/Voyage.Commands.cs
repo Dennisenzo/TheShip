@@ -535,7 +535,7 @@ public sealed partial class Voyage
                 _facts["power"].Truth = "low";
                 break;
             case "pod":
-                PodWear += 3;
+                PodWear += Tuning.PodLostWear;
                 break;
             case "illness":
                 // Waking the patient does not cure them: the illness keeps its clock (the thaw has its usual risk).
@@ -548,7 +548,7 @@ public sealed partial class Voyage
                 _facts["arrival"].Truth = "late";
                 break;
             case "controller":
-                PodWear += 4;
+                PodWear += Tuning.ControllerLostWear;
                 break;
             case "blight":
                 Stores *= Tuning.BlightStoresLeft;

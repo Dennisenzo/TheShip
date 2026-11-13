@@ -13,10 +13,10 @@ public class PartsAndPatchesTests
     }
 
     [Fact]
-    public void The_voyage_starts_with_two_spare_parts()
+    public void The_voyage_starts_with_the_tuned_spare_parts()
     {
-        Assert.Equal(2, new Voyage(1).Parts);
-        Assert.Equal(2, Tuning.StartParts);
+        Assert.Equal(Tuning.StartParts, new Voyage(1).Parts);
+        Assert.Equal(5, Tuning.StartParts);
     }
 
     [Fact]
@@ -136,11 +136,11 @@ public class PartsAndPatchesTests
             var dead = v.Crew.Count(c => c.State == CrewState.Dead);
             InjectPatched(v, "controller");
             v.Drift();
-            Assert.Equal(wear + 4, v.PodWear);
+            Assert.Equal(wear + Tuning.ControllerLostWear, v.PodWear);
             Assert.Contains("The patch on the pod controller gave way.", v.Log.Last(e => e.Text.StartsWith("DRIFT:")).Text);
             sleeperDeaths += v.Crew.Count(c => c.State == CrewState.Dead) - dead;
         }
-        Assert.True(sleeperDeaths > 0, "no sleeper died in 40 runs at 15% each");
+        Assert.True(sleeperDeaths > 0, "no sleeper died in 40 runs at 10% each");
 
         var clean = ToTheLastDrift(1);
         var before = clean.Crew.Count(c => c.State == CrewState.Dead);
@@ -335,13 +335,13 @@ public class PartsAndPatchesTests
     }
 
     [Fact]
-    public void A_patched_pod_at_the_last_drift_adds_three_wear()
+    public void A_patched_pod_at_the_last_drift_adds_wear()
     {
         var v = ToTheLastDrift(1);
         var wear = v.PodWear;
         InjectPatched(v, "pod");
         v.Drift();
-        Assert.Equal(wear + 3, v.PodWear);
+        Assert.Equal(wear + Tuning.PodLostWear, v.PodWear);
         Assert.Contains("The patch on the failed pod gave way.", v.Log.Last(e => e.Text.StartsWith("DRIFT:")).Text);
     }
 
