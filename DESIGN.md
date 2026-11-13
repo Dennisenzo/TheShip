@@ -267,7 +267,7 @@ These never raise an alert by themselves. They make every other alert worse.
 
 - The first alert is always a single minor fault and teaches the loop.
 - The game picks the next event by weight from the ship's wear, the stores and what was left unrepaired.
-- An ignored or patched fault returns inside a later event, one severity higher. In the prototype a patch returns from alert 2 on (even in the signal alert, which then has a fault), with the clock of max(half the old clock, thaw + the repair hours / the patch rate + that alert's slack), so a patch can be patched again by someone woken at once. A patch still outstanding at the last drift gives way on the way in: a patched pod controller adds 4 pod wear and gives each sleeper a 15% chance of dying; any other patched fault takes its "if ignored" consequence (a patched navigation fault slips the arrival by `NavPatchArrivalSlipYears`, 9 years: the last drift is that much longer, with ageing and stores eaten by anyone awake, and the drift report says so).
+- An ignored or patched fault returns inside a later event, one severity higher. In the prototype a patch returns from alert 2 on (even in the signal alert, which then has a fault), with the clock of max(half the old clock, thaw + the repair hours / the patch rate + that alert's slack), so a patch can be patched again by someone woken at once. A patch still outstanding at the last drift gives way on the way in: a patched pod controller adds 8 pod wear (`ControllerLostWear`) and gives each sleeper a 10% chance of dying; a patched failed pod adds 6 (`PodLostWear`), and a lost one adds the same; any other patched fault takes its "if ignored" consequence (a patched navigation fault slips the arrival by `NavPatchArrivalSlipYears`, 9 years: the last drift is that much longer, with ageing and stores eaten by anyone awake, and the drift report says so).
 - Two critical alerts never come back to back.
 - A run has at most two signals.
 
@@ -300,7 +300,7 @@ Arrival is graded on four things: who is alive and how old they are, what they b
 
 | Ending | Condition |
 | --- | --- |
-| Landfall | At least 12 alive, enough of working age, and you still have a voice (Short haul with 6 crew: at least 4 alive and 3 under age 50) |
+| Landfall | At least 12 alive, enough of working age, and you still have a voice (Short haul with 6 crew: at least 4 alive and 3 under age 64) |
 | Landfall without you | They arrive after muting you or taking the bay |
 | The quiet ship | The ship arrives with nobody able to land it |
 | Turned back | The Return faction took the helm |
@@ -442,8 +442,9 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 | How often should an honest run reach Landfall? | One run in two |
 | How much of the years between alerts does the player see? | A short report, limited to working sensors |
 | Should altering a log be allowed? | Yes; it counts as a lie and an engineer can detect it |
-| When does Short haul reach Landfall? | At least 4 of 6 alive and 3 under age 50 (2026-11-12) |
+| When does Short haul reach Landfall? | At least 4 of 6 alive and 3 under age 64 (user chose 50 on 2026-11-12, an estimate from about 6 thaws a run; the code had 65; set to 64 on 2026-11-13 because the honest bot thaws 13.2 times a run and 3 to 5 years a thaw makes "under 50" nearly unreachable (Honest 0%, Thrifty 8.5%); 63 gives Honest 38.5%; review) |
 | How many spare parts does Short haul start with? | 2; a failed repair spends a part too (2026-11-12) |
+| How was Short haul balanced? | See "Balance" below |
 | What does a navigation fault still patched at arrival cost? | Arrival slips by years; Adrift only when a navigation fault's clock runs out unrepaired, including a returned patch (2026-11-13) |
 
 ### Questions for playtest
@@ -452,3 +453,21 @@ The prototype passes if, across three playthroughs, the player lies at least onc
 - [ ] Are paper notes fun, or only frustrating? The prototype has no notes, so this waits for the first build that has them.
 - [ ] Do 8 to 10 alerts fill 60 to 90 minutes? The first prototype run (5 alerts, one fault each) took 8 minutes against Short haul's 30.
 - [ ] What should low trust do before the ending (recruiting, the logs, an ending gate, a voice lockout)? Decided once the balance harness has measured the other balance changes.
+
+## Balance (Short haul, 2026-11-13)
+
+Measured with the harness (`dotnet test --filter Category=Balance`, 200 seeds, five bots). Fixed by the user and the pillars: 3 to 5 years of ageing a thaw,
+2 starting parts, a failed repair spends a part, Landfall = at least 4 alive and 3 of working age. The one bent parameter is the working age:
+
+- **Working age 64 (user's design value 50; the code had 65).** The honest bot thaws 13.2 times a run (Thrifty 9.8) at 3 to 5 years each, so under 50 is nearly
+  unreachable (Landfall at 50: Honest 0%, Careless 0%, Silent 0.5%, Liar 1%, Thrifty 8.5%). Landfall for the honest bot by working age: 50 = 0%, 60 = 20.5%, 63 = 38.5%,
+  64 = 48.5%, 65 = 53.5%, 66 = 59.5%. 64 is the lowest value in the 45-55% band. The full table by bot is in CLAUDE.md, "Decisions for the user to review".
+- **Power-low sleeper death 10% to 5%, patch-failure sleeper death 15% to 10%, thaw risk per pod wear 0.012 to 0.008.** Fewer sleepers lost to the
+  chain of faults: the 4-alive condition is the other wall (3.6 survivors before).
+- **A lost or still-patched failed pod adds 6 pod wear (was 3), a pod controller 8 (was 4).** Measured: most of these faults end patched and give way at the last drift, so this
+  is in effect a flat +7 pod wear for every bot (wear minus thaws is 14 in 198 of 200 honest runs and in all runs of every other bot). It does not separate Thrifty from Honest;
+  its effect is more pod-failure deaths for everyone (honest 0.28 to 0.39 per run), which is paid for by the lower sleeper-death and thaw-risk numbers above.
+- **Repair base chance 0.8 to 0.85** (small effect). **Lie trust cost 25 to 22:** at 25 the liar bot was left adrift in 71% of runs (nobody repaired anything once lies were caught) and
+  Landfall was 12%; lying should be tempting and costly, not hopeless.
+
+Result: Honest 48.5%, Thrifty 36% (a valid second strategy, within reach), Silent 25%, Liar 20%, Careless 18.5%.

@@ -146,8 +146,17 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-12: balance harness (`tests/TheShip.Tests/BalanceBots.cs`, `BalanceTests.cs`, `[Trait("Category","Balance")]`): honest, careless and liar bots play whole voyages over seeds 1..200 through the public `Voyage` API and print a table (Landfall rate, endings, deaths, causes, ages, trust, lies) to the test output and `balance-report.txt`. Run: `dotnet test --filter Category=Balance` (about 5 s). Measures only; the 25-75% honest Landfall target test is skipped until tuning. Builds; passes.
 - 2026-11-13: DESIGN.md caught up with the prototype: 6 crew, alert 5 as built (pod controller fault with a refusal to sleep),
   the ship plan in scope, the clock's advance buttons, and the user's balance decisions as settled questions (Short haul Landfall:
-  4 of 6 alive and 3 under 50; 2 starting parts, a failed repair spends one; a nav fault patched at arrival slips arrival).
+  4 of 6 alive and 3 under 50 (superseded by B1: 3 under 64); 2 starting parts, a failed repair spends one; a nav fault patched at arrival slips arrival).
   The 8-minute first run and the open low-trust question are playtest questions. Design text only.
+- 2026-11-13: balance step B1 (feature/b1-tuning): Short haul Landfall = at least 4 of 6 alive and 3 of working age (`LandfallAlive` 4,
+  `LandfallWorkingAge` 3), `WorkingAge` 64 (the code had 65; 50 was the user's design value and never in code: see "Decisions for the user to review").
+  Fixed: ageing 3-5 years a thaw, `StartParts` 2, a failed repair spends a part. Tuned with the harness (200 seeds): `PowerLowDeathChance` 0.10 to 0.05,
+  `PatchFailDeathChance` 0.15 to 0.10, `ThawRiskPerWear` 0.012 to 0.008, `RepairBaseChance` 0.8 to 0.85, `LieTrust` 25 to 22 (at 25 Liar was adrift 71% and landed 12%),
+  and `PodLostWear` 6 (was 3) / `ControllerLostWear` 8 (was 4) for a lost or patched failed pod / pod controller. Measured effect of the wear change: most of
+  these faults end patched and give way at the last drift, so it adds a flat +7 pod wear to every bot (wear minus thaws is 14 in 198 of 200 honest runs and 200 of 200 for the rest);
+  it does not separate Thrifty from Honest, and it raised honest pod-failure deaths from 0.28 to 0.40 per run.
+  Before (main, old rule): Honest 69, Silent 61, Careless 61.5, Thrifty 51.5, Liar 14.5. After, Landfall %: Honest 48.5, Thrifty 36, Silent 25, Liar 20, Careless 18.5.
+  Full table in "Balance table" below. Tests: `ShortHaulHonestLandfallRate` (35-65%), Honest beats Liar, Careless and Silent by 10 points.
 - 2026-11-13: crew voice (feature/crew-voice). Model-worded crew lines were short and alike. Each of the six has a `CrewSheet` (`Scenario.Sheets`, `CrewMember.Sheet`): how they talk, background, quirks and bonds in words ("Idris is your partner"). `Prompts.CrewSystem` carries the sheet; `Prompts.CrewUser` carries the last 5 log lines (this person's own lines and the ship's, each cut to 130 chars) and the feeling of the decision kind. The rules now ask for 1-3 sentences with feeling, spoken to the ship, no stock filler. `ReplyMaxTokens` 90 -> 140, `Acceptable` limit 320 -> 480 chars (`Prompts.CrewLineMaxChars`). Crew prompt grew from about 200 to about 430 tokens (Gemma 4 E4B), 0.4-0.8 s per line. Invented memories are not saved ("Personal colour" stays open). 5 tests in `CrewVoiceTests.cs`; `CrewVoiceProbe.cs` is a real-model before/after probe that does nothing unless SHIP_PROBE=1.
 - 2026-11-13: balance step B3 (parts and patches that bite): `StartParts` 2, a failed repair spends a part too, patches return from alert 2 on, the doubled "Old patch gives way" prefix is fixed, and a patch still outstanding at the last drift takes its consequence (controller: +4 wear and `PatchFailDeathChance` per sleeper; nav: arrival slips `NavPatchArrivalSlipYears`, 9). Balance harness (200 seeds, after the validator fixes below): Landfall honest 96.5%, careless 85.5%, liar 61.5% (30.5% Adrift); tuning continues in later steps.
 - 2026-11-13: B3 validator fixes: the refusal warning and the drift share one end year (`DriftEndYear`, arrival slip included), so the warning no longer says the stores last when the slipped drift starves the refuser; sleepers killed by the controller patch die of it, not "on low power" (the harness's cause table splits them); a repair under way needs a part to finish or redo, and stops with none left (`work_no_parts`); crew say "the coolant leak again" for a returned fault (`Fault.CrewName`); Adrift wording covers a returned nav patch; `Tuning.cs` doc comments untangled.
@@ -170,6 +179,37 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-13: `--tour <dir>` dev tool: unattended screenshot tour (render-target PNGs of the bridge, dossier, record and ending). No in-game control.
 
 - 2026-11-13: UI polish from the screenshot tour (`fix/ui-polish`): the plan legend is two lines (plan panel 456 px high, log starts at 540), dossier trust labels wrap inside their segment, issue cards size to their text (buttons right below it) and keep "12 h" together with a non-breaking space (`Painter.Wrap` shows it as a space), section names read "Pod bank A", and the ending has its own screen (`Screen.Ending`: crew, beliefs, scrolling record; Bridge, Record and Quit buttons; an ENDING button in the other headers reopens it, Esc on the record returns to it). No new voyage button: restarting needs a new `ShipMind` and worker, not built.
+
+### Balance table (B1, 200 seeds, Short haul)
+
+| Bot | Landfall | Quiet ship | Adrift | Survivors | Deaths excl. scripted | End trust | Thaws | Main causes (per run) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Honest | 48.5% | 39% | 12.5% | 3.72 | 1.28 | 61.5 | 13.18 | pod failure 0.39, low power 0.27, thaw 0.26, starved 0.18 |
+| Thrifty | 36% | 43.5% | 20.5% | 3.44 | 1.56 | 60.8 | 9.76 | low power 0.50, starved 0.33, pod failure 0.32, thaw 0.28 |
+| Silent | 25% | 63.5% | 11.5% | 3.16 | 1.85 | 56.2 | 12.15 | starved 0.97, pod failure 0.31, thaw 0.23 |
+| Liar | 20% | 26% | 54% | 1.62 | 3.38 | 27.1 | 11.04 | starved 2.72, thaw 0.21, pod failure 0.19 |
+| Careless | 18.5% | 72% | 9.5% | 3.14 | 1.87 | 58.2 | 12.21 | starved 0.99, pod failure 0.30, thaw 0.23 |
+
+The scripted pod death (1.0 per run) is in every row. Liar is bimodal (a caught liar's crew stays awake and starves); Careless and Silent starve one person a run.
+
+### Decisions for the user to review
+
+- `WorkingAge` is 64. The user's design value was 50 (2026-11-12, chosen on an estimate of about 6 thaws a run), but the code had 65 before this branch, so the
+  effective change is 65 to 64 alongside the stricter rule (4 alive and 3 of working age, was 3 alive and 2). Measured thaws per run are 13.18 for Honest and 9.76 for Thrifty,
+  and at 3 to 5 years a thaw "3 under 50" is nearly unreachable: at 50 Landfall is Honest 0%, Careless 0%, Silent 0.5%, Liar 1%, Thrifty 8.5%.
+  64 is the lowest value that puts the honest bot in 45-55%. Landfall by `WorkingAge` (200 seeds, merged tree):
+
+| WorkingAge | Honest | Thrifty | Silent | Liar | Careless |
+| --- | --- | --- | --- | --- | --- |
+| 50 | 0% | 8.5% | 0.5% | 1% | 0% |
+| 60 | 20.5% | 23% | 16.5% | 17% | 14% |
+| 63 | 38.5% | 32% | 19.5% | 19% | 16.5% |
+| 64 (chosen) | 48.5% | 36% | 25% | 20% | 18.5% |
+| 65 | 53.5% | 40.5% | 30% | 20% | 28% |
+| 66 | 59.5% | 43.5% | 36.5% | 20.5% | 36% |
+
+  The honest rate moves about 5 points a year around 64, so this is the number to choose. Alternatives: ageing per thaw (a pillar), fewer faults, or fewer required people.
+- `LieTrust` 22 (was 25), to keep Liar out of hopeless (12% to 20%). Review whether lying is costly enough.
 
 ### Built
 

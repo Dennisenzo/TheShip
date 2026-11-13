@@ -16,7 +16,7 @@ public static class Tuning
     public const int ThawAgeMax = 5;
     /// <summary>One year of ageing per ten years asleep.</summary>
     public const double SleepAgeing = 0.1;
-    public const double WorkingAge = 65;
+    public const double WorkingAge = 64;
 
     public const double StartStores = 1500;     // person-days
     public const int StartParts = 2;
@@ -35,14 +35,17 @@ public static class Tuning
     /// <summary>Years the arrival slips when the navigation fix was only a patch at the last drift.</summary>
     public const double NavPatchArrivalSlipYears = 9;
     /// <summary>Each sleeper's death chance when a patched pod controller gives way at the last drift.</summary>
-    public const double PatchFailDeathChance = 0.15;
-    public const double ThawRiskPerWear = 0.012;
+    public const double PatchFailDeathChance = 0.10;
+    public const double ThawRiskPerWear = 0.008;
     public const double ThawInjury = 25;
     /// <summary>Share of failed thaws that kill outright instead of injuring.</summary>
     public const double ThawFatalShare = 0.3;
     /// <summary>A sleeper's death chance in a drift is pod wear x years x this.</summary>
     public const double SleepDeathPerWearYear = 0.0001;
-    public const double PowerLowDeathChance = 0.10;
+    public const double PowerLowDeathChance = 0.05;
+    /// <summary>Pod wear a lost failed-pod or pod-controller fault adds.</summary>
+    public const int PodLostWear = 6;
+    public const int ControllerLostWear = 8;
     public const int PodsWornAt = 8;
     public const double StoresShortAt = 300;
     /// <summary>Days a person awake lives once the stores are empty (DESIGN.md, "What every decision spends": hunger).</summary>
@@ -53,7 +56,7 @@ public static class Tuning
     public const double NumberTolerance = 1;
 
     // Trust
-    public const double LieTrust = 25;
+    public const double LieTrust = 22;
     public const double LieMattersExtra = 10;
     public const double AlteredLogTrust = 30;
     public const double HardTruthTrust = 8;
@@ -80,7 +83,7 @@ public static class Tuning
     public const double DoubtThreshold = 55;
 
     // Repairs
-    public const double RepairBaseChance = 0.8;
+    public const double RepairBaseChance = 0.85;
     public const double RepairPerSkill = 0.12;
     public const double RepairInjuryChance = 0.15;
     public const double RepairInjury = 20;
@@ -90,6 +93,6 @@ public static class Tuning
     public const double EngineerSpotsAlteredLog = 0.6;
 
     // Ending (Short haul: 6 crew)
-    public const int LandfallAlive = 3;
-    public const int LandfallWorkingAge = 2;
+    public const int LandfallAlive = 4;
+    public const int LandfallWorkingAge = 3;
 }
