@@ -114,7 +114,6 @@ public sealed partial class ShipGame
         _ => "Works against you.",
     };
 
-    /// <summary>The ship's numbers in the header, each with its own colour, tooltip and change flash. Drawn from the right edge leftwards.</summary>
     /// <summary>The header's numbers, right to left: label, shown text, whether it warns, the key and value that flash, and the tooltip.</summary>
     private List<(string Label, string Text, bool Warn, string Key, double Value, string Tip)> Stats(Voyage v) => new()
     {
@@ -134,6 +133,7 @@ public sealed partial class ShipGame
     private float StatsWidth(Voyage v) =>
         Stats(v).Sum(s => _p.Small.MeasureString(s.Text).X + _p.Small.MeasureString(s.Label).X + 7 + 20) - 20;
 
+    /// <summary>The ship's numbers in the header, each with its own colour, tooltip and change flash. Drawn from the right edge leftwards.</summary>
     private void DrawStats(Voyage v, int right)
     {
         var hold = _transition is not null;
