@@ -22,9 +22,9 @@ public sealed partial class ShipGame
             return asker.Name + " is waiting for an answer.";
         var thawing = v.Crew.FirstOrDefault(c => c.State == CrewState.Thawing);
         var awake = v.Awake.ToList();
-        // While the crew hold the cold-sleep bay, waking and sleeping are theirs; the clock and talk are left.
-        if (v.Lockouts.Bay)
-            return "The crew hold the cold-sleep bay. Talk, keep a promise, or advance the clock.";
+        // While the crew hold the cold-sleep bay, waking and sleeping are theirs: a line that would say to wake or sleep someone
+        // says that instead (the clock and talk are left).
+        const string bay = "The crew hold the cold-sleep bay. Talk, keep a promise, or advance the clock.";
 
         if (v.Phase == Phase.Alert)
         {
@@ -32,14 +32,14 @@ public sealed partial class ShipGame
             if (open.Count == 0)
                 return "Nothing needs repair. Advance the clock.";
             if (awake.Count == 0 && thawing is null)
-                return "Nobody is awake. Wake someone from the crew list.";
+                return v.Lockouts.Bay ? bay : "Nobody is awake. Wake someone from the crew list.";
             var idle = awake.FirstOrDefault(c => c.WorkingOn is null);
             var unstaffed = open.Any(f => awake.Count(c => c.WorkingOn == f.Id) < f.People);
             if (idle != null && unstaffed)
                 return "Select " + idle.Name + ", then Repair or Patch.";
             if (thawing != null)
                 return thawing.Name + " thaws in " + Voyage.Hours(Math.Max(0, thawing.ThawDoneAt - v.Clock)) + ". Advance the clock.";
-            return unstaffed ? "A fault has nobody on it. Wake someone, or advance the clock." : "Work is under way. Advance the clock.";
+            return !unstaffed ? "Work is under way. Advance the clock." : v.Lockouts.Bay ? bay : "A fault has nobody on it. Wake someone, or advance the clock.";
         }
 
         if (awake.Count == 0 && thawing is null)
@@ -51,7 +51,7 @@ public sealed partial class ShipGame
             return thawing.Name + " thaws in " + Voyage.Hours(Math.Max(0, thawing.ThawDoneAt - v.Clock)) + ". Advance the clock.";
         var waiting = awake.FirstOrDefault(c => !v.CanSleepNow(c));
         if (waiting is null)
-            return "Everyone awake can sleep. Ask them, then drift.";
+            return v.Lockouts.Bay ? bay : "Everyone awake can sleep. Ask them, then drift.";
         var days = Math.Ceiling((Tuning.MinAwakeHours - waiting.HoursAwake) / 24);
         return waiting.Name + " can sleep in " + N(days) + " days. Advance the clock, or talk.";
     }
