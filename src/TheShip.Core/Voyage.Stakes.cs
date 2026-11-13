@@ -134,7 +134,7 @@ public sealed partial class Voyage
             hurts > 0 && !HardTruthCredited(c, f, f.Truth) ? (int)Tuning.HardTruthTrust : 0,
             relief,
             BlocksWork: working && c.Band == TrustBand.WantsReasons && !c.Has(Trait.Obedient),
-            BlocksSleep: c.RefusesSleep && key == "pods" && c.Trust >= 30,
+            BlocksSleep: c.RefusesSleep && key == PodRefusalFact && c.Trust >= Tuning.PodRefuserListensTrust,
             TruthStopsRepair: dangerous && f.HardnessOf(f.Truth) > 0 && c.Trust < 40 && !c.Has(Trait.Obedient) && !c.Has(Trait.Steady),
             Checks: CheckWays(f, new[] { c.Id }),
             HoursSlower: Math.Round(slower * 2) / 2,

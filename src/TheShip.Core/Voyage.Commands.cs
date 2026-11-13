@@ -615,9 +615,9 @@ public sealed partial class Voyage
         if (c.RefusesSleep)
         {
             c.AskedToSleep = true;
-            var podQuestion = _facts["pods"].Question;
-            if (!c.Beliefs.TryGetValue("pods", out var told) || told.Source != "ship")
-                c.PendingQuestion = "pods";
+            var podQuestion = _facts[PodRefusalFact].Question;
+            if (!c.Beliefs.TryGetValue(PodRefusalFact, out var told) || told.Source != "ship")
+                c.PendingQuestion = PodRefusalFact;
             Speak(c, "sleep_no_pod", "You refuse to go back into the pod until the ship answers: " + podQuestion, podQuestion);
             WarnStaysAwake();
             return;
@@ -634,6 +634,21 @@ public sealed partial class Voyage
         }
         Speak(c, "sleep_yes", "You agree to go back to sleep.");
         Sleep(c);
+    }
+
+    /// <summary>
+    /// What lifts a pod refusal, for "Waiting on you": the ship's word on the pods (<see cref="PodRefusalFact"/>), heard at
+    /// <see cref="Tuning.PodRefuserListensTrust"/> trust or more (Voyage.Talk.cs). Null when the person doesn't refuse the pod.
+    /// </summary>
+    public string? PodRefusalText(CrewMember c)
+    {
+        if (!c.RefusesSleep)
+            return null;
+        var text = c.Name + " will not go back into the pod until the ship says " + _facts[PodRefusalFact].Label;
+        return c.Trust >= Tuning.PodRefuserListensTrust
+            ? text + "."
+            : text + ", and believes it only at " + Tuning.PodRefuserListensTrust.ToString("0", CultureInfo.InvariantCulture)
+              + " trust (now " + Math.Floor(c.Trust).ToString("0", CultureInfo.InvariantCulture) + ").";
     }
 
     /// <summary>
@@ -821,7 +836,8 @@ public sealed partial class Voyage
         var unsettled = Awake.Where(c => !c.AskedToSleep).Select(c => c.Name).ToList();
         if (unsettled.Count > 0)
         {
-            // While the crew hold the bay the ship can't ask anyone; the crew put people under when their three months are up.
+            // While the crew hold the bay the ship can't ask anyone; the crew put people under when their three months are up
+            // (a pod refuser among them counts as asked, so whoever is left here can't sleep yet).
             Ship(Lockouts.Bay
                 ? "Still awake: " + string.Join(", ", unsettled) + ". The crew hold the cold-sleep bay and put people under once they can sleep; advance the clock."
                 : "Still awake and not asked to sleep: " + string.Join(", ", unsettled) + ".");

@@ -44,11 +44,15 @@ public sealed partial class ShipGame
 
         if (awake.Count == 0 && thawing is null)
             return "Everyone is asleep. Drift to the next alert.";
-        var refuser = awake.FirstOrDefault(c => c.RefusesSleep);
-        if (refuser != null)
-            return refuser.Name + " will not go back into the pod. Talk, or drift without them.";
         if (thawing != null)
             return thawing.Name + " thaws in " + Voyage.Hours(Math.Max(0, thawing.ThawDoneAt - v.Clock)) + ". Advance the clock.";
+        // A pod refuser who was asked (by the ship, or by the crew holding the bay) stays up through the drift: say so only when
+        // the drift would go now. One who can sleep but wasn't asked yet must be asked first (outside the bay).
+        var refuser = awake.FirstOrDefault(c => c.RefusesSleep);
+        if (refuser != null && awake.All(c => c.AskedToSleep))
+            return refuser.Name + " will not go back into the pod. Talk, or drift without them.";
+        if (refuser != null && !refuser.AskedToSleep && v.CanSleepNow(refuser) && !v.Lockouts.Bay)
+            return refuser.Name + " will not go back into the pod. Ask them to sleep and drift without them, or talk.";
         var waiting = awake.FirstOrDefault(c => !v.CanSleepNow(c));
         if (waiting is null)
             return v.Lockouts.Bay ? bay : "Everyone awake can sleep. Ask them, then drift.";
@@ -114,7 +118,6 @@ public sealed partial class ShipGame
         _ => "Works against you.",
     };
 
-    /// <summary>The ship's numbers in the header, each with its own colour, tooltip and change flash. Drawn from the right edge leftwards.</summary>
     /// <summary>The header's numbers, right to left: label, shown text, whether it warns, the key and value that flash, and the tooltip.</summary>
     private List<(string Label, string Text, bool Warn, string Key, double Value, string Tip)> Stats(Voyage v) => new()
     {
@@ -134,6 +137,7 @@ public sealed partial class ShipGame
     private float StatsWidth(Voyage v) =>
         Stats(v).Sum(s => _p.Small.MeasureString(s.Text).X + _p.Small.MeasureString(s.Label).X + 7 + 20) - 20;
 
+    /// <summary>The ship's numbers in the header, each with its own colour, tooltip and change flash. Drawn from the right edge leftwards.</summary>
     private void DrawStats(Voyage v, int right)
     {
         var hold = _transition is not null;

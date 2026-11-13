@@ -9,6 +9,9 @@ namespace TheShip.Core;
 /// </summary>
 public sealed partial class Voyage
 {
+    /// <summary>The fact a pod refuser (<see cref="CrewMember.RefusesSleep"/>) waits to hear the ship's word on.</summary>
+    public const string PodRefusalFact = "pods";
+
     private readonly Random _rng;
     private readonly Dictionary<string, Fact> _facts;
     private readonly List<string> _patched = new();

@@ -79,10 +79,15 @@ public class MainValidationTests
     {
         var v = new Voyage(1);
         var mara = Woken(v, "mara");
+        var jonah = Woken(v, "jonah");
         v.Go();
         var fault = v.FindFault("coolant")!;
         AssignAnswering(v, mara, fault);
-        mara.Morale = 60;
+        AssignAnswering(v, jonah, fault);
+        Assert.Equal(2, v.Crew.Count(c => c.WorkingOn == fault.Id));
+        // A team at far apart morale: the hours follow the team's average (the asker alone would quote 1 h, the team takes 0.5 h).
+        jonah.Morale = 100;
+        mara.Morale = 50;
         mara.Beliefs.Remove("dose");
         mara.PendingQuestion = "dose";
         var s = v.StakesOf(mara)!;
@@ -118,5 +123,79 @@ public class MainValidationTests
         Assert.Equal(CrewState.Asleep, v.Find("jonah")!.State);
         Assert.Equal(CrewState.Awake, lin.State);
         Assert.True(lin.RefusesSleep, lin.PendingQuestion);
+    }
+
+    /// <summary>
+    /// Seed 1: Mara and Jonah at trust 5 take the bay; Lin refuses the pod at <paramref name="linTrust"/>. Runs aftermath beats
+    /// until the crew's sleep rule has dealt with everyone who can sleep, and returns the voyage.
+    /// </summary>
+    private static Voyage BayWithPodRefuser(double linTrust)
+    {
+        var v = new Voyage(1);
+        VoyageTests.HonestFirstAlert(v);
+        v.Wake(v.Find("jonah")!);
+        var lin = v.Find("lin")!;
+        v.Wake(lin);
+        v.Go();
+        lin.RefusesSleep = true;
+        lin.PendingQuestion = null;
+        for (var i = 0; i < 14 && v.Phase == Phase.Aftermath && !(v.Lockouts.Bay && v.CanSleepNow(lin) && v.Awake.All(c => c == lin)); i++)
+        {
+            v.Find("mara")!.Trust = 5;
+            v.Find("jonah")!.Trust = 5;
+            lin.Trust = linTrust;
+            v.GoUntilAttention();
+        }
+        Assert.True(v.Lockouts.Bay);
+        Assert.Equal(Phase.Aftermath, v.Phase);
+        return v;
+    }
+
+    [Fact]
+    public void Under_the_bay_a_pod_refuser_at_low_trust_does_not_block_the_drift()
+    {
+        var v = BayWithPodRefuser(20);
+        var lin = v.Find("lin")!;
+        Assert.Equal(CrewState.Awake, lin.State);
+        Assert.True(lin.RefusesSleep);
+        Assert.True(lin.AskedToSleep, "the crew asked her, as the ship would outside the bay");
+        Assert.Contains(v.Log, e => e.Text.StartsWith("If you drift now, Lin stays awake through it"));
+
+        var alert = v.AlertIndex;
+        v.Drift();
+        Assert.DoesNotContain(v.Log, e => e.Text.StartsWith("Still awake"));
+        Assert.True(v.AlertIndex > alert || v.Phase == Phase.Ended, "the drift went without her");
+    }
+
+    [Fact]
+    public void Under_the_bay_the_pods_statement_still_lifts_a_refusal_at_trust_50()
+    {
+        var v = BayWithPodRefuser(50);
+        var lin = v.Find("lin")!;
+        Assert.True(lin.AskedToSleep);
+        var pods = v.GetFact(Voyage.PodRefusalFact);
+        v.Say(pods.Say(pods.Truth), new Reading(LineKind.Statement, Voyage.PodRefusalFact, pods.Truth), new[] { lin });
+        Assert.False(lin.RefusesSleep);
+        // The crew put her under at the next beat, as anyone else who can sleep.
+        v.GoUntilAttention();
+        Assert.Equal(CrewState.Asleep, lin.State);
+    }
+
+    [Fact]
+    public void A_pod_refuser_whose_question_was_settled_is_shown_what_lifts_the_refusal()
+    {
+        var v = new Voyage(1);
+        var lin = Woken(v, "lin");
+        v.Go();
+        lin.RefusesSleep = true;
+        // She read the log, so Learn settled her pods question; the refusal stays.
+        lin.PendingQuestion = null;
+        lin.Trust = 50;
+        Assert.Equal("Lin will not go back into the pod until the ship says whether the sleep pods are sound.", v.PodRefusalText(lin));
+        lin.Trust = 20;
+        Assert.Equal("Lin will not go back into the pod until the ship says whether the sleep pods are sound, and believes it only at 30 trust (now 20).",
+                     v.PodRefusalText(lin));
+        lin.RefusesSleep = false;
+        Assert.Null(v.PodRefusalText(lin));
     }
 }
