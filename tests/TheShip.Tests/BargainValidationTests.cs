@@ -117,15 +117,15 @@ public class BargainValidationTests
         v.Wake(mara);
         v.Go();
         var f = v.FindFault("")!;
-        for (var round = 0; round < 3 && mara.OpenBargain is null; round++)
+        // Her question and the danger are answered first, so the price is her only condition.
+        for (var i = 0; i < 4 && mara.PendingQuestion is { } q; i++)
         {
-            for (var i = 0; i < 4 && mara.PendingQuestion is { } q; i++)
-            {
-                var fact = v.GetFact(q);
-                v.Say(fact.Say(fact.Truth), new Reading(LineKind.Statement, fact.Key, fact.Truth), new[] { mara });
-            }
-            v.Assign(mara, f, patch: false);
+            var fact = v.GetFact(q);
+            v.Say(fact.Say(fact.Truth), new Reading(LineKind.Statement, fact.Key, fact.Truth), new[] { mara });
         }
+        if (f.DangerFact is { } danger)
+            v.Say(v.GetFact(danger).Say(v.GetFact(danger).Truth), new Reading(LineKind.Statement, danger, v.GetFact(danger).Truth), new[] { mara });
+        v.Assign(mara, f, patch: false);
         Assert.Equal("wake_partner", mara.OpenBargain?.Key);
         return (v, mara, f);
     }
@@ -148,22 +148,22 @@ public class BargainValidationTests
     }
 
     [Fact]
-    public void Agreeing_while_a_question_waits_gives_the_answer_refusal_and_work_starts_once_answered()
+    public void Agreeing_while_a_question_waits_strikes_the_deal_and_the_work_starts_by_itself_once_answered()
     {
         var (v, mara, f) = Offered();
         mara.PendingQuestion = "alive:idris";
         v.Say("Agreed.", Promise("wake_partner"), new[] { mara });
-        Assert.Equal(1, Kind(v, "refuse_answer"));
+        // The word is given; the question still stands, so she does not start yet and does not close the deal.
+        Assert.Equal(1, v.BargainsStruck);
         Assert.Equal(0, Kind(v, "bargain_struck"));
         Assert.NotEqual(f.Id, mara.WorkingOn);
 
         var fact = v.GetFact("alive:idris");
-        v.Say(fact.Say(fact.Truth), new Reading(LineKind.Statement, fact.Key, fact.Truth), new[] { mara });
         var trust = mara.Trust;
-        v.Assign(mara, f, patch: false);
+        v.Say(fact.Say(fact.Truth), new Reading(LineKind.Statement, fact.Key, fact.Truth), new[] { mara });
         Assert.Equal(f.Id, mara.WorkingOn);
         Assert.Equal(0, Kind(v, "comply_pushed") + Kind(v, "bargain_refused"));
-        Assert.Equal(trust, mara.Trust, 3);
+        Assert.True(mara.Trust >= trust - 0.001);
     }
 
     // ---- 5. Promises about the dead and about logs the crew took ----

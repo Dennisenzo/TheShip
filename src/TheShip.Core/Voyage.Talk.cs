@@ -27,6 +27,9 @@ public sealed partial class Voyage
         foreach (var l in listeners)
             Clamp(l);
         LapseBargains();
+        // The last condition of a job met by this line: the work starts by itself.
+        foreach (var l in listeners)
+            ResumeJob(l);
         return true;
     }
 
@@ -52,6 +55,14 @@ public sealed partial class Voyage
 
     private void Apply(string text, Reading reading, List<CrewMember> listeners)
     {
+        // What the line responds to (an open question, terms, a request): the game decides what that does, then the rest is as usual.
+        (reading, var handled) = ApplyItem(reading, listeners);
+        if (handled.Count > 0)
+        {
+            listeners = listeners.Where(l => !handled.Contains(l)).ToList();
+            if (listeners.Count == 0)
+                return;
+        }
         var names = string.Join(" and ", listeners.Select(l => l.Name));
         var ids = listeners.Select(l => l.Id).ToList();
         switch (reading.Kind)
@@ -158,6 +169,13 @@ public sealed partial class Voyage
                     Speak(l, "answer", "The ship asked you something. You only know what you were told and what you saw; say so.");
                 break;
             case LineKind.Order:
+                // An order in words means the job that person has on the table (the same as Repair or Patch for it); with none, they ask which fault.
+                if (listeners.Select(l => (Who: l, Job: JobOf(l))).FirstOrDefault(x => x.Job != null) is { Job: { } job } ordered)
+                {
+                    Recorded("Recorded: you told " + ordered.Who.Name + " to get on with it.");
+                    Assign(ordered.Who, job.Fault, job.Patch);
+                    break;
+                }
                 Speak(listeners[0], "order", "The ship gave an order in words. You ask which fault it means.");
                 Log.Add(new LogEntry(LogKind.Help, "", "Work is asked for on the issue itself: select someone awake, then Repair or Patch."));
                 break;

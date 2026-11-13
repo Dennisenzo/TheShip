@@ -20,6 +20,8 @@ public static class Lines
             "ask_danger" => Pick(rng, "Before I go in: " + detail, "One thing first. " + detail),
             "comply" => Pick(rng, "On it. " + Cap(detail) + ".", "All right. I'll take " + detail + "."),
             "bargain" => Pick(rng, "I'll take it, if you give me your word: " + detail + ".", "I'll do it. First your word: " + detail + "."),
+            "conditions" => Pick(rng, "Before I start, all of it at once: " + detail, "I have conditions, and I want them met. " + detail),
+            "request_declined" => Pick(rng, "So that's a no. I won't forget it.", "No? All right. Then you know what I think of that."),
             "bargain_struck" => Pick(rng, "Then we have a deal. " + Cap(detail) + ".", "Good. I'll hold you to it. " + Cap(detail) + "."),
             "comply_pushed" => Pick(rng, "Fine. I'll do it. I haven't forgotten what I asked.", "All right, I'm going. But I remember what I asked for."),
             "bargain_refused" => Pick(rng, "My terms haven't changed. " + Cap(detail) + ".", "Not without your word. " + Cap(detail) + "."),

@@ -293,59 +293,6 @@ public sealed partial class Voyage
             Ship(f.Name + " needs " + f.People + " people before the work can start.");
     }
 
-    /// <summary>
-    /// The Assign gate for a wary person: offer the condition once per waking, refuse while it stands, or let a push roll.
-    /// True when the click was handled here (no work started, unless the push passed).
-    /// </summary>
-    private bool BargainGate(CrewMember c, Fault f, bool patch)
-    {
-        var task = TaskText(f, patch);
-        if (BargainOf(c) is not { } b)
-        {
-            if (c.BargainOffered || BargainKeyFor(c) is not { } key)
-                return false;
-            c.BargainOffered = true;
-            c.BargainDeclined = false;
-            c.OpenBargain = new Bargain(key, f.Id, patch, Current.Number);
-            BargainsOffered++;
-            OfferLine(c, c.OpenBargain, task);
-            return true;
-        }
-        if (b.FaultId != f.Id || b.Patch != patch)
-        {
-            // They name the same price for the other piece of work.
-            c.OpenBargain = b = b with { FaultId = f.Id, Patch = patch };
-            if (!c.BargainDeclined)
-            {
-                OfferLine(c, b, task);
-                return true;
-            }
-        }
-        var cond = CommitmentText(c, b.Key);
-        if (c.BargainDeclined)
-        {
-            Speak(c, "bargain_refused", "You still will not start " + task + " without the ship's word to " + cond + ".", cond);
-            return true;
-        }
-        // Pushing past the condition: one roll, and it costs trust either way.
-        var pass = _rng.NextDouble() < PushChance(c);
-        c.Trust -= Tuning.BargainPushedTrust;
-        Clamp(c);
-        if (pass)
-        {
-            c.OpenBargain = null;
-            BargainsPushedThrough++;
-            StartWork(c, f, patch, "comply_pushed", "You start " + task + " without the ship's word to " + cond + ", and you let the ship know it.");
-        }
-        else
-        {
-            c.BargainDeclined = true;
-            BargainsPushedRefused++;
-            Speak(c, "bargain_refused", "You will not start " + task + " without the ship's word to " + cond + ". You were pushed and you refuse.", cond);
-        }
-        return true;
-    }
-
     private void OfferLine(CrewMember c, Bargain b, string task)
     {
         var cond = CommitmentText(c, b.Key);
@@ -367,10 +314,12 @@ public sealed partial class Voyage
     {
         var f = Current.Faults.FirstOrDefault(x => x.Id == b.FaultId);
         c.OpenBargain = null;
+        var stated = c.Job?.Stated ?? new List<JobCondition>();
+        c.Job = null;
         if (f is null || f.Resolved || Locked(f.Section) || (!b.Patch && Parts <= 0)
             || c.State != CrewState.Awake || (c.WorkingOn != null && c.WorkingOn != f.Id))
             return false;
-        if (Refuses(c, f))
+        if (TrustRefuses(c) || DangerRefuses(c, f))
         {
             StartCommitment(made, c);
             return true;
@@ -378,7 +327,9 @@ public sealed partial class Voyage
         StartCommitment(made, c, Tuning.BargainDueDays);
         made.Bargained.Add(c.Id);
         BargainsStruck++;
-        StartWork(c, f, b.Patch, "bargain_struck", "You have the ship's word to " + CommitmentText(c, b.Key) + ". You start " + TaskText(f, b.Patch) + ".");
+        // The word is given. If it was the last condition the work starts now; otherwise it starts when the rest are met.
+        c.Job = new JobTerms(f.Id, b.Patch, stated);
+        ResumeJob(c, "bargain_struck", "You have the ship's word to " + CommitmentText(c, b.Key) + ". You start " + TaskText(f, b.Patch) + ".");
         return true;
     }
 

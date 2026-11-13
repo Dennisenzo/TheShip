@@ -122,6 +122,10 @@ public sealed class CrewMember
     public bool AskedToSleep { get; set; }
     public bool RequestMade { get; set; }
     public bool RequestGranted { get; set; }
+    /// <summary>The ship said no to their request (in words); the cost was charged then.</summary>
+    public bool RequestDeclined { get; set; }
+    /// <summary>The conditions they stated for the job they were asked to start (null when none are open).</summary>
+    public JobTerms? Job { get; set; }
     public bool SawPartner { get; set; }
     /// <summary>A promise has already earned its small trust gain in this waking (once per person per waking; reset at the thaw).</summary>
     public bool PromiseCredited { get; set; }
@@ -288,12 +292,28 @@ public sealed class Statement
     public bool OpenFor(string id) => Kind == StatementKind.Promise && Hearers.Contains(id) && !PromiseKept.ContainsKey(id) && !Released.Contains(id) && !Repeated.Contains(id) && !Moot.Contains(id);
 }
 
+/// <summary>How a line responds to an open item: answers it, accepts it, refuses it, dodges it, orders the work on (instead of waiting), or something else.</summary>
+public enum ItemResponse { None, Answer, Accept, Refuse, Dodge, Work, Other }
+
+/// <summary>One thing on the table between a listener and the ship that a line can respond to; <see cref="Id"/> is "mara.terms" and the like.</summary>
+public sealed record OpenItem(CrewMember Who, string Id, string Kind, string Text);
+
+/// <summary>One condition a person stated for a job: "answer" (Key = the fact asked), "danger" (the fact asked) or "bargain" (the promise key).</summary>
+public sealed record JobCondition(string Kind, string Key, string Text);
+
+/// <summary>The job a person stated their conditions for, and which conditions they stated (all at once, on the first Repair or Patch).</summary>
+public sealed record JobTerms(string FaultId, bool Patch, List<JobCondition> Stated);
+
 public enum LineKind { Statement, Promise, Order, Question, Dodge, Plain }
 
 /// <summary>What the reading pass made of one player line (DESIGN.md, "Reading").</summary>
-public sealed record Reading(LineKind Kind, string? FactKey = null, string? Value = null, string? PromiseKey = null)
+/// <param name="Item">The id of the open item (a listener's question, terms, request or accusation) the line responds to, or null (<see cref="Voyage.OpenItems"/>).</param>
+/// <param name="Response">How it responds to that item; the game decides the outcome, the model only reports what the player meant.</param>
+public sealed record Reading(LineKind Kind, string? FactKey = null, string? Value = null, string? PromiseKey = null,
+    string? Item = null, ItemResponse Response = ItemResponse.None)
 {
     public static readonly Reading Plain = new(LineKind.Plain);
+    public static readonly string[] ResponseWords = { "none", "answer", "accept", "refuse", "dodge", "work", "other" };
     public static readonly string[] PromiseKeys = { "wake_partner", "show_logs", "no_more_thaws", "other" };
 }
 
