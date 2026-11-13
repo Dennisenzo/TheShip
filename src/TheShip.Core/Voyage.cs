@@ -31,7 +31,7 @@ public sealed partial class Voyage
     public double Year => Clock / Tuning.HoursPerYear;
     public double Stores { get; internal set; } = Tuning.StartStores;
     public int Parts { get; private set; } = Tuning.StartParts;
-    public int PodWear { get; private set; }
+    public int PodWear { get; internal set; }
     public bool PowerLow { get; private set; }
     public bool NavLost { get; private set; }
     public bool LogsLocked { get; private set; }
@@ -167,16 +167,25 @@ public sealed partial class Voyage
         _facts["stores"].Truth = Stores < Tuning.StoresShortAt ? "short" : "enough";
     }
 
-    private void Kill(CrewMember c, string how, bool quiet = false)
+    /// <summary>
+    /// Someone dies. A death outside the pods (awake or coming round from a thaw) happens in front of everyone awake:
+    /// they learn it as evidence, the way they learn who is up when someone is thawed (<see cref="Meet"/>).
+    /// <paramref name="witnessesSilent"/>: the caller has the witnesses say it in its own line (<c>LeftBehind</c>).
+    /// </summary>
+    private void Kill(CrewMember c, string how, bool quiet = false, bool witnessesSilent = false)
     {
         if (!c.Alive)
             return;
+        var seen = c.State is CrewState.Awake or CrewState.Thawing;
         c.State = CrewState.Dead;
         c.WorkingOn = null;
         _facts["alive:" + c.Id].Truth = "dead";
         Attend(c.Name + " died");
         if (!quiet)
             Ship(c.Name + " " + how + ".");
+        if (seen)
+            foreach (var w in Awake.ToList())
+                Learn(w, "alive:" + c.Id, "dead", "evidence", silent: witnessesSilent);
         DropIllnessOf(c);
     }
 

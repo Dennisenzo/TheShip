@@ -188,6 +188,9 @@ public sealed partial class Voyage
         c.Beliefs[key] = new Belief(value, source, Year);
         if (source is not ("evidence" or "witness"))
             return;
+        // Seeing the answer for themselves settles the question they asked the ship.
+        if (c.PendingQuestion == key)
+            c.PendingQuestion = null;
 
         var caught = false;
         var heard = Statements.Where(s => s.Kind == StatementKind.False && s.FactKey == key && s.Value != null

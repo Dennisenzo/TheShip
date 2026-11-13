@@ -286,7 +286,6 @@ public sealed partial class Voyage
         c.EarlySleepAnnounced = false;
         c.PendingQuestion = null;
         PodWear++;
-        Ship(c.Name + " is awake.");
 
         if (_rng.NextDouble() < Tuning.ThawRiskPerWear * PodWear)
         {
@@ -300,6 +299,7 @@ public sealed partial class Voyage
                 return;
             }
         }
+        Ship(c.Name + " is awake.");
 
         // A promise never to thaw them again is broken by this thaw.
         foreach (var s in Statements.Where(s => s.Kind == StatementKind.Promise && s.PromiseKey == "no_more_thaws"
@@ -540,7 +540,8 @@ public sealed partial class Voyage
             case "illness":
                 // Waking the patient does not cure them: the illness keeps its clock (the thaw has its usual risk).
                 if (f.SubjectId is { } sick && Crew.First(c => c.Id == sick) is { Alive: true } patient)
-                    Kill(patient, patient.State == CrewState.Asleep ? "died of the illness in their pod" : "died of the illness");
+                    Kill(patient, patient.State == CrewState.Asleep ? "died of the illness in their pod" : "died of the illness",
+                         witnessesSilent: true);
                 break;
             case "nav":
                 NavLost = true;
@@ -827,8 +828,18 @@ public sealed partial class Voyage
         var (storesOut, starved) = Eat(awake, hours);
         if (storesOut is { } outAt)
             events.Add($"Stores ran out in year {Math.Floor((start + outAt) / Tuning.HoursPerYear):0}.");
+        // The starving die in time order, so only those still alive see each death.
         foreach (var (c, at) in starved.OrderBy(kv => kv.Value))
+        {
             events.Add($"{c.Name} starved in year {Math.Floor((start + at) / Tuning.HoursPerYear):0}.");
+            c.Trust += c.PendingTrust;
+            c.PendingTrust = 0;
+            c.Age += at / Tuning.HoursPerYear;
+            c.HoursAwake += at;
+            Clamp(c);
+            deaths.Add(c.Name);
+            Kill(c, "starved during the drift", quiet: true);
+        }
         foreach (var c in Crew.Where(c => c.Alive).ToList())
         {
             string? sleepCause = null;
@@ -837,15 +848,8 @@ public sealed partial class Voyage
             if (c.State == CrewState.Awake)
             {
                 // Someone who would not sleep ages, eats and reads everything, for as long as they live.
-                var lived = starved.TryGetValue(c, out var at) ? at : hours;
-                c.Age += lived / Tuning.HoursPerYear;
-                c.HoursAwake += lived;
-                if (starved.ContainsKey(c))
-                {
-                    deaths.Add(c.Name);
-                    Kill(c, "starved during the drift", quiet: true);
-                    continue;
-                }
+                c.Age += hours / Tuning.HoursPerYear;
+                c.HoursAwake += hours;
                 foreach (var f in FactList)
                     ReadLog(c, f, quiet: true);
             }
