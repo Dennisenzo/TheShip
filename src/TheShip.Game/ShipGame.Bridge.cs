@@ -798,17 +798,17 @@ public sealed partial class ShipGame
             .FirstOrDefault(c => c == selected || asking == 1);
         if (staked != null)
             yield return (staked, v.StakesText(staked));
+        // What a wary person wants before starting: the selected one's (or the only one's) bargain, ahead of the bay items.
+        var bargainers = v.Awake.Where(c => v.BargainOf(c) != null).ToList();
+        var bargainer = bargainers.FirstOrDefault(c => c == selected) ?? (bargainers.Count == 1 ? bargainers[0] : null);
+        if (bargainer != null && v.BargainText(bargainer) is { } bargainText)
+            yield return (bargainer, bargainText);
         if (v.Lockouts.BayWarned.Count > 0)
             yield return (null, string.Join(" and ", v.Lockouts.BayWarned.Select(id => v.Crew.First(c => c.Id == id).Name))
                          + " will take the cold-sleep bay at the next step. Win one of them back above 15 trust, or they do.");
         if (v.Lockouts.Bay)
             yield return (null, v.BayLockReason + " Keep a promise to one of them and win their trust above " + Tuning.BayReturnTrust.ToString("0") + " to get it back.");
         var owed = v.Ledger().Where(e => e.State == "open").ToList();
-        // What a wary person wants before starting: the selected one's (or the only one's) bargain, ahead of the bay items.
-        var bargainers = v.Awake.Where(c => v.BargainOf(c) != null).ToList();
-        var bargainer = bargainers.FirstOrDefault(c => c == selected) ?? (bargainers.Count == 1 ? bargainers[0] : null);
-        if (bargainer != null && v.BargainText(bargainer) is { } bargainText)
-            yield return (bargainer, bargainText);
         foreach (var c in v.Awake.OrderBy(a => a == selected ? 0 : 1).ToList())
         {
             if (c != staked && c.PendingQuestion != null && v.HasFact(c.PendingQuestion))

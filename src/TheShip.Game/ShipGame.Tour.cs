@@ -151,13 +151,17 @@ public sealed partial class ShipGame
                     continue;
                 var p = who;
                 var f = fault;
-                Act("repair " + f.Name + " by " + p.Name, () =>
+                Act("repair " + f.Name + " by " + p.Name, () => v.Assign(p, f, patch: patch));
+                foreach (var w in Settle()) yield return w;
+                // A wary person sets the ship's word as the price: the shot shows it, then the tour gives its word.
+                if (v.BargainOf(p) is { } deal)
                 {
-                    v.Assign(p, f, patch: patch);
-                    // A wary person sets the ship's word as the price: the tour gives it (the bargain UI comes with step 3).
-                    if (v.BargainOf(p) is { } deal)
-                        v.Say("Agreed.", new Reading(LineKind.Promise, PromiseKey: deal.Key), new[] { p });
-                });
+                    _target = p;
+                    Shoot(dir, tag + "-bargain-open");
+                    Act("say to " + p.Name, () => v.Say("Agreed.", new Reading(LineKind.Promise, PromiseKey: deal.Key), new[] { p }));
+                    foreach (var w in Settle()) yield return w;
+                    _target = null;
+                }
             }
             foreach (var w in Settle()) yield return w;
             _target = v.Awake.FirstOrDefault();
