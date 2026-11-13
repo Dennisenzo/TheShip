@@ -80,13 +80,18 @@ public class WorkTermsTests
         var (v, mara, f) = Ready(1, "dosed");
         v.AssignDeal(mara, f, patch: false);
         Assert.True(mara.Terms!.RiskBriefed);
-        var line = v.Log.Single(e => e.Kind == LogKind.Recorded && e.Text.StartsWith("Mara starts")).Text;
+        var line = v.Log.Single(e => e.Kind == LogKind.Recorded && e.Text.StartsWith("Recorded: Mara starts")).Text;
         Assert.Contains("precautions", line);
         Assert.Contains("10% slower", line);
+        Assert.Contains("believing that working in the coolant bay gives a radiation dose:", line);
+        Assert.EndsWith(Tuning.PrecautionHarm == 0.5 ? "halved." : "%.", line);
+        // Another Repair click for someone already on the fault keeps the terms and records nothing new.
+        v.AssignDeal(mara, f, patch: false);
+        Assert.Single(v.Log, e => e.Kind == LogKind.Recorded && e.Text.Contains("Mara starts"));
         // A lie gets the same terms as the truth would: here the other way round, nothing is recorded.
         var (v2, m2, f2) = Ready(1, "safe");
         v2.AssignDeal(m2, f2, patch: false);
-        Assert.DoesNotContain(v2.Log, e => e.Kind == LogKind.Recorded && e.Text.StartsWith("Mara starts"));
+        Assert.DoesNotContain(v2.Log, e => e.Kind == LogKind.Recorded && e.Text.Contains("Mara starts"));
     }
 
     [Fact]
