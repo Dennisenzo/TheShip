@@ -232,6 +232,8 @@ public sealed class Accusation
 {
     public required int StatementId { get; init; }
     public required string FactKey { get; init; }
+    /// <summary>Set when the ship broke its word (the statement is a promise): the promise key. The fact is what admitting is about.</summary>
+    public string? PromiseKey { get; init; }
     /// <summary>How they found it out (<see cref="Statement.FoundOutHow"/>).</summary>
     public required string How { get; init; }
     /// <summary>Aftermath beats left before it closes unanswered; counts down only while it is the open one.</summary>

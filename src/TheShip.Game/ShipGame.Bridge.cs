@@ -800,6 +800,8 @@ public sealed partial class ShipGame
     private static string AccusationShort(Voyage v, CrewMember c)
     {
         var a = v.OpenAccusation(c)!;
+        if (a.PromiseKey != null)
+            return v.PromiseAccusationShort(c, a) + " Keep it now or tell " + c.Them + " the truth (" + a.BeatsLeft * 2 + " weeks).";
         var label = v.HasFact(a.FactKey) ? v.GetFact(a.FactKey).Label : "something you said";
         return c.Name + " caught you lying about " + label + " (" + a.How + "). Tell " + c.Them + " what is true (" + a.BeatsLeft * 2 + " weeks).";
     }

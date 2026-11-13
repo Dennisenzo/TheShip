@@ -227,14 +227,14 @@ Done when: every clickable thing reacts within one frame of the mouse arriving, 
 - **Sound** (`Sounds.cs`, made in code like the click): a two-note chime for a new alert, a low sweep for a drift, a short low tone for a
   refused request or a disabled button. Volumes sit next to `ClickVolume`.
 
-## Decisions taken in this plan, for the user to confirm
+## Decisions taken in this plan (1, 2 and 4 confirmed by the user, 2026-11-13)
 
-1. **Repair without a selection** opens a picker of awake crew with their skill. Selecting a card first still works.
-2. **Trust deltas** are shown, but only after the line that explains them is in the log.
+1. **Repair without a selection** opens a picker of awake crew with their skill. Selecting a card first still works. *Confirmed by the user, 2026-11-13.*
+2. **Trust deltas** are shown, but only after the line that explains them is in the log. *Confirmed by the user, 2026-11-13.*
 3. **The drift transition** is 3 seconds and skippable. The drift report stays up until the player does something, but nothing
    requires CONTINUE: any click or key closes it and goes through (a click on the bridge does its job, a key reaches the voice line).
    A click on the report card itself is CONTINUE (on to the new alert). The user's decision, 2026-11-13: no step that only confirms.
-4. **The briefing** never mentions lying.
+4. **The briefing** never mentions lying. *Confirmed by the user, 2026-11-13.*
 
 ## Not in this plan
 

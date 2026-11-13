@@ -152,7 +152,7 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
   4 of 6 alive and 3 under 50 (superseded by B1: 3 under 64); 2 starting parts, a failed repair spends one; a nav fault patched at arrival slips arrival).
   The 8-minute first run and the open low-trust question are playtest questions. Design text only.
 - 2026-11-13: balance step B1 (feature/b1-tuning): Short haul Landfall = at least 4 of 6 alive and 3 of working age (`LandfallAlive` 4,
-  `LandfallWorkingAge` 3), `WorkingAge` 64 (the code had 65; 50 was the user's design value and never in code: see "Decisions for the user to review").
+  `LandfallWorkingAge` 3), `WorkingAge` 64 (65 since 2026-11-13, decided by the user).
   Fixed: ageing 3-5 years a thaw, `StartParts` 2, a failed repair spends a part. Tuned with the harness (200 seeds): `PowerLowDeathChance` 0.10 to 0.05,
   `PatchFailDeathChance` 0.15 to 0.10, `ThawRiskPerWear` 0.012 to 0.008, `RepairBaseChance` 0.8 to 0.85, `LieTrust` 25 to 22 (at 25 Liar was adrift 71% and landed 12%),
   and `PodLostWear` 6 (was 3) / `ControllerLostWear` 8 (was 4) for a lost or patched failed pod / pod controller. Measured effect of the wear change: most of
@@ -214,64 +214,35 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 - 2026-11-13: low findings and a docs cleanup (fix/low-and-docs). A worker hurt by a repair they started unbriefed and were told about mid-work is still charged `HurtByOrder`, but the notice now says "the ship told you only after you had started" (or "told you it was safe after you had started"), not "never told you"; the template fallback says "Nobody warned me ... before I went in". "Waiting on you" says a doubt about a fact with no record yet (a cause of a fault still to come) "will check once it comes up" (`Voyage.DoubtText`). A regression test for a failed repair that spends the last part and injures a lead whose beliefs changed mid-work (start terms). Docs: "Differences from DESIGN.md" keeps only what DESIGN.md does not record (the Cities LLM-stack note moved to README.md), "Not built yet" and "Next steps" name what is really open, the balance table is the current 600-seed one from DESIGN.md, the B1 `WorkingAge` table is marked stale, and the Record screen's TRUE/LIE tags are a new decision for the user. DESIGN.md: the prototype's conversations (Question, bargains, work terms) are built; Short haul is "8 crew (prototype 6)". Tests: `WorkTermsTests` (2 new), `DoubtTextTests`.
 - 2026-11-13: accusation validation fixes (fix/accusation-validation). Ignoring an accusation no longer pays better than admitting: doubts the audit starts (`CrewMember.AuditDoubts`) earn no `ConfirmedTruth` when they check out (13 truths and 1 lie: admit 54, ignore 62 before; `AccusationValidationTests`). The dossier and the Record show a lie corrected for a listener as "Corrected in year Y" (they said "Not found out. Could be: ..."). A corrected log rewrite left in place and read again is a new unfound lie for that reader (`ReadLog` adds a new record of the same text; before, the correction kept it free). An admission no longer downgrades what they saw to "you said so" (`Hear` keeps a firsthand belief the ship agrees with, for someone who caught a lie on that fact; for everyone it moved Honest 43.2% to 39.2%), so admit-then-lie-again is caught at once; an accused reader keeps what they saw over a rewritten log entry. The accusation text and its Waiting item use the person's pronoun ("Tell her what is true, or she will check everything you told her"; `CrewMember.They`/`Them`). A drift no longer closes an accusation silently: `accusation_closed` is said after the drift report; admissions and unanswered closes get a `Recorded:` line. The `caught` line's decision text puts how it was found in the second person (`Voyage.YouForm`: "you were told by Lin ...", "you found it out for yourself"; it said "you was"). The tour puts back the liar's trust, morale and caught lies after the admitted-lie shot (`Voyage.TourRestore`, dev only), so later shots come from a normal run. Balance at 600 seeds: Honest and every bot that never lies byte-identical (43.2%); Liar 10.7% -> 11.7%, Corrector 37.7% -> 40.2%.
 - 2026-11-13: main validation 6 (fix/main-validation-6, docs only). DESIGN.md's "Correcting" paragraph gives the Corrector's current 40.2% (it said 37.7%); Built names `TourRestore`; the balance table's heading and the Next steps are current ("The lie comes due" is merged). 620 tests pass, 0 warnings; 600 seeds: Honest 43.2% with every never-lying bot's report byte-identical to 72eb474, Liar 11.7%, Corrector 40.2%. Open (Low): a doubt on a log-evidence fact the person already holds firsthand and correct is never settled (`ReadLog` returns before `Learn`), so it stays in "Waiting on you" and that person stops browsing the log; it predates this merge (left at the end of 195 of 200 Careless runs on `pods`, 2 of 200 Honest runs on `earth`; cause not traced) and `Hear` now adds a path: it keeps a firsthand belief and still adds the doubt.
+- 2026-11-13: the user's decisions, step 1 (feature/user-decisions): `Tuning.WorkingAge` 64 -> 65 (decided by the user); morale speed stays as it is and `LieTrust` stays 22 (both decided, DESIGN.md "Settled questions"). Landfall at 600 seeds, 64 -> 65 (Honest / Thrifty / Careless / Silent / Liar / Breaker / Corrector): 43.2 / 38.5 / 27.3 / 25.2 / 11.7 / 39.8 / 40.2 -> 46.7 / 42.8 / 34.8 / 31.7 / 12.0 / 44.5 / 43.0. `WorkingAge` table re-measured below (DESIGN.md, "Balance"); at 66 Honest beats Careless by 8.5 points, under the test's 10, so 65 is the top. Balance tests unchanged (35-65% band holds).
+- 2026-11-13: the user's decisions, step 4 (feature/user-decisions): a broken promise opens an accusation (`Accusation.PromiseKey`, `Voyage.OpenPromiseAccusation`, `SettlePromiseAccusations`, `PromiseAccusationShort`). Wake_partner and show_logs promises broken at the due date while the person is awake: "Mara holds you to your word: wake Idris." in Waiting and NEXT. Admit = say the truth on the promise's fact (partner's life / first closed log entry; no refund) or keep it late (pays `AccusationAdmitTrust` once); ignore as for a lie; released promises and promises broken by sleeping open none. No new rng draws. Balance bots: the Breaker answers by telling the truth (`BalanceBot.BreakerAdmits`; `SHIP_BREAKER_IGNORES=1`), and `BreakerStrict` (`SHIP_BREAKER_STRICT=1`) refuses the matching request. 600 seeds, Landfall before -> after: Honest 46.7 -> 46.7, Thrifty 42.8 -> 42.8, Careless 34.8 -> 34.5, Silent 31.7 -> 30.8, Liar 12.0 -> 12.0, Breaker 44.5 -> 43.2 (ignoring: 44.2), Corrector 43.0 -> 43.0. Strict Breaker 63.8% (ignoring 63.2%): never keeping the partner promise saves a thaw, see "Decisions for the user to review". Tests: `PromiseAccusationTests`.
+- 2026-11-13: the user's decisions, step 5 (feature/user-decisions): a cause lie is caught at completion only by a worker with the fault's skill at `Tuning.CauseSeenSkill` (2) or more (`Voyage.Commands.cs`, the completion `Learn`); no chance roll, no new rng draws; a less skilled worker keeps what the ship told them. Terms/stakes texts never promised it. 600 seeds, Landfall before -> after: Honest 46.7 -> 43.3, Thrifty 42.8 -> 43.0, Careless 34.5 -> 34.8, Silent 30.8 -> 31.8, Liar 12.0 -> 9.7, Breaker 43.2 -> 44.2, Corrector 43.0 -> 49.0; at 2400 seeds (old rule vs new) Honest 47.8 -> 46.3, Liar 11.3 -> 11.1, Corrector 44.1 -> 46.8: small, and the Liar is not helped because the bots send the best-qualified person. The Corrector guard allows 10 points at 200 seeds (6 at 600+). Tests: `CauseSeenTests`.
+- 2026-11-13: the user's decisions, steps 6 and 7 (docs only, feature/user-decisions): the Record screen and dossier keep their TRUE / LIE tags; DESIGN.md ("Trust") now states the rule's scope (the log, crew-facing lines and the Waiting/terms/stakes texts; the Record and the dossier are the ship's own record). UI-PLAN.md decisions 1 (repair picker), 2 (trust deltas after the explaining line) and 4 (the briefing never mentions lying) are marked confirmed. "Decisions for the user to review" now holds one item: a promise never kept at all wins (strict Breaker 63.8%).
 
-### Balance table (600 seeds, Short haul, main after the accusation validation fixes, 2026-11-13)
+### Balance table (600 seeds, Short haul, feature/user-decisions, 2026-11-13)
 
-The current figures and their history are in DESIGN.md, "Balance" (the last table is under "The lie comes due and the balance bots"; the Liar and Corrector rows here are from the paragraph after it):
+`WorkingAge` 65, broken promises open an accusation, a cause lie is caught only by a skilled worker. The 600-seed figures swing by a few points between rule changes that draw no
+new random numbers (DESIGN.md, "Balance"); a 2400-seed run of the last step moved Honest 47.8 -> 46.3 and Corrector 44.1 -> 46.8. Copied from DESIGN.md:
 
 | Bot | Landfall | Survivors | Adrift |
 | --- | --- | --- | --- |
-| Honest | 43.2% | 3.49 | 20.0% |
-| Breaker | 39.8% | 3.42 | 21.0% |
-| Thrifty | 38.5% | 3.47 | 20.5% |
-| Corrector | 40.2% | 3.33 | 16.7% |
-| Careless | 27.3% | 3.17 | 14.0% |
-| Silent | 25.2% | 3.18 | 18.8% |
-| Liar | 11.7% | 1.68 | 64.3% |
+| Honest | 43.3% | 3.35 | 20.7% |
+| Breaker | 44.2% | 3.47 | 20.2% |
+| Thrifty | 43.0% | 3.45 | 21.2% |
+| Corrector | 49.0% | 3.49 | 18.7% |
+| Careless | 34.8% | 3.22 | 15.3% |
+| Silent | 31.8% | 3.17 | 21.0% |
+| Liar | 9.7% | 1.60 | 67.5% |
 
 The balance test (`ShortHaulHonestLandfallRate`) holds Honest in 35-65% at 200 seeds; `SHIP_SEEDS=600 dotnet test --filter Category=Balance` for the 600-seed run.
 The scripted pod death (1.0 per run) is in every run.
 
 ### Decisions for the user to review
 
-- `WorkingAge` is 64. The user's design value was 50 (2026-11-12, chosen on an estimate of about 6 thaws a run), but the code had 65 before this branch, so the
-  effective change is 65 to 64 alongside the stricter rule (4 alive and 3 of working age, was 3 alive and 2). Measured thaws per run are 13.18 for Honest and 9.76 for Thrifty,
-  and at 3 to 5 years a thaw "3 under 50" is nearly unreachable: at 50 Landfall is Honest 0%, Careless 0%, Silent 0.5%, Liar 1%, Thrifty 8.5%.
-  At B1, 64 was the lowest value that put the honest bot in 45-55%. The balance test's band is 35-65%, and Honest is now 43.2% at 600 seeds (DESIGN.md, "Balance").
-  Landfall by `WorkingAge` below, **measured at B1 and stale** (200 seeds, before morale set the work speed, the cause facts and the bot briefings; not measured again):
-
-| WorkingAge | Honest | Thrifty | Silent | Liar | Careless |
-| --- | --- | --- | --- | --- | --- |
-| 50 | 0% | 8.5% | 0.5% | 1% | 0% |
-| 60 | 20.5% | 23% | 16.5% | 17% | 14% |
-| 63 | 38.5% | 32% | 19.5% | 19% | 16.5% |
-| 64 (chosen) | 48.5% | 36% | 25% | 20% | 18.5% |
-| 65 | 53.5% | 40.5% | 30% | 20% | 28% |
-| 66 | 59.5% | 43.5% | 36.5% | 20.5% | 36% |
-
-  The honest rate moves about 5 points a year around 64, so this is the number to choose. Alternatives: ageing per thaw (a pillar), fewer faults, or fewer required people.
-- `LieTrust` 22 (was 25), to keep Liar out of hopeless (12% to 20%). Review whether lying is costly enough.
-- After the morale-speed step the honest bot landed 43.5% (now 43.2% at 600 seeds), below the 45-55% band that justified `WorkingAge` 64 at B1 though inside the
-  test's 35-65%, and Adrift rose for every bot (Honest 12.5% -> 20.5%: slower work loses more navigation faults). Levers: `MoraleRateSpan` / `MoraleRateMin` (120 / 0.8 measured 40.5%, 100 / 0.7 34%; a wider span or higher minimum softens it),
-  `WorkingAge` 65 (53.5% at B1, before the morale step; not re-measured), or more clock slack on the navigation fault.
-- Breaking a promise costs too little (bargains, 2026-11-13). The Breaker bot (honest answers, accepts every bargain, keeps none) lands 43.8% against Honest 41.3%
-  (600 seeds): one person's -15 trust and -8 morale rarely matters. Tried and reverted: `PromiseBroken` 20/25/30 (Breaker 43.5/40.5/40.5%), a grudge rule (the wronged person
-  refuses the pod until the promise is done: Careless and Silent to 0%), a trust cost for the other crew (Liar to 9%). The Liar bot now keeps its word (`BalanceBot.LiarKeepsWord`),
-  because breaking promises let it skip a doomed re-waking (Liar 33.8% when it broke them). Candidates are in DESIGN.md ("Bargains and the balance bots"). To choose.
-- Lying may now be close to hopeless (work terms, 2026-11-13). With cause facts the Liar bot lies about every hard cause and is caught at every completion
-  (7.6 lies, 7.2 caught per run): Liar Landfall 12.8% -> 4.2%, Adrift 66.8% (600 seeds). The bot lies every time it can; a player would pick their lies.
-  Earlier the user's direction was "lying should be tempting and costly, not hopeless" (`LieTrust` 25 -> 22). Levers: a cause lie caught only when the worker
-  can see it (not every completion), a smaller `LieTrust` for a cause lie, or a Liar bot that lies only about the danger. To choose.
-  Since the lie comes due (2026-11-13) a Liar that admits every accusation lands 11.7% (2.2% when it ignores them), and the Corrector 40.2% (after fix/accusation-validation; 10.7%, 2.0% and 37.7% before).
-
-- The Record screen tags every statement TRUE or LIE (`ShipGame.Screens.cs`, `Standing`; the dossier's "what you told them" uses the same tags) and its header
-  counts "N lines, M lies, K found out". That sits against the rule "what the player sees never says whether a statement is true" (DESIGN.md, "Trust" and
-  "Reading"). What history shows: the tags were intended. The design canvas's Record artboard (2026-11-12) has TRUE / LIE / PROMISE / DODGE tags, "1 lie, not found
-  out" in the header and notes like "True when you said it."; the game built it in 610aa75. The rule came a day later with say-at-once (2026-11-13), which hid
-  "(true)/(false)" in the log's "Recorded" line (`LogEntry.Secret`); DESIGN.md then wrote it as a general rule (the hard-truth credit is unannounced because of it),
-  but neither change looked at the Record. Options: keep the tags (the ship knows what it said; the rule is about the log and the crew-facing lines), remove them
-  (the Record lists what was said and to whom, the header counts lines only), or show LIE only for statements already found out (the player learns a lie's
-  status when the crew does). To choose.
+- A promise that is never kept at all wins (broken promises, 2026-11-13). The accusation the user chose is built, and the Breaker that grants requests (so it keeps the promise
+  late when the person asks) lands 43.2% against Honest 46.7%. But a strict Breaker, which also refuses the request that is the promise, lands 63.8% (survivors 4.10 against
+  3.49): not waking the partner saves a thaw, and thaws are what age and wear the crew. An accusation costs a person -4 trust and an audit, far less. Needs a cost that bites
+  (DESIGN.md, "Broken promises open an accusation, and the Breaker"). To choose.
 
 ### Built
 
@@ -329,4 +300,4 @@ are drawn (`Variation.cs`); hidden truth, crew secrets, bonds, layout, ship clas
 
 1. Run the three playthroughs of the prototype's pass test (DESIGN.md, "Prototype scope").
 2. The open decisions for the user ("Decisions for the user to review" above).
-3. Decisions 1, 2 and 4 at the end of `UI-PLAN.md` are still the user's to confirm (3 is decided).
+3. All four decisions at the end of `UI-PLAN.md` are decided.

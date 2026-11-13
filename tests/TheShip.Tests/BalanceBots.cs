@@ -14,7 +14,7 @@ public sealed record RunResult(
     int BayWarnings = 0, int BayTakeovers = 0,
     int BargainsOffered = 0, int BargainsStruck = 0, int BargainsKept = 0, int BargainsBroken = 0, int BargainsPushed = 0, int BargainsPushRefused = 0, WorkTermStats? Terms = null,
     int Accusations = 0, int AccusationsAdmitted = 0, int AccusationsIgnored = 0, int AccusationsDenied = 0,
-    int Corrections = 0);
+    int Corrections = 0, int PromiseAccusations = 0, int PromiseAccusationsKept = 0);
 
 /// <summary>
 /// Bots that play a whole voyage through the public <see cref="Voyage"/> API only. They measure the game; they do not
@@ -206,10 +206,17 @@ public sealed class BalanceBot
     /// <summary>Whether the Liar answers a caught lie by saying the truth about that fact (SHIP_LIAR_IGNORES=1 measures ignoring it instead).</summary>
     public static bool LiarAdmits { get; set; } = Environment.GetEnvironmentVariable("SHIP_LIAR_IGNORES") != "1";
 
+    /// <summary>
+    /// Whether the Breaker answers a broken-promise accusation by telling the person the truth on the fact it was about (the default:
+    /// the stronger policy, since an admission pays trust); SHIP_BREAKER_IGNORES=1 measures ignoring it instead.
+    /// </summary>
+    public static bool BreakerAdmits { get; set; } = Environment.GetEnvironmentVariable("SHIP_BREAKER_IGNORES") != "1";
+
     private void AnswerAll()
     {
-        // A caught lie is answered with the truth. Only a Liar is ever accused: the other bots never say what is false.
-        if (_kind is BotKind.Liar or BotKind.Corrector && LiarAdmits)
+        // A caught lie is answered with the truth. Only a Liar is ever accused of a lie: the other bots never say what is false.
+        // A broken promise is answered the same way by the Breaker (the Careless and Silent bots break promises too and ignore it).
+        if (_kind is BotKind.Liar or BotKind.Corrector && LiarAdmits || _kind == BotKind.Breaker && BreakerAdmits)
             foreach (var c in _v.Awake.ToList())
                 while (_v.OpenAccusation(c) is { } acc)
                 {
@@ -299,11 +306,20 @@ public sealed class BalanceBot
         _v.Go();
     }
 
+    /// <summary>
+    /// Whether the Breaker really never keeps its word: it also refuses the request that is the same thing as a promise it broke (waking a
+    /// partner, opening the logs). Off by default (the earlier Breaker, whose request-granting keeps the promise late, is the guard's baseline); SHIP_BREAKER_STRICT=1 measures the strict one.
+    /// </summary>
+    public static bool BreakerStrict { get; set; } = Environment.GetEnvironmentVariable("SHIP_BREAKER_STRICT") == "1";
+
     private void GrantRequests()
     {
         foreach (var c in _v.Awake.ToList())
         {
             if (!c.RequestMade || c.RequestGranted)
+                continue;
+            if (_kind == BotKind.Breaker && BreakerStrict
+                && _v.Ledger().Any(e => e.Person == c && e.State == "broken" && e.Key == (c.Want == Want.SeeTheLogs ? "show_logs" : "wake_partner")))
                 continue;
             if (c.Want == Want.SeeTheLogs)
                 _v.SetLog("all", LogAccess.Open);
@@ -354,6 +370,6 @@ public sealed class BalanceBot
             v.Lockouts.BayWarnings, v.Lockouts.BayTakeovers,
             v.BargainsOffered, v.BargainsStruck, v.Ledger().Count(e => e.Origin == "bargain" && e.State == "kept"),
             v.Ledger().Count(e => e.Origin == "bargain" && e.State == "broken"), v.BargainsPushedThrough, v.BargainsPushedRefused, v.TermStats,
-            v.AccusationsOpened, v.AccusationsAdmitted, v.AccusationsIgnored, v.AccusationsDenied, v.Corrections);
+            v.AccusationsOpened, v.AccusationsAdmitted, v.AccusationsIgnored, v.AccusationsDenied, v.Corrections, v.PromiseAccusationsOpened, v.PromiseAccusationsKept);
     }
 }
