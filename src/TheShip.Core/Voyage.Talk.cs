@@ -197,7 +197,13 @@ public sealed partial class Voyage
         var doubts = DoubtScore(c, f) >= Tuning.DoubtThreshold;
         // The good answer to what they asked, believed: a relief, whether or not it is true (DESIGN.md, "Trust").
         var relief = Relieves(c, f, value, old, asked);
-        c.Beliefs[f.Key] = new Belief(value, "ship", Year);
+        // Someone who caught the ship lying on this fact keeps what they saw when the ship now agrees with it (an admission
+        // included): it does not turn back into hearsay, so the same lie told again is caught at once. Limited to them so that a
+        // ship that never lies plays exactly as before.
+        var keepSeen = old is { Firsthand: true } && f.Same(old.Value, value)
+                       && Statements.Any(o => o.FactKey == f.Key && o.FoundOutBy.ContainsKey(c.Id));
+        if (!keepSeen)
+            c.Beliefs[f.Key] = new Belief(value, "ship", Year);
         if (doubts && !admit)
             c.Doubts.Add(f.Key);
         if (c.RefusesSleep && f.Key == PodRefusalFact && c.Trust >= Tuning.PodRefuserListensTrust)
@@ -419,6 +425,9 @@ public sealed partial class Voyage
         }
         if (!LogsLocked && f.Access == LogAccess.Altered && f.AlteredValue is { } fake && !f.IsTrue(fake))
         {
+            // Someone who caught the ship lying on this fact does not take its log over what they saw: the rewrite fools nobody here.
+            if (c.Accusations.Any(a => a.FactKey == f.Key) && c.Beliefs.TryGetValue(f.Key, out var seen) && seen.Firsthand && !f.Same(seen.Value, fake))
+                return;
             var s = Statements.LastOrDefault(x => x.InLog && x.FactKey == f.Key && x.Value == fake);
             // A correction covers the rewrite as they read it then. Left in the log and read again, it deceives them anew: a new
             // record of the same text, unfound and uncorrected for this reader (DESIGN.md, "How a lie is caught").

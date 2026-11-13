@@ -132,4 +132,47 @@ public class AccusationValidationTests
         Assert.Equal(trust, lin.Trust, 3);
         Assert.Single(v.Statements, s => s.InLog);
     }
+
+    /// <summary>An admission agrees with what they saw: they keep it as seen, so the same lie told again right after is caught at once.</summary>
+    [Fact]
+    public void Admitting_keeps_what_they_saw_and_a_repeated_lie_is_caught_at_once()
+    {
+        var (v, mara, _) = Lied();
+        v.ReadLog(mara, v.GetFact("date"));
+        Assert.NotNull(v.OpenAccusation(mara));
+        SayValue(v, mara, "date", v.GetFact("date").Truth);
+        Assert.Null(v.OpenAccusation(mara));
+        Assert.True(mara.Beliefs["date"].Firsthand);
+        var caught = mara.CaughtLies;
+        SayValue(v, mara, "date", WrongDate(v));
+        Assert.True(v.Statements.Last().FoundOutBy.ContainsKey("mara"));
+        Assert.Equal(caught + 1, mara.CaughtLies);
+    }
+
+    /// <summary>
+    /// A non-engineer who caught the ship lying on a fact does not take a rewritten log entry on that fact over what they saw:
+    /// the accusation's footing stays, and a denial is still caught at once.
+    /// </summary>
+    [Fact]
+    public void An_accused_reader_keeps_what_they_saw_over_a_rewritten_log()
+    {
+        var v = new Voyage(1);
+        var lin = v.Find("lin")!;
+        v.Wake(lin);
+        v.Go();
+        lin.Trust = 70;
+        var date = v.GetFact("date");
+        SayValue(v, lin, "date", WrongDate(v));
+        v.ReadLog(lin, date);
+        Assert.NotNull(v.OpenAccusation(lin));
+        Assert.True(lin.Beliefs["date"].Firsthand);
+        v.SetLog("date", LogAccess.Altered, WrongDate(v));
+        v.ReadLog(lin, date);
+        Assert.True(lin.Beliefs["date"].Firsthand);
+        Assert.True(date.Same(lin.Beliefs["date"].Value, date.Truth));
+        var caught = lin.CaughtLies;
+        SayValue(v, lin, "date", WrongDate(v));
+        Assert.Equal(caught + 1, lin.CaughtLies);
+        Assert.Equal(1, v.AccusationsDenied);
+    }
 }
