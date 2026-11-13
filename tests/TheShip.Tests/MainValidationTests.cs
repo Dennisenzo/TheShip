@@ -93,4 +93,30 @@ public class MainValidationTests
         Assert.Equal(Math.Round((hurt - now) * 2) / 2, s.HoursSlower);
         Assert.True(s.HoursSlower > 0);
     }
+
+    [Fact]
+    public void While_the_bay_is_taken_the_crew_do_not_put_a_pod_refuser_to_sleep()
+    {
+        var v = new Voyage(1);
+        VoyageTests.HonestFirstAlert(v);
+        v.Wake(v.Find("jonah")!);
+        var lin = v.Find("lin")!;
+        v.Wake(lin);
+        v.Go();
+        lin.RefusesSleep = true;
+        lin.PendingQuestion = "pods";
+        Assert.True(v.StakesOf(lin)!.BlocksSleep);
+        for (var i = 0; i < 14 && v.Phase == Phase.Aftermath; i++)
+        {
+            v.Find("mara")!.Trust = 5;
+            v.Find("jonah")!.Trust = 5;
+            lin.Trust = 50;
+            v.GoUntilAttention();
+        }
+        Assert.True(v.Lockouts.Bay);
+        Assert.Equal(CrewState.Asleep, v.Find("mara")!.State);
+        Assert.Equal(CrewState.Asleep, v.Find("jonah")!.State);
+        Assert.Equal(CrewState.Awake, lin.State);
+        Assert.True(lin.RefusesSleep, lin.PendingQuestion);
+    }
 }
