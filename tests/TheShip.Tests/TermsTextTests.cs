@@ -103,9 +103,11 @@ public class TermsTextTests
     }
 
     /// <summary>Rows of the "Waiting on you" panel a text takes: word wrap at 45 columns (326 px at 7.19 px a character, as <c>Painter.Wrap</c>).</summary>
-    internal static int WaitingRows(string text)
+    internal static int WaitingRows(string text) => Rows(text, 45);
+
+    /// <summary>Rows a text takes word-wrapped at <paramref name="columns"/> characters, as <c>Painter.Wrap</c> does.</summary>
+    internal static int Rows(string text, int columns)
     {
-        const int columns = 45;
         var rows = 0;
         var line = 0;
         foreach (var word in text.Split(' '))
@@ -181,7 +183,8 @@ public class TermsTextTests
                 {
                     foreach (var f in v.Current.Faults)
                         if (v.CauseKnown(f) is { } cause)
-                            Assert.True(("Cause: " + cause).Length <= IssueCardLayout.Columns * 3, $"seed {seed}: {cause}");
+                            // A compact card gives the cause line two lines at most (IssueCardLayout.Split).
+                            Assert.True(Rows("Cause: " + cause + ".", IssueCardLayout.Columns) <= 2, $"seed {seed}: {cause}");
                     for (var i = 0; i < 12 && v.Phase == Phase.Alert; i++) v.Go();
                 }
                 if (v.Phase == Phase.Aftermath) v.Drift();

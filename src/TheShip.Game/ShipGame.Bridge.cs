@@ -118,7 +118,7 @@ public sealed partial class ShipGame
                 if (f.DangerFact is { } danger)
                     y = _p.Paragraph("Known to you: " + v.GetFact(danger).Say(v.GetFact(danger).Truth) + ".", ix, y, inner, Painter.Dim);
                 if (v.CauseKnown(f) is { } cause)
-                    y = _p.Paragraph("Cause: " + cause, ix, y, inner, Painter.Dim);
+                    y = _p.Paragraph("Cause: " + cause + ".", ix, y, inner, Painter.Dim);
                 if (f.ExposureFact is { } seen)
                     y = _p.Paragraph("Whoever works here learns " + v.GetFact(seen).Label + ".", ix, y, inner, Painter.Dim);
                 y += 8;
@@ -239,7 +239,8 @@ public sealed partial class ShipGame
         var words = text.Split(' ').ToList();
         while (words.Count > 1 && _p.Lines(string.Join(' ', words) + "..", width) > maxLines)
             words.RemoveAt(words.Count - 1);
-        return string.Join(' ', words) + "..";
+        // No punctuation before the cut mark ("seal,.." or "seal..."): the mark ends the words.
+        return string.Join(' ', words).TrimEnd('.', ',', ';', ':') + "..";
     }
 
     /// <summary>The text cut to fit one line of <paramref name="width"/> pixels in a font whose characters are <paramref name="charWidth"/> wide.</summary>
@@ -278,7 +279,7 @@ public sealed partial class ShipGame
         var where = v.GetSection(f.Section)?.Name ?? "";
         var needs = SectionName(where) + ". " + Patient(v, f) + f.Skill + Nb + f.Level + (f.People > 1 ? ", " + f.People + Nb + "people" : "") + ", " + N(f.Hours) + Nb + "h.";
         var extra = f.DangerFact is { } danger ? "Known: " + v.GetFact(danger).Say(v.GetFact(danger).Truth) + "."
-            : v.CauseKnown(f) is { } cause ? "Cause: " + cause
+            : v.CauseKnown(f) is { } cause ? "Cause: " + cause + "."
             : f.ExposureFact is { } seen ? "Whoever works here learns " + v.GetFact(seen).Label + "." : "";
         var workers = v.Awake.Where(c => c.WorkingOn == f.Id).Select(c => c.Name).ToList();
         var split = IssueCardLayout.Split(shown, _p.Lines(needs, inner), extra.Length == 0 ? 0 : _p.Lines(extra, inner), workers.Count > 0);
