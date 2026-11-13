@@ -35,6 +35,10 @@ public sealed partial class Voyage
             parts.Add(t.CauseBriefed
                 ? name + " knows the cause: " + causeGain + "."
                 : name + " has not been told the cause; telling them: " + causeGain + ".");
+        // The partner awake (or thawing) too: the pair works faster (Tuning.PairRate), in the clock and the estimates alike.
+        if (c.PartnerId is { } pid && Crew.First(x => x.Id == pid) is { State: CrewState.Awake or CrewState.Thawing } mate)
+            parts.Add(name + " has " + mate.Name + (mate.State == CrewState.Awake ? " awake too" : " thawing") + ": "
+                      + Num((Tuning.PairRate - 1) * 100) + "% faster" + (mate.State == CrewState.Awake ? "." : " once " + mate.They + " is up."));
         if (parts.Count == 0)
             return "";
         return (c.WorkingOn == f.Id ? name + " works on it: " : "If " + name + " starts now: ") + string.Join(" ", parts);

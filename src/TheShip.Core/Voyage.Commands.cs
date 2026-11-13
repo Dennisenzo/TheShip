@@ -393,6 +393,14 @@ public sealed partial class Voyage
         // Awake together: a reunion lifts them both (waking the partner pays).
         if (c.PartnerId is { } pid && Crew.First(x => x.Id == pid) is { State: CrewState.Awake } mate)
         {
+            // Their care of the pod bank counts once per pair per alert (with its aftermath): sending one back and thawing them again
+            // pays the thaw's wear and gets no second care.
+            var pair = string.CompareOrdinal(c.Id, mate.Id) < 0 ? c.Id + "+" + mate.Id : mate.Id + "+" + c.Id;
+            var care = _podCare.Add((pair, AlertIndex));
+            // The player hears what the reunion does (the numbers come from Tuning).
+            Ship(FormattableString.Invariant($"{mate.Name} and {c.Name} are together again: morale +{Tuning.ReunionMorale:0} for both, each works {(Tuning.PairRate - 1) * 100:0}% faster while the other is up, ")
+                 + FormattableString.Invariant($"and together they grow {Tuning.PairGardenPerDay:0.#} person-days of stores a day in the hydroponics")
+                 + (care ? FormattableString.Invariant($". Tending the pod bank, they take {Tuning.ReunionPodCare} off the pod wear.") : "."));
             foreach (var (a, b) in new[] { (c, mate), (mate, c) })
             {
                 a.Morale += Tuning.ReunionMorale;
@@ -400,10 +408,7 @@ public sealed partial class Voyage
                 Speak(a, "reunion", "Your partner " + b.Name + " is awake with you. You are together again, and it lifts you.", b.Name);
             }
             Reunions++;
-            // Their care of the pod bank counts once per pair per alert (with its aftermath): sending one back and thawing them again
-            // pays the thaw's wear and gets no second care.
-            var pair = string.CompareOrdinal(c.Id, mate.Id) < 0 ? c.Id + "+" + mate.Id : mate.Id + "+" + c.Id;
-            if (_podCare.Add((pair, AlertIndex)))
+            if (care)
             {
                 PodWear = Math.Max(0, PodWear - Tuning.ReunionPodCare);
                 SyncFacts();

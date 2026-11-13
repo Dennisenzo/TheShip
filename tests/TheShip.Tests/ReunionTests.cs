@@ -197,4 +197,20 @@ public class ReunionTests
         var pair = both.EarliestDoneHours(both.FindFault("")!);
         Assert.Equal((alone - Tuning.ThawHours) / Tuning.PairRate, pair - Tuning.ThawHours, 6);
     }
+
+    [Fact]
+    public void The_ship_says_what_a_reunion_does_and_the_terms_name_the_pair_speed()
+    {
+        var (v, mara, idris) = Aftermath();
+        v.Wake(idris);
+        var coolant = v.Current.Faults.FirstOrDefault() ?? new Fault { Id = "x", Kind = "x", Name = "x", Skill = Skill.Engineering, Level = 1, Hours = 1, ClockHours = 10, IfIgnored = "x", Section = "engine", CauseFact = "cause:coolant" };
+        Assert.Contains("Idris thawing: 10% faster once he is up.", v.TermsText(mara, coolant));
+        ThawThrough(v, idris);
+        var line = Assert.Single(v.Log, e => e.Kind == LogKind.Ship && e.Text.Contains("together again", StringComparison.Ordinal));
+        Assert.Contains("morale +" + Tuning.ReunionMorale, line.Text);
+        Assert.Contains("10% faster", line.Text);
+        Assert.Contains("person-days of stores a day", line.Text);
+        Assert.Contains("pod wear", line.Text);
+        Assert.Contains("Mara has Idris awake too: 10% faster.", v.TermsText(mara, coolant));
+    }
 }
