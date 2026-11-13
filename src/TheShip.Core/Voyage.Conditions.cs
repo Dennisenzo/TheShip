@@ -252,11 +252,7 @@ public sealed partial class Voyage
         switch (item.Kind, reading.Response)
         {
             case ("terms", ItemResponse.Refuse or ItemResponse.Work):
-                outcome = () =>
-                {
-                    Recorded("Recorded: you pressed " + c.Name + " to start without your word.");
-                    PushByWords(c);
-                };
+                outcome = () => PushByWords(c);
                 handled.Add(c);
                 break;
             // Agreeing to the terms is giving the word they asked for, also when the promise was read without its key ("other", "none");
@@ -286,12 +282,26 @@ public sealed partial class Voyage
     private static bool NamesPromise(Reading r) =>
         r.Kind == LineKind.Promise && r.PromiseKey is { } k && k != "other" && Reading.PromiseKeys.Contains(k);
 
-    /// <summary>The player's words are the push (same as Repair again): the person decides now.</summary>
+    /// <summary>
+    /// The player's words are the push (same as Repair again): the person decides now. While other conditions are still open there
+    /// is nothing to push past yet: the same click would have them say what they still wait on, and nothing is recorded as a push.
+    /// </summary>
     private void PushByWords(CrewMember c)
     {
-        if (BargainOf(c) is { } b && Current.Faults.FirstOrDefault(x => x.Id == b.FaultId) is { } f)
-            Assign(c, f, b.Patch);
+        if (BargainOf(c) is not { } b || Current.Faults.FirstOrDefault(x => x.Id == b.FaultId) is not { } f)
+            return;
+        if (OnlyPriceLeft(c) && (c.Job is { } j && j.FaultId == b.FaultId && j.Patch == b.Patch || c.BargainDeclined))
+            Recorded("Recorded: you pressed " + c.Name + " to start without your word.");
+        Assign(c, f, b.Patch);
     }
+
+    /// <summary>
+    /// The ship's word is all this person still waits on for their job: Repair or Patch again (or saying no to the terms) is the push.
+    /// While a question is open too it is not (the button keeps its own label).
+    /// </summary>
+    public bool OnlyPriceLeft(CrewMember c) =>
+        BargainOf(c) is { } b && Current.Faults.FirstOrDefault(x => x.Id == b.FaultId) is { } f
+        && OpenConditions(c, f) is { Count: 1 } left && left[0].Kind == "bargain";
 
     private void DeclineRequest(CrewMember c)
     {

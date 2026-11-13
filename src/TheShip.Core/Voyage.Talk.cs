@@ -178,6 +178,12 @@ public sealed partial class Voyage
                     Assign(ordered.Who, job.Fault, job.Patch);
                     break;
                 }
+                // Someone already at work says what they are on, rather than asking which fault.
+                if (listeners.FirstOrDefault(l => l.WorkingOn != null) is { } busy && Current.Faults.FirstOrDefault(x => x.Id == busy.WorkingOn) is { } on)
+                {
+                    Speak(busy, "busy", "The ship told you to get on with the work. You are already on " + TaskText(on, on.Patching) + "; say so.", "the " + on.CrewName);
+                    break;
+                }
                 Speak(listeners[0], "order", "The ship gave an order in words. You ask which fault it means.");
                 Log.Add(new LogEntry(LogKind.Help, "", "Work is asked for on the issue itself: select someone awake, then Repair or Patch."));
                 break;

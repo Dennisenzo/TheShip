@@ -73,6 +73,7 @@ public static class Lines
             "takeover_warning" => Pick(rng, "We've talked. We're taking the sleepers out of your hands. Fix this before the next shift, or we do it.", "You decide who wakes and who sleeps, and we don't trust you with that any more. We take the bay soon."),
             "bay_returned" => "You kept your word. The bay is yours again. Don't make me regret it.",
             "order" => "Tell me which fault and I'll look at it.",
+            "busy" => Pick(rng, "I'm already on " + detail + ".", "I'm on it. " + Cap(detail) + " is what I'm working on."),
             _ => "...",
         };
     }

@@ -181,8 +181,9 @@ public sealed partial class ShipGame
             ? (anyone ? "Choose who to ask." : "Nobody is awake.")
             : who.Name + " has " + skill + " " + who.SkillOf(fault.Skill) + "; this needs " + fault.Level + "."
               + (v.TermsText(who, fault) is { Length: > 0 } terms ? " " + terms : "");
-        // A person with an open bargain on this very piece of work: the button pushes past it (and says so).
-        var bargain = who != null ? v.BargainOf(who) : null;
+        // A person whose only open condition is the price of this very piece of work: the button pushes past it (and says so).
+        // While a question is open too, it is still Repair or Patch: the click has them say what they wait on.
+        var bargain = who != null && v.OnlyPriceLeft(who) ? v.BargainOf(who) : null;
         var pushRepair = bargain is { } br && br.FaultId == fault.Id && !br.Patch;
         var pushPatch = bargain is { } bp && bp.FaultId == fault.Id && bp.Patch;
         var pushTip = who != null && v.BargainText(who) is { } bt ? bt : fit;

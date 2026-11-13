@@ -154,6 +154,54 @@ public class ConditionsTests
         Assert.Null(mara.Job);
     }
 
+    [Fact]
+    public void Refusing_the_terms_while_questions_are_open_is_no_push()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Assert.False(v.OnlyPriceLeft(mara));
+        var trust = mara.Trust;
+        var from = v.Log.Count;
+        v.Say("No, I won't promise that.", new Reading(LineKind.Plain, Item: "mara.terms", Response: ItemResponse.Refuse), new[] { mara });
+        Assert.DoesNotContain(v.Log.Skip(from), e => e.Text.Contains("pressed", StringComparison.Ordinal));
+        Assert.Equal(trust, mara.Trust, 3);
+        Assert.Equal(0, v.BargainsPushedThrough + v.BargainsPushedRefused);
+        // She says what she still waits on.
+        Assert.Equal("conditions", v.Log.Skip(from).Last(e => e.Intent != null).Intent!.Kind);
+        Tell(v, mara, "alive:idris");
+        Tell(v, mara, f.DangerFact!);
+        Assert.True(v.OnlyPriceLeft(mara));
+    }
+
+    [Fact]
+    public void Giving_the_word_while_questions_are_open_gets_a_line_that_says_what_is_left()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        var from = v.Log.Count;
+        v.Say("I promise I will wake Idris.", new Reading(LineKind.Promise, PromiseKey: "wake_partner"), new[] { mara });
+        Assert.NotEqual(f.Id, mara.WorkingOn);
+        var line = v.Log.Skip(from).Last(e => e.Intent != null).Intent!;
+        Assert.Equal("promise", line.Kind);
+        Assert.Contains("How is Idris?", line.Decision);
+        Assert.Equal(1, v.BargainsStruck);
+    }
+
+    [Fact]
+    public void An_order_to_someone_already_working_gets_what_they_are_on()
+    {
+        var (v, mara, f) = Alert1();
+        mara.Trust = 70;
+        v.Assign(mara, f, patch: false);
+        Assert.Equal(f.Id, mara.WorkingOn);
+        var from = v.Log.Count;
+        v.Say("get on with it", new Reading(LineKind.Order), new[] { mara });
+        var line = v.Log.Skip(from).Last(e => e.Intent != null).Intent!;
+        Assert.Equal("busy", line.Kind);
+        Assert.Contains("coolant", line.Detail);
+        Assert.DoesNotContain(v.Log.Skip(from), e => e.Kind == LogKind.Help);
+    }
+
     /// <summary>An obedient person short of trusting, woken for the coolant leak, asked to repair: Asha at trust 45.</summary>
     private static (Voyage v, CrewMember asha, Fault f) ObedientWary()
     {

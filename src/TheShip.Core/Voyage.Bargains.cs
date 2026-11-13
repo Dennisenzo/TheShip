@@ -330,6 +330,10 @@ public sealed partial class Voyage
         // The word is given. If it was the last condition the work starts now; otherwise it starts when the rest are met.
         c.Job = new JobTerms(f.Id, b.Patch, stated);
         ResumeJob(c, "bargain_struck", "You have the ship's word to " + CommitmentText(c, b.Key) + ". You start " + TaskText(f, b.Patch) + ".");
+        // Other conditions still open: they say they have the word and what they still wait on.
+        if (c.Job != null && JobLeft(c) is { } left)
+            Speak(c, "promise", "The ship gave you its word to " + CommitmentText(c, b.Key) + ". You still wait on the rest before you start "
+                                + TaskText(f, b.Patch) + ": " + left + ".");
         return true;
     }
 
