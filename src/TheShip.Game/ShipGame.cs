@@ -370,6 +370,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         }
 
         StepTransition();
+        StepOverlays();
         // The ending waits for the last drift's report to be closed.
         if (_voyage is { Phase: Phase.Ended, Ending: { } ending } && !_endingShown && _transition is null)
         {

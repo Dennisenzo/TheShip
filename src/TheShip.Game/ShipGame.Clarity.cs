@@ -156,10 +156,7 @@ public sealed partial class ShipGame
             return;
         var awake = v.Awake.ToList();
         if (awake.Count == 0 || pick.Fault.Resolved)
-        {
-            _picker = null;
-            return;
-        }
+            return; // closed in the next update (StepOverlays)
         const int width = 300;
         var height = 44 + awake.Count * 46 + 6;
         var panel = new Rectangle(pick.X, Math.Min(pick.Y, Painter.ScreenHeight - 16 - height), width, height);
@@ -177,7 +174,7 @@ public sealed partial class ShipGame
             if (_p.Button(new Rectangle(panel.X + 10, y, width - 20, 40), label, selected: c.SkillOf(skill) >= fault.Level,
                     tip: "This needs " + skill.ToString().ToLowerInvariant() + " " + fault.Level + "."))
             {
-                _picker = null;
+                Do(() => _picker = null);
                 Act((patch ? "patch " : "repair ") + fault.Name + " by " + person.Name, () => v.Assign(person, fault, patch));
             }
             y += 46;
@@ -185,6 +182,18 @@ public sealed partial class ShipGame
         // A click anywhere else closes it.
         if (_p.Click && !_p.Over(panel))
             Do(() => _picker = null);
+    }
+
+    /// <summary>
+    /// Closes what has lapsed, once per update and never in a draw: a picker whose fault is resolved or with nobody awake
+    /// to pick, and a banner whose time is up.
+    /// </summary>
+    private void StepOverlays()
+    {
+        if (_picker is { } pick && (pick.Fault.Resolved || _voyage is null || !_voyage.Awake.Any()))
+            _picker = null;
+        if (_banner is not null && _bannerUntil <= _now)
+            _banner = null;
     }
 
     // ---- What is under the mouse, for cross-highlighting ----

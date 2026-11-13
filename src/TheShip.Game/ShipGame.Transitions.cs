@@ -253,10 +253,7 @@ public sealed partial class ShipGame
             return;
         var left = (float)(_bannerUntil - _now);
         if (left <= 0f)
-        {
-            _banner = null;
-            return;
-        }
+            return; // cleared in the next update (StepOverlays)
         var strip = new Rectangle(log.X + 1, log.Y + 1, log.Width - 2, 33);
         _p.Fill(strip, Painter.Fade(Painter.Accent, Math.Min(1f, left / 0.5f)));
         _p.Text(_p.Body, Clip(_banner, strip.Width - 28, _p.BodyWidth), strip.X + 14, strip.Y + 7, Painter.Ground);
