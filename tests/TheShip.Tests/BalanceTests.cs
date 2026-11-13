@@ -77,6 +77,7 @@ public class BalanceTests
                 sb.AppendLine($"  Injuries briefed (injured_warned) / not      {N(t.Average(x => x.InjuriesBriefed))} / {N(t.Average(x => x.InjuriesNotBriefed))} per run");
             }
             sb.AppendLine($"  Accusations opened / admitted / ignored / denied  {N(r.Average(x => x.Accusations))} / {N(r.Average(x => x.AccusationsAdmitted))} / {N(r.Average(x => x.AccusationsIgnored))} / {N(r.Average(x => x.AccusationsDenied))} per run");
+            sb.AppendLine($"  Corrections             {N(r.Average(x => x.Corrections))} per run");
             sb.AppendLine($"  Lies told / caught      {N(r.Average(x => x.LiesTold))} / {N(r.Average(x => x.CaughtLies))} per run");
             sb.AppendLine($"  Thaws / pod wear        {N(r.Average(x => x.Thaws))} / {N(r.Average(x => x.PodWear))}");
             double Sd(IEnumerable<double> xs) { var l = xs.ToList(); if (l.Count < 2) return 0; var mu = l.Average(); return Math.Sqrt(l.Sum(x => (x - mu) * (x - mu)) / l.Count); }
@@ -107,6 +108,7 @@ public class BalanceTests
     [InlineData(BotKind.Thrifty)]
     [InlineData(BotKind.Silent)]
     [InlineData(BotKind.Breaker)]
+    [InlineData(BotKind.Corrector)]
     public void Every_bot_finishes_every_run(BotKind kind)
     {
         var stuck = Runs(kind).Where(r => !r.Ended).Select(r => r.Seed).ToList();
@@ -120,6 +122,7 @@ public class BalanceTests
     [InlineData(BotKind.Thrifty)]
     [InlineData(BotKind.Silent)]
     [InlineData(BotKind.Breaker)]
+    [InlineData(BotKind.Corrector)]
     public void The_same_seed_gives_the_same_result(BotKind kind)
     {
         foreach (var seed in new[] { 1, 17, 101, 200 })
@@ -173,6 +176,15 @@ public class BalanceTests
             $"Breaker {Rate(BotKind.Breaker):P1} vs Honest {Rate(BotKind.Honest):P1}");
     }
 
+
+    [Fact]
+    public void Correcting_a_lie_is_not_a_winning_strategy()
+    {
+        // The Corrector lies like the Liar and then tells each person the truth before they find out. It may match Honest but not beat it by
+        // more than 6 points (600 seeds); if it does, raise Tuning.SelfCorrectTrust.
+        Assert.True(Rate(BotKind.Corrector) - Rate(BotKind.Honest) <= 0.06,
+            $"Corrector {Rate(BotKind.Corrector):P1} vs Honest {Rate(BotKind.Honest):P1}");
+    }
     [Fact]
     public void Honesty_beats_carelessness_and_silence_by_at_least_ten_points()
     {

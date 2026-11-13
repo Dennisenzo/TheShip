@@ -252,6 +252,8 @@ public sealed class Statement
     public Dictionary<string, double> FoundOutBy { get; } = new();
     /// <summary>Crew id to how they found the lie out, as a past-tense phrase that takes a subject: "read the log entry", "was told by Lin what she saw".</summary>
     public Dictionary<string, string> FoundOutHow { get; } = new();
+    /// <summary>Crew id to the year the ship told them the truth on this fact before they found the lie out (self-correction): no LieTrust or accusation later.</summary>
+    public Dictionary<string, double> Corrected { get; } = new();
     /// <summary>Crew id to what became of the accusation that finding-out opened: "admitted", "ignored" or "denied".</summary>
     public Dictionary<string, string> Accused { get; } = new();
     /// <summary>Crew id to whether the promise to them was kept.</summary>

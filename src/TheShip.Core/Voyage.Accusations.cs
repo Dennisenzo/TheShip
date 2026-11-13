@@ -11,6 +11,8 @@ public sealed partial class Voyage
     public int AccusationsAdmitted { get; private set; }
     public int AccusationsIgnored { get; private set; }
     public int AccusationsDenied { get; private set; }
+    /// <summary>Lies the ship told the truth about before they were found out (a measure for the balance harness).</summary>
+    public int Corrections { get; private set; }
     private int _beat;
 
     /// <summary>The accusation this person has open (the oldest), if any.</summary>

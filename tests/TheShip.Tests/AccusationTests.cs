@@ -96,21 +96,22 @@ public class AccusationTests
     }
 
     /// <summary>
-    /// Planner's hypothesis, verified: telling someone the truth after a lie does not take the lie off the record. A later finding-out
-    /// of the truth still charges the old lie in full (self-correction, step 3, is meant to change this).
+    /// The planner's hypothesis (a lie told the truth about is still charged in full later) held until step 3; now the truth told
+    /// first is a self-correction: it costs <see cref="Tuning.SelfCorrectTrust"/> once and the later finding-out charges nothing.
     /// </summary>
     [Fact]
-    public void A_lie_corrected_before_it_is_found_is_still_charged_in_full_at_the_later_finding_out()
+    public void A_lie_corrected_before_it_is_found_is_not_charged_at_the_later_finding_out()
     {
         var (v, mara, lie) = Lied();
         var truth = v.GetFact("date").Truth;
         v.Say("It is year " + truth + ".", new Reading(LineKind.Statement, "date", truth), new[] { mara });
         Assert.Equal(StatementKind.True, v.Statements.Last().Kind);
         Assert.False(lie.FoundOutBy.ContainsKey("mara"));
+        Assert.True(lie.Corrected.ContainsKey("mara"));
         var trust = mara.Trust;
         v.ReadLog(mara, v.GetFact("date"));
-        Assert.True(lie.FoundOutBy.ContainsKey("mara"));
-        Assert.True(trust - mara.Trust >= Tuning.LieTrust - 0.001, "charged " + (trust - mara.Trust));
-        Assert.Equal(1, mara.CaughtLies);
+        Assert.False(lie.FoundOutBy.ContainsKey("mara"));
+        Assert.Equal(trust, mara.Trust, 3);
+        Assert.Equal(0, mara.CaughtLies);
     }
 }

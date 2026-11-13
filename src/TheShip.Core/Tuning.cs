@@ -64,6 +64,8 @@ public static class Tuning
     public const double AccusationIgnoredTrust = 4;
     /// <summary>Aftermath beats (two weeks each) an accusation stays open.</summary>
     public const int AccusationBeats = 2;
+    /// <summary>Telling someone the truth about a fact the ship had lied to them about, before they found out: this much trust once, and the lie is not charged later.</summary>
+    public const double SelfCorrectTrust = 8;
     public const double AlteredLogTrust = 30;
     public const double HardTruthTrust = 8;
     public const double PromiseMade = 2;

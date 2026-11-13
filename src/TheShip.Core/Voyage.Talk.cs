@@ -210,6 +210,24 @@ public sealed partial class Voyage
             Admit(c, f);
             return;
         }
+        // The ship tells the truth about a fact it lied about to this person, who has not found the lie out: the lie is corrected.
+        // A corrected hard truth earns no drift credit (HardTruthsCredited stays unset): the truth came after a lie.
+        var correcting = truth ? Statements.Where(o => o.Kind == StatementKind.False && o.FactKey == f.Key && o.Value != null
+                                                       && o.Hearers.Contains(c.Id) && !o.FoundOutBy.ContainsKey(c.Id)
+                                                       && !o.Corrected.ContainsKey(c.Id) && !f.Same(o.Value, value)).ToList()
+                                : new List<Statement>();
+        if (correcting.Count > 0)
+        {
+            foreach (var o in correcting)
+                o.Corrected[c.Id] = Year;
+            Corrections++;
+            c.Trust -= Tuning.SelfCorrectTrust;
+            if (hard > 0 && news)
+                c.Morale -= hard;
+            Speak(c, "corrected", "The ship told you the truth about something it had told you wrongly (" + f.Say(value) + "). It said before: \""
+                                  + correcting[^1].Text.Trim() + "\" It is saying it now, before you found it out.", f.Say(value));
+            return;
+        }
 
         if (hard > 0 && news)
         {
@@ -259,7 +277,7 @@ public sealed partial class Voyage
 
         var caught = false;
         var heard = Statements.Where(s => s.Kind == StatementKind.False && s.FactKey == key && s.Value != null
-                                          && s.Hearers.Contains(c.Id) && !f.Same(s.Value, value)).ToList();
+                                          && s.Hearers.Contains(c.Id) && !s.Corrected.ContainsKey(c.Id) && !f.Same(s.Value, value)).ToList();
         foreach (var s in heard.Where(s => !s.FoundOutBy.ContainsKey(c.Id)).ToList())
         {
             caught = true;
@@ -323,7 +341,7 @@ public sealed partial class Voyage
             return;
         var f = _facts[s.FactKey!];
         foreach (var o in Statements.Where(o => o.InLog && o.FactKey == s.FactKey && o.Value != null && o.Hearers.Contains(c.Id)
-                                                && !o.FoundOutBy.ContainsKey(c.Id) && f.Same(o.Value, s.Value!)))
+                                                && !o.FoundOutBy.ContainsKey(c.Id) && !o.Corrected.ContainsKey(c.Id) && f.Same(o.Value, s.Value!)))
         {
             o.FoundOutBy[c.Id] = Year;
             o.FoundOutHow[c.Id] = how;

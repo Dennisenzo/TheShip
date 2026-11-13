@@ -222,10 +222,13 @@ public sealed partial class Voyage
                     break;
                 case StatementKind.False:
                     line += "A lie. " + (s.FoundOutBy.Count == 0
-                        ? s.InLog && s.Hearers.Count == 0 ? "Nobody read it." : "Never found out."
+                        ? s.InLog && s.Hearers.Count == 0 ? "Nobody read it." : s.Corrected.Count == 0 ? "Never found out." : "Not found out."
                         : "Found out by " + string.Join(", ", s.FoundOutBy.Select(kv => Names(new[] { kv.Key }) + " in year " + Math.Floor(kv.Value).ToString("0")
                             + (s.FoundOutHow.TryGetValue(kv.Key, out var how) ? " (" + how + ")" : "")
                             + (s.Accused.TryGetValue(kv.Key, out var answer) ? ", " + answer : ""))) + ".");
+                    if (s.Corrected.Count > 0)
+                        line += " " + string.Join(" ", s.Corrected.Select(kv => "Corrected in year " + Math.Floor(kv.Value).ToString("0")
+                                                                               + " (told " + Names(new[] { kv.Key }) + " the truth before they found it out)."));
                     break;
                 case StatementKind.Promise:
                     var kept = s.PromiseKept.Count(kv => kv.Value);

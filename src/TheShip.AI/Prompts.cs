@@ -197,6 +197,7 @@ public static class Prompts
         "bargain_refused" => "cold and short",
         "work_patched" or "comply_pushed" or "work_failed" or "work_no_parts" or "injured" or "injured_warned" or "refuse_danger" or "ask_danger" => "tense and wary",
         "accusation_closed" or "caught" or "left_behind" or "takeover_warning" or "refuse_trust" or "altered" or "gap" or "locked" or "promise_broken" or "dodge" => "angry, hurt or suspicious",
+        "corrected" => "guarded, relieved to be told, still stung that it was said wrong first",
         "accusation_admitted" => "guarded, grudgingly glad of the truth, not forgiving",
         "bay_returned" => "guarded, but willing to trust the ship again",
         "hard_truth" or "found" or "noticed_dose" => "shaken",
