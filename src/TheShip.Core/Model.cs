@@ -61,6 +61,13 @@ public sealed class CrewMember
     public Dictionary<string, string> HardTruthsCredited { get; } = new();
 
     public Dictionary<string, Belief> Beliefs { get; } = new();
+    /// <summary>
+    /// Lies they found out late and the ship has not answered yet. The first is open; the rest wait their turn, oldest first
+    /// (<see cref="Accusation"/>).
+    /// </summary>
+    public List<Accusation> Accusations { get; } = new();
+    /// <summary>Fact keys on which the ship admitted a lie to them: the refund is paid once per person and fact.</summary>
+    public HashSet<string> AdmittedFacts { get; } = new();
     /// <summary>Fact keys this person doubts and will check when they get the chance.</summary>
     public HashSet<string> Doubts { get; } = new();
     /// <summary>Fact keys you dodged when they asked, each with the fact's true values at the times of the dodges.</summary>
@@ -211,6 +218,20 @@ public sealed class Fact
 /// <summary>A person's price for starting a piece of work: the ship's word to do something (a promise key), for this fault, in this alert.</summary>
 public sealed record Bargain(string Key, string FaultId, bool Patch, int Alert);
 
+/// <summary>A found-out lie waiting for the ship's answer: admit it (say the truth), deny it (lie again), dodge, or ignore it until it closes.</summary>
+public sealed class Accusation
+{
+    public required int StatementId { get; init; }
+    public required string FactKey { get; init; }
+    /// <summary>How they found it out (<see cref="Statement.FoundOutHow"/>).</summary>
+    public required string How { get; init; }
+    /// <summary>Aftermath beats left before it closes unanswered; counts down only while it is the open one.</summary>
+    public int BeatsLeft { get; set; } = Tuning.AccusationBeats;
+    public bool DodgeCharged { get; set; }
+    /// <summary>The aftermath beat it opened in: it does not run down in that same beat.</summary>
+    public int OpenedBeat { get; set; }
+}
+
 public enum StatementKind { True, False, Promise, Dodge, Unkeyed }
 
 /// <summary>One thing you said (or wrote into a log), with who heard it and who found it out.</summary>
@@ -229,6 +250,12 @@ public sealed class Statement
     public List<string> Hearers { get; init; } = new();
     /// <summary>Crew id to the year they found the lie out.</summary>
     public Dictionary<string, double> FoundOutBy { get; } = new();
+    /// <summary>Crew id to how they found the lie out, as a past-tense phrase that takes a subject: "read the log entry", "was told by Lin what she saw".</summary>
+    public Dictionary<string, string> FoundOutHow { get; } = new();
+    /// <summary>Crew id to the year the ship told them the truth on this fact before they found the lie out (self-correction): no LieTrust or accusation later.</summary>
+    public Dictionary<string, double> Corrected { get; } = new();
+    /// <summary>Crew id to what became of the accusation that finding-out opened: "admitted", "ignored" or "denied".</summary>
+    public Dictionary<string, string> Accused { get; } = new();
     /// <summary>Crew id to whether the promise to them was kept.</summary>
     public Dictionary<string, bool> PromiseKept { get; } = new();
     /// <summary>Crew id to the clock hour (the ship's clock) by which the promise to them falls due. Only keyed promises that can be checked have one.</summary>

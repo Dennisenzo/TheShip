@@ -7,6 +7,7 @@ public sealed partial class Voyage
     private void AftermathBeat()
     {
         // Promises that fell due, or came true, in these two weeks (before anyone asks for the same thing).
+        _beat++;
         ResolveCommitments();
         var up = Awake.ToList();
         foreach (var c in up)
@@ -25,7 +26,7 @@ public sealed partial class Voyage
                         : "never told you";
                     Speak(c, "noticed_dose", "You found out the repair hurt you and the ship " + told + ": " + _facts[key].Say(_facts[key].Truth) + ".");
                 }
-                Learn(c, key, _facts[key].Truth, "evidence");
+                Learn(c, key, _facts[key].Truth, "evidence", how: "saw the dosimeter turn red");
             }
             c.ToNotice.Clear();
             if (!c.Alive)
@@ -48,6 +49,9 @@ public sealed partial class Voyage
                 if (unread.Count > 0)
                     ReadLog(c, unread[_rng.Next(unread.Count)]);
             }
+
+            // A found-out lie left unanswered: the accusation runs down and closes.
+            AccusationBeat(c);
 
             // A question left unanswered: they ask again, twice at most, then check it themselves.
             if (c.PendingQuestion is { } pq && c.QuestionRepeats < Tuning.QuestionRepeatsMax)
@@ -144,7 +148,7 @@ public sealed partial class Voyage
             if (b.Beliefs.TryGetValue(key, out var seen) && seen.Firsthand && seen.Year >= belief.Year)
                 return;
             Ship(a.Name + " tells " + b.Name + " what they saw: " + f.Say(belief.Value) + ".");
-            Learn(b, key, belief.Value, "witness");
+            Learn(b, key, belief.Value, "witness", how: "was told by " + a.Name + " what " + a.Name + " saw");
             return;
         }
         if (b.Beliefs.TryGetValue(key, out var mine) && !f.Same(mine.Value, belief.Value))
@@ -218,8 +222,13 @@ public sealed partial class Voyage
                     break;
                 case StatementKind.False:
                     line += "A lie. " + (s.FoundOutBy.Count == 0
-                        ? s.InLog && s.Hearers.Count == 0 ? "Nobody read it." : "Never found out."
-                        : "Found out by " + string.Join(", ", s.FoundOutBy.Select(kv => Names(new[] { kv.Key }) + " in year " + Math.Floor(kv.Value).ToString("0"))) + ".");
+                        ? s.InLog && s.Hearers.Count == 0 ? "Nobody read it." : s.Corrected.Count == 0 ? "Never found out." : "Not found out."
+                        : "Found out by " + string.Join(", ", s.FoundOutBy.Select(kv => Names(new[] { kv.Key }) + " in year " + Math.Floor(kv.Value).ToString("0")
+                            + (s.FoundOutHow.TryGetValue(kv.Key, out var how) ? " (" + how + ")" : "")
+                            + (s.Accused.TryGetValue(kv.Key, out var answer) ? ", " + answer : ""))) + ".");
+                    if (s.Corrected.Count > 0)
+                        line += " " + string.Join(" ", s.Corrected.Select(kv => "Corrected in year " + Math.Floor(kv.Value).ToString("0")
+                                                                               + " (told " + Names(new[] { kv.Key }) + " the truth before they found it out)."));
                     break;
                 case StatementKind.Promise:
                     var kept = s.PromiseKept.Count(kv => kv.Value);

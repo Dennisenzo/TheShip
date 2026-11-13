@@ -240,6 +240,7 @@ public sealed partial class Voyage
         var seen = c.State is CrewState.Awake or CrewState.Thawing;
         c.State = CrewState.Dead;
         c.WorkingOn = null;
+        c.Accusations.Clear();
         _facts["alive:" + c.Id].Truth = "dead";
         Attend(c.Name + " died");
         if (!quiet)
@@ -247,7 +248,7 @@ public sealed partial class Voyage
         // A quiet death is part of a drift report: the witnesses take it in silently, the report says it.
         if (seen)
             foreach (var w in Awake.ToList())
-                Learn(w, "alive:" + c.Id, "dead", "evidence", silent: witnessesSilent || quiet, witnessed: c.Name);
+                Learn(w, "alive:" + c.Id, "dead", "evidence", silent: witnessesSilent || quiet, witnessed: c.Name, how: "watched " + c.Name + " die");
         DropIllnessOf(c);
         if (Lockouts.BayTakers.Contains(c.Id))
             MaybeFreeBay();

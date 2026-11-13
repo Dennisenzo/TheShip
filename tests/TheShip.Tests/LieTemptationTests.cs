@@ -227,6 +227,8 @@ public class LieTemptationTests
         var mara = Woken(v, "mara");
         VoyageTests.Say(v, mara, "Idris is alive and asleep.");
         Assert.Equal("dosed", v.GetFact("dose").Truth);
+        // Told straight first (credited); each later flip-flop truth is a correction of the lie before it, which earns nothing.
+        Tell(v, mara, "dose", "dosed");
         for (var i = 0; i < 3; i++)
         {
             Tell(v, mara, "dose", "safe");

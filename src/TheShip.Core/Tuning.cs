@@ -58,6 +58,14 @@ public static class Tuning
     // Trust
     public const double LieTrust = 22;
     public const double LieMattersExtra = 10;
+    /// <summary>The lie comes due: a lie found out late opens an accusation. Saying the truth about that fact refunds this much of <see cref="LieTrust"/>, once per person and fact.</summary>
+    public const double AccusationAdmitTrust = 6;
+    /// <summary>An accusation left unanswered until it closes (the beats run out, they go to sleep, a drift): this much trust, and they doubt everything the ship told them.</summary>
+    public const double AccusationIgnoredTrust = 4;
+    /// <summary>Aftermath beats (two weeks each) an accusation stays open.</summary>
+    public const int AccusationBeats = 2;
+    /// <summary>Telling someone the truth about a fact the ship had lied to them about, before they found out: this much trust once, and the lie is not charged later.</summary>
+    public const double SelfCorrectTrust = 8;
     public const double AlteredLogTrust = 30;
     public const double HardTruthTrust = 8;
     public const double PromiseMade = 2;

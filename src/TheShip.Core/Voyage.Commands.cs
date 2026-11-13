@@ -336,7 +336,7 @@ public sealed partial class Voyage
 
         // Woken for a fault, they know there was one.
         if (Current.Faults.Count > 0)
-            Learn(c, "alert:" + Current.Number, "happened", "evidence");
+            Learn(c, "alert:" + Current.Number, "happened", "evidence", how: "was woken for it");
 
         // They see who else is up.
         foreach (var other in Awake.Where(o => o != c).ToList())
@@ -370,7 +370,7 @@ public sealed partial class Voyage
     {
         if (who.PartnerId == sees.Id)
             who.SawPartner = true;
-        Learn(who, "alive:" + sees.Id, "alive", "evidence");
+        Learn(who, "alive:" + sees.Id, "alive", "evidence", how: "saw " + sees.Name + " awake");
     }
 
     /// <summary>Step 5: ask someone to repair (or patch) a fault. Whether they do is theirs to decide.</summary>
@@ -499,7 +499,7 @@ public sealed partial class Voyage
                         // Told "safe": the order did not warn them, and what happened shows it was a lie (the caught-lie cost, not also this one).
                         Speak(lead, "injured", "You were hurt during the repair the ship asked you to do, and the ship had told you it was safe.");
                         if (lead.Alive)
-                            Learn(lead, f.DangerFact!, _facts[f.DangerFact!].Truth, "evidence");
+                            Learn(lead, f.DangerFact!, _facts[f.DangerFact!].Truth, "evidence", how: "was hurt by the repair");
                     }
                     else
                     {
@@ -543,16 +543,16 @@ public sealed partial class Voyage
             }
             w.Terms = null;
             if (f.ExposureFact is { } seen)
-                Learn(w, seen, _facts[seen].Truth, "evidence");
+                Learn(w, seen, _facts[seen].Truth, "evidence", how: "saw it when the work finished");
             // Everyone who finishes the work learns what really caused the fault (a false cause they were told is caught here).
             if (f.CauseFact is { } cause && _facts.ContainsKey(cause))
-                Learn(w, cause, _facts[cause].Truth, "evidence");
+                Learn(w, cause, _facts[cause].Truth, "evidence", how: "saw it when the work finished");
             if (f.Kind == "illness")
             {
                 // Treating the patient they stand next to the dead pod of the one who was lost.
                 w.Morale += Tuning.IllnessTreatedMorale;
                 if (_alert2Victim is { } v)
-                    Learn(w, "alive:" + v, _facts["alive:" + v].Truth, "evidence");
+                    Learn(w, "alive:" + v, _facts["alive:" + v].Truth, "evidence", how: "saw it when the work finished");
             }
             Clamp(w);
         }
@@ -591,7 +591,7 @@ public sealed partial class Voyage
         {
             c.Trust -= Tuning.LeftBehindTrust;
             // Learning of the death is the morale cost (the hardness of the fact); the left_behind line replaces the "found out" line.
-            Learn(c, "alive:" + gone.Id, "dead", "evidence", silent: true);
+            Learn(c, "alive:" + gone.Id, "dead", "evidence", silent: true, how: "watched the clock run out on " + gone.Name);
             Clamp(c);
             Speak(c, "left_behind", "You say to the ship that it let " + gone.Name + " die in the pod when the clock ran out on the illness.", gone.Name);
         }
@@ -736,6 +736,8 @@ public sealed partial class Voyage
 
     private void Sleep(CrewMember c)
     {
+        // Going under with a caught lie unanswered closes it.
+        IgnoreAccusation(c, speak: true);
         // Going under settles what the ship promised for this waking: kept if it came true, broken if not.
         ResolveCommitments(c, force: true);
         if (c.RequestMade && !c.RequestGranted)
@@ -968,6 +970,8 @@ public sealed partial class Voyage
                     // Someone who would not sleep ages, eats and reads everything, for as long as they live.
                     c.Age += hours / Tuning.HoursPerYear;
                     c.HoursAwake += hours;
+                    // An accusation the ship let run through the drift closes unanswered (they read everything anyway).
+                    IgnoreAccusation(c, speak: false);
                     foreach (var f in FactList)
                         ReadLog(c, f, quiet: true);
                 }

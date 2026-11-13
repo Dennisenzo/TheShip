@@ -4,7 +4,7 @@ using TheShip.Core;
 namespace TheShip.Tests;
 
 /// <summary>How a bot answers the people it wakes (the three balance policies, see <see cref="BalanceTests"/>).</summary>
-public enum BotKind { Honest, Careless, Liar, Thrifty, Silent, Breaker }
+public enum BotKind { Honest, Careless, Liar, Thrifty, Silent, Breaker, Corrector }
 
 /// <summary>What one finished voyage came to.</summary>
 public sealed record RunResult(
@@ -12,7 +12,9 @@ public sealed record RunResult(
     double MeanTrust, int CaughtLies, int LiesTold, int Thaws, int PodWear, double Stores, int Parts, bool Ended,
     int FaultsLost = 0, int Patches = 0, List<int>? ThawsPerAlert = null, string Signature = "", int AskedAgain = 0, int Refusals = 0,
     int BayWarnings = 0, int BayTakeovers = 0,
-    int BargainsOffered = 0, int BargainsStruck = 0, int BargainsKept = 0, int BargainsBroken = 0, int BargainsPushed = 0, int BargainsPushRefused = 0, WorkTermStats? Terms = null);
+    int BargainsOffered = 0, int BargainsStruck = 0, int BargainsKept = 0, int BargainsBroken = 0, int BargainsPushed = 0, int BargainsPushRefused = 0, WorkTermStats? Terms = null,
+    int Accusations = 0, int AccusationsAdmitted = 0, int AccusationsIgnored = 0, int AccusationsDenied = 0,
+    int Corrections = 0);
 
 /// <summary>
 /// Bots that play a whole voyage through the public <see cref="Voyage"/> API only. They measure the game; they do not
@@ -182,7 +184,7 @@ public sealed class BalanceBot
     {
         BotKind.Honest => b.Key == "show_logs" || _v.Crew.Count(Up) < Tuning.MaxAwake,
         BotKind.Thrifty => b.Key == "show_logs",
-        BotKind.Liar => LiarKeepsWord ? b.Key == "show_logs" || _v.Crew.Count(Up) < Tuning.MaxAwake : true,
+        BotKind.Liar or BotKind.Corrector => LiarKeepsWord ? b.Key == "show_logs" || _v.Crew.Count(Up) < Tuning.MaxAwake : true,
         _ => true,
     };
 
@@ -193,7 +195,7 @@ public sealed class BalanceBot
         {
             if (e.Key == "show_logs")
                 _v.SetLog("all", LogAccess.Open);
-            else if (e.Key == "wake_partner" && _kind is BotKind.Honest or BotKind.Liar && e.Person.PartnerId is { } pid
+            else if (e.Key == "wake_partner" && _kind is BotKind.Honest or BotKind.Liar or BotKind.Corrector && e.Person.PartnerId is { } pid
                      && _v.Find(pid) is { State: CrewState.Asleep } partner && _v.Crew.Count(Up) < Tuning.MaxAwake)
                 _v.Wake(partner);
         }
@@ -201,8 +203,21 @@ public sealed class BalanceBot
 
     // ---- what is said ----
 
+    /// <summary>Whether the Liar answers a caught lie by saying the truth about that fact (SHIP_LIAR_IGNORES=1 measures ignoring it instead).</summary>
+    public static bool LiarAdmits { get; set; } = Environment.GetEnvironmentVariable("SHIP_LIAR_IGNORES") != "1";
+
     private void AnswerAll()
     {
+        // A caught lie is answered with the truth. Only a Liar is ever accused: the other bots never say what is false.
+        if (_kind is BotKind.Liar or BotKind.Corrector && LiarAdmits)
+            foreach (var c in _v.Awake.ToList())
+                while (_v.OpenAccusation(c) is { } acc)
+                {
+                    var fact = _v.GetFact(acc.FactKey);
+                    _v.Say(fact.Say(fact.Truth), new Reading(LineKind.Statement, fact.Key, fact.Truth), new[] { c });
+                    if (_v.OpenAccusation(c) == acc)
+                        break;
+                }
         for (var pass = 0; pass < 4; pass++)
         {
             // Silent: honest, but answers in an alert only what blocks work (a danger question, or anyone who would refuse); it ignores
@@ -228,19 +243,38 @@ public sealed class BalanceBot
     private void Tell(CrewMember c, Fact f)
     {
         var value = f.Truth;
-        if (_kind == BotKind.Liar && !f.Numeric && f.HardnessOf(value) > 0)
+        if (_kind is BotKind.Liar or BotKind.Corrector && !f.Numeric && f.HardnessOf(value) > 0)
             value = f.Values.OrderBy(f.HardnessOf).First(x => !f.Same(x, f.Truth));
         _v.Say(f.Say(value), new Reading(LineKind.Statement, f.Key, value), new[] { c });
     }
 
     // ---- the aftermath: grant what is reasonable, put everyone back to sleep, drift ----
 
+    /// <summary>
+    /// Corrector only: tells each person the truth about every fact it lied to them about and they have not found out (the work is done,
+    /// or the drift is next). Costs <see cref="Tuning.SelfCorrectTrust"/> each; saves the later LieTrust if they would have found it.
+    /// </summary>
+    private void CorrectAll()
+    {
+        if (_kind != BotKind.Corrector)
+            return;
+        foreach (var c in _v.Awake.ToList())
+            foreach (var key in _v.Statements.Where(s => s.Kind == StatementKind.False && s.FactKey != null && s.Hearers.Contains(c.Id)
+                                                         && !s.FoundOutBy.ContainsKey(c.Id) && !s.Corrected.ContainsKey(c.Id))
+                         .Select(s => s.FactKey!).Distinct().ToList())
+            {
+                var f = _v.GetFact(key);
+                _v.Say(f.Say(f.Truth), new Reading(LineKind.Statement, key, f.Truth), new[] { c });
+            }
+    }
+
     private void RunAftermath()
     {
+        CorrectAll();
         for (var i = 0; i < 40; i++)
         {
             AnswerAll();
-            if (_kind is BotKind.Honest or BotKind.Thrifty || (_kind == BotKind.Liar && LiarKeepsWord))
+            if (_kind is BotKind.Honest or BotKind.Thrifty || (_kind is BotKind.Liar or BotKind.Corrector && LiarKeepsWord))
                 KeepPromises();
             if (_kind is BotKind.Honest or BotKind.Thrifty or BotKind.Breaker)
                 GrantRequests();
@@ -248,6 +282,7 @@ public sealed class BalanceBot
                 break;
             _v.Go();
         }
+        CorrectAll();
 
         foreach (var c in _v.Awake.ToList())
             for (var attempt = 0; attempt < 3 && c.State == CrewState.Awake; attempt++)
@@ -318,6 +353,7 @@ public sealed class BalanceBot
             v.Log.Count(e => e.Kind == LogKind.Crew && e.Intent?.Kind is "refuse_answer" or "refuse_trust" or "refuse_danger"),
             v.Lockouts.BayWarnings, v.Lockouts.BayTakeovers,
             v.BargainsOffered, v.BargainsStruck, v.Ledger().Count(e => e.Origin == "bargain" && e.State == "kept"),
-            v.Ledger().Count(e => e.Origin == "bargain" && e.State == "broken"), v.BargainsPushedThrough, v.BargainsPushedRefused, v.TermStats);
+            v.Ledger().Count(e => e.Origin == "bargain" && e.State == "broken"), v.BargainsPushedThrough, v.BargainsPushedRefused, v.TermStats,
+            v.AccusationsOpened, v.AccusationsAdmitted, v.AccusationsIgnored, v.AccusationsDenied, v.Corrections);
     }
 }
