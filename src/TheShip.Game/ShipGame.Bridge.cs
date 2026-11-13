@@ -565,6 +565,34 @@ public sealed partial class ShipGame
     private double _logFadeAt;
     /// <summary>The log's length at the last clock move: entries from here on are new since then.</summary>
     private int _logMark;
+    /// <summary>Which log entries are on screen: each waits for the one before it to be shown in full (<see cref="LogReveal"/>).</summary>
+    private readonly LogReveal _reveal = new();
+    private readonly List<RevealItem> _revealItems = new();
+    private int LogVisible => _reveal.Visible;
+
+    /// <summary>Called once per update: moves the reveal on. A key or a click that skips a transition also finishes the typing.</summary>
+    private void StepLogReveal(double dt, bool skip)
+    {
+        if (_voyage is not { } v)
+            return;
+        for (var i = _revealItems.Count; i < v.Log.Count; i++)
+            _revealItems.Add(default);
+        for (var i = 0; i < v.Log.Count; i++)
+        {
+            var e = v.Log[i];
+            var text = e.Kind switch
+            {
+                LogKind.Ship => "SHIP - " + e.Text,
+                LogKind.Crew => e.Speaker + " - " + e.Text,
+                _ => "",
+            };
+            _revealItems[i] = new RevealItem(e.Kind == LogKind.Crew, e.Pending, text.Length);
+        }
+        _reveal.Update(_revealItems, ShownLogCount(v), dt, skip, Motion.Still);
+    }
+
+    /// <summary>True while log lines are still held back or typing (the tour waits for it).</summary>
+    private bool LogDraining => _reveal.Draining;
 
     private void DrawLog(Voyage v, Rectangle rect)
     {
@@ -581,7 +609,7 @@ public sealed partial class ShipGame
         var visible = Math.Max(1, (areaBottom - areaTop) / step);
 
         // Lines that are new since the last frame fade in; lines since the last clock move have a mark in the margin.
-        var count = ShownLogCount(v);
+        var count = LogVisible;
         if (count > _logKnown)
         {
             _logFadeFrom = _logKnown;
@@ -595,6 +623,7 @@ public sealed partial class ShipGame
         foreach (var entry in v.Log.Take(count))
         {
             entryIndex++;
+            var head = entryIndex == _reveal.Shown && _reveal.HeadVisible;
             var color = entry.Kind switch
             {
                 LogKind.Ship => Painter.Accent,
@@ -610,8 +639,15 @@ public sealed partial class ShipGame
                 LogKind.Recorded => "    " + entry.Text,
                 _ => entry.Text,
             };
+            // The head line types out: wrap the whole text, show the first characters of it.
+            var left = head && !entry.Pending ? _reveal.Chars : int.MaxValue;
             foreach (var line in Painter.Wrap(text, columns))
-                lines.Add((line, color, entryIndex));
+            {
+                if (left <= 0)
+                    break;
+                lines.Add((line.Length > left ? line[..left] : line, color, entryIndex));
+                left -= line.Length + 1;
+            }
         }
         _scroll = Math.Min(_scroll, Math.Max(0, lines.Count - visible));
         var first = Math.Max(0, lines.Count - visible - _scroll);
