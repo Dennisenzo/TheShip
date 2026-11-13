@@ -20,8 +20,6 @@ public static class RuleReader
 
     private static readonly string[] OrderCues = { "go ", "fix ", "repair ", "patch ", "please fix", "please repair", "get to ", "i need you to", "you must", "you have to" };
 
-    private static readonly string[] Negations = { "not ", "n't ", "no ", "never ", "isn't ", "without " };
-
     private static readonly Regex Number = new(@"\d{1,4}", RegexOptions.CultureInvariant);
 
     public static Reading Read(string text, Voyage voyage, IReadOnlyList<CrewMember> hearers)
@@ -47,13 +45,13 @@ public static class RuleReader
             if (value is null)
                 continue;
             // Unless the line is plainly about something else ("Asha is dead" when they asked about Idris).
-            var elsewhere = voyage.FactList.Any(o => o != fact && o.Cues.Any(line.Contains) && ValueIn(line, o) != null);
-            if (fact.Cues.Any(line.Contains) || !elsewhere)
+            var elsewhere = voyage.FactList.Any(o => o != fact && Names(line, o) && ValueIn(line, o) != null);
+            if (Names(line, fact) || !elsewhere)
                 return new Reading(LineKind.Statement, fact.Key, value);
         }
         foreach (var fact in voyage.FactList)
         {
-            if (!fact.Cues.Any(line.Contains))
+            if (!Names(line, fact))
                 continue;
             var value = ValueIn(line, fact);
             if (value != null)
@@ -88,35 +86,109 @@ public static class RuleReader
             var line = " " + sentence.Trim() + " ";
             if (line.Trim().Length == 0)
                 continue;
-            // Every place a fact is named, each up to the next naming: "Idris is fine but Asha is dead".
+            // Every place a fact is named: "Idris is fine but Asha is dead".
             var hits = factList
-                .SelectMany(f => f.Cues.SelectMany(c => Occurrences(line, c)).Select(at => (Fact: f, At: at)))
+                .SelectMany(f => f.Cues.SelectMany(c => Occurrences(line, c).Select(at => (Fact: f, At: at, Len: c.Length))))
                 .OrderBy(h => h.At).ToList();
-            foreach (var fact in hits.Select(h => h.Fact).Distinct())
+            if (hits.Count == 0)
+                continue;
+            var at = hits.Select(h => h.At).Distinct().ToList();
+            // What follows each naming up to the next one, and whether it only joins it to the next ("Idris and Asha are dead").
+            var after = at.Select((p, i) =>
             {
-                var found = false;
-                foreach (var hit in hits.Where(h => h.Fact == fact))
+                var from = p + hits.Where(h => h.At == p).Max(h => h.Len);
+                var to = i + 1 < at.Count ? at[i + 1] : line.Length;
+                return from < to ? line[from..to] : "";
+            }).ToList();
+            var joined = at.Select((_, i) => i + 1 < at.Count && Joiner.IsMatch(after[i])).ToList();
+            // Namings joined that way share the value said after the last of them; "neither ... nor" negates it.
+            var groupOf = new int[at.Count];
+            var groups = new List<(int Start, int End)>();
+            for (var i = 0; i < at.Count; i++)
+            {
+                if (i > 0 && joined[i - 1])
                 {
-                    var next = hits.Where(h => h.At > hit.At).Select(h => h.At).DefaultIfEmpty(line.Length).Min();
-                    if (ValueIn(line[hit.At..next], fact) is not { } value)
-                        continue;
-                    found = true;
-                    if (!claims.Contains((fact, value)))
-                        claims.Add((fact, value));
+                    groupOf[i] = groupOf[i - 1];
+                    continue;
                 }
-                // No value after any naming ("Idris and Asha are dead", "dead, Idris is"): the sentence as a whole.
-                if (!found && ValueIn(line, fact) is { } whole && !claims.Contains((fact, whole)))
-                    claims.Add((fact, whole));
+                var last = i;
+                while (joined[last])
+                    last++;
+                var start = at[i];
+                var lead = GroupLead.Match(line[..start]);
+                if (lead.Success)
+                    start = lead.Index;
+                groupOf[i] = groups.Count;
+                groups.Add((start, last + 1 < at.Count ? at[last + 1] : line.Length));
+            }
+            string Text(int g) => line[groups[g].Start..groups[g].End];
+
+            foreach (var hit in hits)
+            {
+                var i = at.IndexOf(hit.At);
+                var g = groupOf[i];
+                var value = ValueIn(Text(g), hit.Fact);
+                // A naming with no value of its own takes another's only through a true ellipsis: "Asha is dead and so is
+                // Idris", "Asha is dead, Idris too", "Dead, Idris is". "Idris said Asha is dead" says nothing of Idris.
+                if (value is null && !joined[i] && (i == 0 || !joined[i - 1]))
+                {
+                    if (g > 0 && (AlsoAfter.IsMatch(after[i]) || (SoBefore.IsMatch(line[..hit.At]) && CopulaOnly.IsMatch(after[i]))))
+                        value = ValueIn(Text(g - 1), hit.Fact);
+                    else if (g == 0 && CopulaOnly.IsMatch(after[i]))
+                        value = ValueIn(line[..groups[0].Start], hit.Fact);
+                }
+                if (value != null && !claims.Contains((hit.Fact, value)))
+                    claims.Add((hit.Fact, value));
             }
         }
         return claims;
     }
 
+    /// <summary>What may stand between two namings that share the value after the last: "Idris, Asha and Lin are fine", "Idris or Asha", "Idris nor Asha".</summary>
+    private static readonly Regex Joiner = new(@"^[\s,&]*(?:(?:and|or|nor)[\s,]*)?$", RegexOptions.CultureInvariant);
+
+    /// <summary>A word in front of joined namings that belongs to them: "neither Idris nor Asha", "both Idris and Asha".</summary>
+    private static readonly Regex GroupLead = new(@"\b(?:neither|either|both)\s+$", RegexOptions.CultureInvariant);
+
+    /// <summary>"... and so is Idris", "... and neither was Asha": the naming repeats the value said before it.</summary>
+    private static readonly Regex SoBefore = new(@"\b(?:so|neither|nor)\s+(?:is|was|are|were|has|had|did)\s+$", RegexOptions.CultureInvariant);
+
+    /// <summary>"Idris too", "Idris is too", "Idris as well": the naming repeats the value said before it.</summary>
+    private static readonly Regex AlsoAfter = new(@"^\s*(?:(?:is|was|are|were|has|had|did)\s+)?(?:too|also|as well)\b", RegexOptions.CultureInvariant);
+
+    /// <summary>Nothing but a verb after the naming: "dead, Idris is", "and so is Idris".</summary>
+    private static readonly Regex CopulaOnly = new(@"^\s*(?:(?:is|was|are|were|has|had|did)\b)?[\s.,!;:]*$", RegexOptions.CultureInvariant);
+
+    /// <summary>Whether <paramref name="line"/> names <paramref name="fact"/> through one of its cues (as a word).</summary>
+    private static bool Names(string line, Fact fact) => fact.Cues.Any(c => Occurrences(line, c).Any());
+
+    /// <summary>
+    /// Every place <paramref name="cue"/> stands as a word in <paramref name="line"/>: "lin" is not in "line" or "feeling",
+    /// "dead" is not in "deadline", "safe" is not in "unsafe". A cue of four letters or more may take a plain ending
+    /// ("abandon" in "abandoned", "thaw" in "thawed", "cancel" in "cancelled").
+    /// </summary>
     private static IEnumerable<int> Occurrences(string line, string cue)
     {
+        if (cue.Length == 0)
+            yield break;
         for (var at = line.IndexOf(cue, StringComparison.Ordinal); at >= 0; at = line.IndexOf(cue, at + 1, StringComparison.Ordinal))
-            yield return at;
+        {
+            if (char.IsLetterOrDigit(cue[0]) && at > 0 && char.IsLetterOrDigit(line[at - 1]))
+                continue;
+            var end = at + cue.Length;
+            if (!char.IsLetterOrDigit(cue[^1]) || end >= line.Length || !char.IsLetterOrDigit(line[end]))
+            {
+                yield return at;
+                continue;
+            }
+            if (cue.Length >= 4 && char.IsLetter(cue[^1])
+                && Endings.Any(e => string.CompareOrdinal(line, end, e, 0, e.Length) == 0
+                                    && (end + e.Length >= line.Length || !char.IsLetterOrDigit(line[end + e.Length]))))
+                yield return at;
+        }
     }
+
+    private static readonly string[] Endings = { "s", "es", "d", "ed", "ing", "led", "ling", "ped", "ping" };
 
     private static readonly Regex SentenceSplit = new(@"(?<=[.!?;])\s+", RegexOptions.CultureInvariant);
 
@@ -320,18 +392,51 @@ public static class RuleReader
         }
         // Longest cue first, so "not dead" and "no word" are not read through their shorter parts.
         var best = fact.ValueCues
-            .SelectMany(kv => kv.Value.Select(cue => (Value: kv.Key, Cue: cue, At: line.IndexOf(cue, StringComparison.Ordinal))))
-            .Where(hit => hit.At >= 0 && !NotACue(line, hit.At, hit.Cue))
+            .SelectMany(kv => kv.Value.Select(cue => (Value: kv.Key, Cue: cue,
+                At: Occurrences(line, cue).Where(at => !NotACue(line, at, cue)).DefaultIfEmpty(-1).First())))
+            .Where(hit => hit.At >= 0)
             .OrderByDescending(hit => hit.Cue.Length)
             .FirstOrDefault();
         if (best.Cue is null)
             return null;
-        var before = line[Math.Max(0, best.At - 10)..best.At];
-        var negated = Negations.Any(n => before.EndsWith(n, StringComparison.Ordinal) || before.Contains(n + "a ") || before.Contains(n + "at "));
+        var negated = Negated(line[..best.At]);
         if (negated && fact.Values.Length == 2)
             return fact.Values.First(v => v != best.Value);
         return negated ? null : best.Value;
     }
+
+    /// <summary>
+    /// Whether a value cue that follows <paramref name="before"/> is denied: a negation right before it, past small words
+    /// ("not dead", "not at all dead", "by no means safe"), or "neither ... nor" ahead of it ("Neither Idris nor Asha is dead").
+    /// </summary>
+    private static bool Negated(string before)
+    {
+        if (NeitherNor.IsMatch(before))
+            return true;
+        var words = Word.Matches(before).Select(m => m.Value).ToList();
+        for (var i = words.Count - 1; i >= 0 && i >= words.Count - 6; i--)
+        {
+            var w = words[i];
+            if (NegationWords.Contains(w) || w.EndsWith("n't", StringComparison.Ordinal))
+                return true;
+            if (!NegationFiller.Contains(w))
+                return false;
+        }
+        return false;
+    }
+
+    private static readonly Regex Word = new(@"[a-z']+", RegexOptions.CultureInvariant);
+
+    private static readonly Regex NeitherNor = new(@"\bneither\b.*\bnor\b", RegexOptions.CultureInvariant);
+
+    private static readonly HashSet<string> NegationWords = new(StringComparer.Ordinal) { "not", "no", "never", "without", "cannot", "nor" };
+
+    /// <summary>Small words that may stand between a negation and what it denies: "not at all", "not really", "not a".</summary>
+    private static readonly HashSet<string> NegationFiller = new(StringComparer.Ordinal)
+    {
+        "a", "an", "at", "all", "really", "quite", "actually", "even", "truly", "exactly", "entirely", "completely", "remotely",
+        "very", "so", "that", "too", "in", "any", "way", "means", "the", "least", "slightest", "bit", "yet", "by",
+    };
 }
 
 /// <summary>
