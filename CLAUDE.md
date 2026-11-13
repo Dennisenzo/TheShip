@@ -181,6 +181,8 @@ Scope of the first build is the prototype in DESIGN.md ("Prototype and open ques
 
 - 2026-11-13: UI polish from the screenshot tour (`fix/ui-polish`): the plan legend is two lines (plan panel 456 px high, log starts at 540), dossier trust labels wrap inside their segment, issue cards size to their text (buttons right below it) and keep "12 h" together with a non-breaking space (`Painter.Wrap` shows it as a space), section names read "Pod bank A", and the ending has its own screen (`Screen.Ending`: crew, beliefs, scrolling record; Bridge, Record and Quit buttons; an ENDING button in the other headers reopens it, Esc on the record returns to it). No new voyage button: restarting needs a new `ShipMind` and worker, not built.
 
+- 2026-11-13: `UI-PLAN.md`: a plan for the interface in six steps (foundation: frame time, eased values, overlay layer, tooltips; opening briefing popup; time-skip transitions for hours, weeks and the drift; showing what you are doing: next-step line, named voice prompt, repair picker, change flashes; hover and cross-highlighting; polish and sounds), one `ship-dev` branch per step. Plan only; nothing built. It lists four decisions for the user to confirm.
+
 ### Balance table (B1, 200 seeds, Short haul)
 
 | Bot | Landfall | Quiet ship | Adrift | Survivors | Deaths excl. scripted | End trust | Thaws | Main causes (per run) |
@@ -261,3 +263,4 @@ factions, children, the other events and faults, the other lockouts and endings,
 1. `dotnet build TheShip.slnx` and fix what it reports; then `dotnet test`.
 2. Play a run end to end; tune `Tuning.cs` towards "one honest run in two reaches Landfall".
 3. Run the three playthroughs of the prototype's pass test (DESIGN.md, "Prototype scope").
+4. Build the interface plan in `UI-PLAN.md`, step 0 first.
