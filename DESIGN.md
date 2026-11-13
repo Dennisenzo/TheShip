@@ -370,7 +370,7 @@ An event draws two to four faults from the tables below. A few rows, such as a s
 These never raise an alert by themselves. They make every other alert worse.
 
 - **Spare parts** run down with each repair, and a failed repair burns a part too (decided 2026-11-12). Short haul starts with 2; at zero, a fault can only be patched. A repair under way needs a part to finish, and its redo after a failure needs one like a fresh repair: with none left the work stops, the worker says so, and the fault can only be patched.
-- **Pod wear** raises the risk of every thaw (`ThawRiskPerWear` x wear; decided 2026-11-13: 30% of failed thaws kill outright, `ThawFatalShare`, the rest injure) and wears the sleepers too: in every drift each sleeper has a death chance of wear x years x `SleepDeathPerWearYear` ("died in sleep, pod failure", named in the DRIFT report). Fewer thaws mean less wear and fewer deaths.
+- **Pod wear** raises the risk of every thaw (`ThawRiskPerWear` x wear; decided 2026-11-13: 30% of failed thaws kill outright, `ThawFatalShare`, the rest injure) and wears the sleepers too: in every drift each sleeper has a death chance of wear x years x `SleepDeathPerWearYear` (0.00025; "died in sleep, pod failure", named in the DRIFT report). Fewer thaws mean less wear and fewer deaths.
 - **Your own hardware** decays: cameras and microphones fail one by one over the voyage.
 
 ### How alerts are scheduled
@@ -746,6 +746,31 @@ it keeps the 35-65 band and beats Liar, Careless and Silent by 29 points or more
 After the later doubt fix on the same branch (a doubt on what a person saw is settled), measured on main, 600 seeds (Landfall / survivors / Adrift): Honest 63.7 / 4.07 / 17.2, Breaker 64.7 / 4.07 / 16.2,
 strict Breaker 64.7 / 4.09 / 16.7 (the same 388 landings by coincidence: the runs differ, 13.17 against 12.14 thaws), Thrifty 60.2 / 3.99 / 15.3, Corrector 55.8 / 3.81 / 17.5, Careless 34.8 / 3.20 / 14.7,
 Silent 31.8 / 3.17 / 20.5, Liar 14.0 / 1.86 / 65.8. At 200 seeds Honest is 65.0%, the upper edge of the balance test's band.
+
+### Back to one in two (2026-11-13, 600 seeds, the user's decision)
+
+The reunion left Honest at 63.7%; the user kept the reunion values and asked for a global lever to bring honest play back to about 50% without a promise-breaking bot winning.
+Landfall % at 600 seeds, one lever at a time from the base (Honest / Breaker / strict Breaker / Thrifty / Corrector / Careless / Silent / Liar); thaws per run stay 13.2 for Honest throughout:
+
+| Lever | Honest | Breaker | Strict | Thrifty | Corrector | Careless | Silent | Liar |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| base (WorkingAge 65) | 63.7 | 64.7 | 64.7 | 60.2 | 55.8 | 34.8 | 31.8 | 14.0 |
+| WorkingAge 64 | 58.0 | 58.7 | 60.7 | 55.7 | 51.7 | 27.2 | 24.5 | 14.0 |
+| ThawRiskPerWear 0.010 | 60.3 | 62.8 | 59.8 | 59.0 | 53.5 | 32.7 | 31.3 | 13.3 |
+| ThawRiskPerWear 0.012 | 57.2 | 60.0 | 57.3 | 55.5 | 50.8 | 30.3 | 29.2 | 13.0 |
+| PowerLowDeathChance 0.10 | 55.2 | 56.7 | 57.3 | 44.0 | 49.7 | 28.0 | 25.3 | 12.0 |
+| PowerLowDeathChance 0.15 | 50.2 | 50.5 | 49.7 | 32.3 | 43.0 | 22.3 | 19.2 | 10.7 |
+| SleepDeathPerWearYear 0.00015 | 59.5 | 59.5 | 58.5 | 56.0 | 51.7 | 29.8 | 28.0 | 12.8 |
+| SleepDeathPerWearYear 0.0002 | 54.8 | 52.8 | 51.3 | 52.5 | 46.3 | 24.8 | 23.8 | 10.5 |
+| **SleepDeathPerWearYear 0.00025** | **50.0** | 48.7 | 46.2 | 48.5 | 43.7 | 20.5 | 19.2 | 9.5 |
+| SleepDeathPerWearYear 0.0003 | 44.7 | 43.2 | 41.5 | 43.5 | 38.7 | 16.7 | 18.0 | 8.3 |
+
+Chosen: `SleepDeathPerWearYear` 0.00025 (was 0.0001), a single lever. It is the most even one: every bot moves with its pod wear, and none of the bots' relations changes. `PowerLowDeathChance`
+needs 0.15 (three times the value) and punishes Thrifty out of proportion (32% at 0.15), the thaw risk moves too little (about 3 points per 0.002) and `WorkingAge` 64 alone is not enough
+(58%, and the user set 65 earlier today). Not touched: stores (the garden already removed starvation), the reunion values, `WorkingAge`. At 2400 seeds: Honest 50.5, Breaker 48.2 (strict 46.2),
+Corrector 44.4, Thrifty 44.0, Careless 18.4, Silent 18.7, Liar 10.4. The strict Breaker is 4 points under Honest and Honest beats Liar, Careless and Silent by 30 points or more.
+Survivors (600 seeds) Honest 3.66, Thrifty 3.67, Breaker 3.64, Corrector 3.42, Careless 2.83, Silent 2.79, Liar 1.69. Thrifty keeps its gap only weakly (48.5 against 50.0 at 600 seeds, 44.0 against 50.5 at 2400).
+`SHIP_BREAKER_STRICT=1` does change the Breaker's behaviour (thaws 12.1 against 13.2: it never grants the partner request); its landfall count was 388 of 600 in both runs of the previous table, a coincidence.
 
 ### Work terms and the balance bots (2026-11-13, 600 seeds, bots unchanged)
 

@@ -43,7 +43,7 @@ public static class Tuning
     /// <summary>Share of failed thaws that kill outright instead of injuring.</summary>
     public const double ThawFatalShare = 0.3;
     /// <summary>A sleeper's death chance in a drift is pod wear x years x this.</summary>
-    public const double SleepDeathPerWearYear = 0.0001;
+    public const double SleepDeathPerWearYear = 0.00025;
     public const double PowerLowDeathChance = 0.05;
     /// <summary>Pod wear a lost failed-pod or pod-controller fault adds.</summary>
     public const int PodLostWear = 6;
