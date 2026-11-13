@@ -80,6 +80,7 @@ public static class RuleReader
     {
         var claims = new List<(Fact Fact, string Value)>();
         var factList = facts.ToList();
+        var allCues = factList.SelectMany(f => f.Cues).ToHashSet(StringComparer.Ordinal);
         // Sentence by sentence, so "If Idris is dead, ..." can be skipped without hiding a plain claim next to it.
         foreach (var sentence in SentenceSplit.Split(text.ToLowerInvariant().Replace('’', '\'')))
         {
@@ -90,8 +91,15 @@ public static class RuleReader
             {
                 if (fact.Numeric || claims.Any(c => c.Fact == fact))
                     continue;
-                var cue = fact.Cues.Select(c => line.IndexOf(c, StringComparison.Ordinal)).Where(i => i >= 0).DefaultIfEmpty(-1).Min();
-                if (cue < 0 || Hedged(line[..cue]))
+                var (cue, length) = fact.Cues.Select(c => (At: line.IndexOf(c, StringComparison.Ordinal), c.Length))
+                    .Where(c => c.At >= 0).OrderBy(c => c.At).FirstOrDefault((-1, 0));
+                if (cue < 0)
+                    continue;
+                // The subject starts at the first of a list of names ("I fear Idris and Asha are dead").
+                var subject = cue;
+                for (Match m; (m = CoordinatedBefore.Match(line[..subject])).Success && allCues.Contains(m.Groups["w"].Value);)
+                    subject = m.Index;
+                if (Hedged(line[..subject]) || ModalAfter.IsMatch(line[(cue + length)..].TrimStart()))
                     continue;
                 var value = ValueIn(line, fact);
                 if (value != null)
@@ -104,36 +112,57 @@ public static class RuleReader
     private static readonly Regex SentenceSplit = new(@"(?<=[.!?;])\s+", RegexOptions.CultureInvariant);
 
     /// <summary>
-    /// Words that make what follows them in a sentence not a statement of fact: a condition ("if he's dead"), a denial
-    /// asked for ("don't tell me he's dead"), a belief or a guess ("I think", "maybe"), a counterfactual ("could have
-    /// killed him", "nearly"). A crew line may voice a fear it doesn't know to be true.
+    /// Words in a claim's own verb group that make it a guess or a counterfactual ("he might be dead", "he would laugh").
+    /// Checked only inside the clause right after the subject.
     /// </summary>
     private static readonly Regex Hedge = new(
-        @"\b(?:if|unless|whether|in case|suppose|supposing|what if|i think|i thought|i fear|i guess|i suppose|i bet|i doubt|i hope|"
-        + @"maybe|perhaps|probably|possibly|might|may|could|would|couldn't|wouldn't|could've|would've|might've|should have|should've|"
-        + @"nearly|almost|don't tell me|do not tell me|don't say|do not say|afraid that|scared that|worried that)\b",
+        @"\b(?:if|unless|whether|i think|i guess|i suppose|maybe|perhaps|probably|possibly|might|may|could|would|couldn't|wouldn't|"
+        + @"could've|would've|might've|should have|should've|nearly|almost)\b",
         RegexOptions.CultureInvariant);
 
     /// <summary>
-    /// Where a hedge stops covering what follows: the end of a sentence or a clause (a comma, a colon, a dash, a bracket,
-    /// "and", "but", "so", "yet"), or words that report what follows as a fact: "told me", "warned us", "know why",
-    /// "care that" ("You should have told me Idris is dead", "I doubt you care that Idris is dead" state the death).
+    /// A hedge that directly governs the claim right after it: a condition ("if Idris is dead"), a denial asked for
+    /// ("don't tell me he's dead"), a belief or a guess ("I think (that) he's dead", "maybe he's alive"), with at most two
+    /// filler words between. A crew line may voice a fear it doesn't know to be true; anything else before the claim
+    /// ("you should have told me", "I bet you knew", "because") leaves it a claim. When in doubt the line is rejected.
     /// </summary>
-    private static readonly Regex HedgeEnd = new(
-        @"[.!?;,:()]|\s[-–—]+\s|[–—]|\b(?:and|but|so|yet)\b|\b(?:told|warned|showed)\s+(?:me|us|you|him|her|them)\b|"
-        + @"\b(?:know|knew|knows|see|saw|wonder|wondered|ask|asked|understand|tell me)\s+why\b|"
-        + @"\b(?:care|cares|cared|know|knew|knows|forget|forgot|realise|realised|realize|realized|see|saw|hear|heard)\s+that\b",
+    private static readonly Regex Governs = new(
+        @"\b(?:if|unless|whether|in case|suppose|supposing|what if|i think|i thought|i fear|i feared|i guess|i suppose|i bet|"
+        + @"i doubt|i hope|maybe|perhaps|probably|possibly|don't tell me|do not tell me|don't say|do not say|afraid|scared|worried)"
+        + @"(?:[\s,]+(?:that|maybe|perhaps|just|honestly|really|even|still|the|my|our|your|his|her|their)){0,2}[\s,]*$",
         RegexOptions.CultureInvariant);
 
-    /// <summary>
-    /// Whether the text before a claim makes the claim a condition, a guess or a counterfactual: only a hedge in the same
-    /// clause counts ("I think he's dead" is a guess; "I think so, and he's dead" states it).
-    /// </summary>
-    private static bool Hedged(string before)
+    /// <summary>A modal right before a verb ("could have killed him", "nearly killed her"): it did not happen.</summary>
+    private static readonly Regex ModalBefore = new(
+        @"(?:\b(?:could|would|might|may|should|couldn't|wouldn't|shouldn't)(?:\s+(?:have|not|never|almost|nearly|easily|well|just))*"
+        + @"|\b(?:could've|would've|might've|should've)|\b(?:nearly|almost))\s*$",
+        RegexOptions.CultureInvariant);
+
+    /// <summary>A modal right after a named subject ("Idris might be dead", "the power could be low").</summary>
+    private static readonly Regex ModalAfter = new(
+        @"^(?:'s)?\s*(?:might|may|could|would|couldn't|wouldn't|might've|could've|would've|probably|possibly|maybe|perhaps|nearly|almost)\b",
+        RegexOptions.CultureInvariant);
+
+    /// <summary>A one-word subject before a verb ("maybe you killed him"), stripped to find the hedge that governs it.</summary>
+    private static readonly Regex SubjectWord = new(@"\b(?:you|he|she|they|we|i|it|someone|somebody|that|this)\s*$", RegexOptions.CultureInvariant);
+
+    /// <summary>Whether a hedge directly governs a claim whose subject starts right after <paramref name="before"/>.</summary>
+    private static bool Hedged(string before) => Governs.IsMatch(before);
+
+    /// <summary>Whether a death said through a verb ("killed him") is a guess or a counterfactual: a modal in its verb group, or a hedge governing its subject.</summary>
+    private static bool HedgedVerb(string before)
     {
-        var start = HedgeEnd.Matches(before).Select(m => m.Index + m.Length).DefaultIfEmpty(0).Last();
-        return Hedge.IsMatch(before[start..]);
+        if (ModalBefore.IsMatch(before))
+            return true;
+        var subject = SubjectWord.Match(before);
+        if (!subject.Success)
+            return false;
+        var rest = before[..subject.Index];
+        return Governs.IsMatch(rest) || ModalBefore.IsMatch(rest);
     }
+
+    /// <summary>"Idris and Asha are dead": the subject of a claim starts at the first of a list of cued names.</summary>
+    private static readonly Regex CoordinatedBefore = new(@"\b(?<w>[a-z]+)\s+and\s+$", RegexOptions.CultureInvariant);
 
     // ---- references to people in a crew line ("he's fine", "my partner is dead") ----
 
@@ -235,7 +264,7 @@ public static class RuleReader
             if (m.Groups["pro"].Value == "her" && PossessiveNext(line[(m.Index + m.Length)..]))
                 continue;
             // "could have killed him", "nearly killed her": it did not happen.
-            if (Hedged(line[..m.Index]))
+            if (HedgedVerb(line[..m.Index]))
                 continue;
             var pronoun = m.Groups["pro"].Value switch { "him" => "he", "her" => "she", _ => "they" };
             var (people, weak) = ByPronoun(pronoun, line[..m.Index], context, speaker, crew);

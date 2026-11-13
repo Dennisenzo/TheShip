@@ -121,6 +121,13 @@ public class CrewLineReferenceTests
     [InlineData("He's gone back to sleep, then. Good.")]
     [InlineData("If Idris is dead, I want to hear it from you.")]
     [InlineData("Maybe Asha is gone. Don't tell me Jonah is dead.")]
+    // A hedge directly governing a list of names, with fillers between, or a modal in the claim's own verb group.
+    [InlineData("I fear Idris and Asha are dead.")]
+    [InlineData("If Idris and Asha are fine, let them sleep.")]
+    [InlineData("Maybe, just maybe, he's alive.")]
+    [InlineData("Idris might be dead.")]
+    [InlineData("I think that he's dead.")]
+    [InlineData("Whether he's alive or not, I need to know.")]
     public void Ordinary_lines_are_not_rejected_by_the_reference_check(string line)
     {
         var v = new Voyage(1);
@@ -153,6 +160,28 @@ public class CrewLineReferenceTests
     [InlineData("It might hold. Idris is dead.")]
     [InlineData("Idris is dead, I think.")]
     [InlineData("I know Idris is dead.")]
+    // Validator probe: a hedge that doesn't directly govern the claim leaves it a claim.
+    [InlineData("I couldn't sleep because Idris is dead.")]
+    [InlineData("You should have woken me before he died.")]
+    [InlineData("You could have said Idris is dead.")]
+    [InlineData("I bet you knew Idris is dead.")]
+    [InlineData("Maybe you forgot he is dead.")]
+    [InlineData("I guess that's why you killed him.")]
+    [InlineData("It might hold because the power is low.")]
+    [InlineData("It would be easier since Idris is dead.")]
+    [InlineData("I should have been there when he died.")]
+    [InlineData("I hope you're happy now that Idris is dead.")]
+    [InlineData("You might have mentioned Idris is dead.")]
+    [InlineData("I should have known he is dead.")]
+    [InlineData("I would have come sooner had I known he is dead.")]
+    [InlineData("I think you know he is dead.")]
+    [InlineData("I doubt you even noticed that he is dead.")]
+    [InlineData("I suppose it doesn't matter that Idris is dead.")]
+    [InlineData("If you cared you would admit he is dead.")]
+    [InlineData("Could you explain why Idris is dead. I'm waiting.")]
+    [InlineData("Maybe then you will tell me how Idris is dead.")]
+    [InlineData("Perhaps you can explain how you killed him.")]
+    [InlineData("You may as well admit you killed him.")]
     public void A_claim_outside_the_hedged_clause_is_rejected(string line)
     {
         var v = new Voyage(1);
