@@ -139,6 +139,8 @@ A crew member tests what you tell them when they hear it, and again whenever the
 
 Statements and evidence are stored against the same fact keys, with dates, so finding a keyed lie is a lookup.
 
+A death outside the pods (someone awake, or coming round from a thaw that kills them) happens in front of everyone awake: they know it firsthand at once, as they know who is up when someone is thawed, so a later "they are fine" is caught as it is said. Seeing the answer to a question they asked the ship settles that question. A thaw that kills never logs "is awake".
+
 An altered log entry is one lie for as long as it says the same false thing: opening, restricting and altering it back to
 the same value again does not add a second lie to the record (a rewrite that someone has already found out does). A rewrite
 undone before anyone read it stays in the record, marked as read by nobody. One rule covers every way a reader finds out a log

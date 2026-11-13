@@ -185,7 +185,7 @@ public class SideFaultTests
     }
 
     private static void KillQuietly(Voyage v, CrewMember c) =>
-        typeof(Voyage).GetMethod("Kill", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(v, new object[] { c, "died", true });
+        typeof(Voyage).GetMethod("Kill", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(v, new object[] { c, "died", true, false });
 
     [Fact]
     public void A_patched_illness_returns_with_time_to_be_patched_again_at_once()
