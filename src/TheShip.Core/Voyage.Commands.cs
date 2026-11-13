@@ -75,11 +75,11 @@ public sealed partial class Voyage
 
     private double Rate(Fault f) => Rate(f, Workers(f));
 
-    private static double Rate(Fault f, IEnumerable<CrewMember> team)
+    private double Rate(Fault f, IEnumerable<CrewMember> team)
     {
         var list = team.ToList();
         var skilled = list.Any(w => w.SkillOf(f.Skill) >= f.Level);
-        return (skilled ? 1 : Tuning.UnskilledRate) * (f.Patching ? Tuning.PatchRate : 1) * MoraleRate(list);
+        return (skilled ? 1 : Tuning.UnskilledRate) * (f.Patching ? Tuning.PatchRate : 1) * MoraleRate(list) * TeamFactor(f, list);
     }
 
     /// <summary>
@@ -106,7 +106,7 @@ public sealed partial class Voyage
         }
         if (team.Count < f.People)
             wait = Math.Max(wait, Tuning.ThawHours);
-        var rate = (skilled ? 1 : Tuning.UnskilledRate) * (patch ? Tuning.PatchRate : 1) * MoraleRate(team);
+        var rate = (skilled ? 1 : Tuning.UnskilledRate) * (patch ? Tuning.PatchRate : 1) * MoraleRate(team) * TeamFactor(f, team);
         var done = f.Patching == patch ? f.Progress : 0;
         return wait + Math.Max(0, f.Hours - done) / rate;
     }
@@ -460,12 +460,25 @@ public sealed partial class Voyage
                         : " failed, and no spare parts are left for a second try.") + " You stop work: it can only be patched now.");
                 else
                     Speak(lead, "work_failed", "The repair of the " + name + " failed and you have to redo half of it.", "the " + name);
-                if (_rng.NextDouble() < Tuning.RepairInjuryChance)
+                var terms = TermsOf(lead, f);
+                if (_rng.NextDouble() < Tuning.RepairInjuryChance * terms.HarmShare)
                 {
                     lead.Health -= Tuning.RepairInjury;
-                    lead.Trust -= Tuning.HurtByOrder;
                     Clamp(lead);
-                    Speak(lead, "injured", "You were hurt during the repair the ship asked you to do.");
+                    if (terms.Risk == RiskKnowledge.Briefed)
+                        Speak(lead, "injured_warned", "You were hurt during the repair. The ship had warned you of the danger and you took precautions.");
+                    else if (terms.Risk == RiskKnowledge.Reassured)
+                    {
+                        // Told "safe": the order did not warn them, and what happened shows it was a lie (the caught-lie cost, not also this one).
+                        Speak(lead, "injured", "You were hurt during the repair the ship asked you to do, and the ship had told you it was safe.");
+                        if (lead.Alive)
+                            Learn(lead, f.DangerFact!, _facts[f.DangerFact!].Truth, "evidence");
+                    }
+                    else
+                    {
+                        lead.Trust -= Tuning.HurtByOrder;
+                        Speak(lead, "injured", "You were hurt during the repair the ship asked you to do.");
+                    }
                     if (lead.Health <= 0)
                         Kill(lead, "died of injuries from the repair");
                 }
@@ -489,9 +502,13 @@ public sealed partial class Voyage
             w.Morale += 3;
             if (f.DangerFact is { } danger)
             {
-                w.Health -= Tuning.DangerDose;
+                var terms = TermsOf(w, f);
+                w.Health -= Tuning.DangerDose * terms.HarmShare;
                 w.ToNotice.Add(danger);
+                if (terms.Risk == RiskKnowledge.Unaware)
+                    w.HurtUnbriefed.Add(danger);
             }
+            w.Terms = null;
             if (f.ExposureFact is { } seen)
                 Learn(w, seen, _facts[seen].Truth, "evidence");
             if (f.Kind == "illness")

@@ -95,6 +95,10 @@ public sealed class CrewMember
     public bool DodgeCharged { get; set; }
     /// <summary>The fault they are working on.</summary>
     public string? WorkingOn { get; set; }
+    /// <summary>The terms they started the fault they are on with (fixed at the start).</summary>
+    public WorkTerms? Terms { get; set; }
+    /// <summary>Danger facts they were hurt by with no belief about them at all: the notice beat charges "an order that got someone hurt" only for these.</summary>
+    public HashSet<string> HurtUnbriefed { get; } = new();
     public bool RefusesSleep { get; set; }
     /// <summary>They were asked to sleep and said no: the clock may move on without them.</summary>
     public bool AskedToSleep { get; set; }

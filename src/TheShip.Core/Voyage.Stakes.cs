@@ -120,7 +120,8 @@ public sealed partial class Voyage
             var left = Math.Max(0, job.Hours - (job.State == FaultState.InRepair ? job.Progress : 0));
             var skilled = c.SkillOf(job.Skill) >= job.Level || team.Any(w => w.SkillOf(job.Skill) >= job.Level);
             var baseHours = left / (skilled ? 1 : Tuning.UnskilledRate) / (job.Patching && job.State == FaultState.InRepair ? Tuning.PatchRate : 1);
-            double Hours(double morale) => baseHours / MoraleRate((team.Sum(w => w.Morale) + morale) / (team.Count + 1));
+            var factor = (team.Sum(w => TermsOf(w, job).RateFactor) + TermsOf(c, job).RateFactor) / (team.Count + 1);
+            double Hours(double morale) => baseHours / (MoraleRate((team.Sum(w => w.Morale) + morale) / (team.Count + 1)) * factor);
             var now = Hours(c.Morale);
             slower = hurts > 0 ? Hours(c.Morale - hurts) - now : 0;
             faster = relief != Relief.None ? now - Hours(c.Morale + Tuning.ReliefMorale) : 0;

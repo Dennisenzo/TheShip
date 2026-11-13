@@ -185,10 +185,16 @@ public sealed partial class Voyage
             f.Patching = patch;
         }
         _idleWarned = false;
+        var terms = c.WorkingOn == f.Id && c.Terms is { } kept && kept.FaultId == f.Id ? kept : TermsFor(c, f);
+        c.Terms = terms;
         c.WorkingOn = f.Id;
         f.State = FaultState.InRepair;
         var task = TaskText(f, patch);
-        Speak(c, kind, decision ?? "You agree to take on " + task + ".", task);
+        var knowing = terms.RiskBriefed ? " You know the danger, so you take precautions and work slower." : "";
+        Speak(c, kind, (decision ?? "You agree to take on " + task + ".") + knowing, task);
+        if (terms.RiskBriefed)
+            Recorded(c.Name + " starts " + TaskText(f, patch) + " knowing " + _facts[f.DangerFact!].Say(c.Beliefs[f.DangerFact!].Value)
+                     + ": precautions, work " + (int)Math.Round((1 - terms.RateFactor) * 100) + "% slower, dose and injury chance halved.");
         if (!Staffed(f))
             Ship(f.Name + " needs " + f.People + " people before the work can start.");
     }

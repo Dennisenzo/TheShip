@@ -53,6 +53,7 @@ public static class Lines
             "work_failed" => Pick(rng, "It didn't take. I'm going again.", "That failed. I need more time on " + detail + "."),
             "work_no_parts" => "That was the last spare part. I can't finish " + detail + " without one. Patch it or leave it.",
             "injured" => "I'm hurt. That was your call.",
+            "injured_warned" => "I'm hurt. You told me it was dangerous; I went in anyway.",
             "noticed_dose" => "My dosimeter is red. Nobody told me that bay was hot.",
             "found" => Pick(rng, "I went and looked. " + Cap(detail) + ".", "I checked for myself: " + detail + "."),
             "witnessed" => Pick(rng, "I saw it. " + detail + " is gone.", "I was right there. " + detail + " is gone."),

@@ -379,7 +379,8 @@ public class VoyageTests
         mara.HoursHungry = Tuning.StarveDays * 24 - 2;
         v.Go();
         Assert.Equal(CrewState.Dead, mara.State);
-        Assert.Equal(2, fault.Progress, 3);
+        // She was told of the dose: precautions slow her to Tuning.PrecautionRate, for the 2 h she lived.
+        Assert.Equal(2 * Tuning.PrecautionRate, fault.Progress, 3);
         Assert.NotEqual(FaultState.Repaired, fault.State);
     }
 
