@@ -800,9 +800,15 @@ public sealed partial class ShipGame
             yield return (staked, v.StakesText(staked));
         // What a wary person wants before starting: the selected one's (or the only one's) bargain, ahead of the bay items.
         var bargainers = v.Awake.Where(c => v.BargainOf(c) != null).ToList();
-        var bargainer = bargainers.FirstOrDefault(c => c == selected) ?? (bargainers.Count == 1 ? bargainers[0] : null);
+        // With several and none of them selected, the first one's, and a hint to select the others.
+        var bargainer = bargainers.FirstOrDefault(c => c == selected) ?? bargainers.FirstOrDefault();
         if (bargainer != null && v.BargainText(bargainer) is { } bargainText)
-            yield return (bargainer, bargainText);
+        {
+            var others = bargainers.Where(c => c != bargainer).Select(c => c.Name).ToList();
+            yield return (bargainer, bargainText + (others.Count > 0 && bargainer != selected
+                ? " Select " + string.Join(" or ", others) + " to see " + (others.Count == 1 ? "theirs." : "each of theirs.")
+                : ""));
+        }
         if (v.Lockouts.BayWarned.Count > 0)
             yield return (null, string.Join(" and ", v.Lockouts.BayWarned.Select(id => v.Crew.First(c => c.Id == id).Name))
                          + " will take the cold-sleep bay at the next step. Win one of them back above 15 trust, or they do.");

@@ -222,20 +222,32 @@ public sealed partial class Voyage
     }
 
     /// <summary>
-    /// The condition this person has open, or null. It lapses silently when its fault is resolved, the alert changes, the person
-    /// goes to sleep, or the condition is met by other means.
+    /// The condition this person has open, or null when it no longer stands: its fault is resolved, the alert changed, the person
+    /// is not awake, or the condition was met by other means. Only reads (the draw calls it); <see cref="LapseBargains"/> clears
+    /// what no longer stands after each step.
     /// </summary>
-    public Bargain? BargainOf(CrewMember c)
+    public Bargain? BargainOf(CrewMember c) => c.OpenBargain is { } b && Stands(c, b) ? b : null;
+
+    /// <summary>
+    /// This person's word is what the work waits on: they have an open condition and the fault still needs them (others have not
+    /// taken it on at full strength). For the next-step line.
+    /// </summary>
+    public bool AwaitsWord(CrewMember c) =>
+        BargainOf(c) is { } b && Current.Faults.First(f => f.Id == b.FaultId) is var f
+        && Crew.Count(o => o != c && o.State == CrewState.Awake && o.WorkingOn == f.Id) < f.People;
+
+    private bool Stands(CrewMember c, Bargain b) =>
+        c.State == CrewState.Awake && b.Alert == Current.Number
+        && Current.Faults.FirstOrDefault(f => f.Id == b.FaultId) is { Resolved: false } && ConditionOpen(c, b.Key);
+
+    /// <summary>
+    /// Drops every condition that no longer stands, or whose person has left the wary band (trust fell or rose past it), so one
+    /// can't come back to life later (a partner woken and put back to sleep in the same alert). Run at the end of each step.
+    /// </summary>
+    private void LapseBargains()
     {
-        if (c.OpenBargain is not { } b)
-            return null;
-        if (c.State != CrewState.Awake || b.Alert != Current.Number
-            || Current.Faults.FirstOrDefault(f => f.Id == b.FaultId) is not { Resolved: false } || !ConditionOpen(c, b.Key))
-        {
+        foreach (var c in Crew.Where(c => c.OpenBargain is { } b && (!Stands(c, b) || c.Band != TrustBand.WantsReasons)))
             c.OpenBargain = null;
-            return null;
-        }
-        return b;
     }
 
     private static string TaskText(Fault f, bool patch) => (patch ? "patching the " : "the ") + f.CrewName;
@@ -359,9 +371,12 @@ public sealed partial class Voyage
         var text = FormattableString.Invariant($"{c.Name} will start {TaskText(f, b.Patch)} if you promise to {cond} within {Tuning.BargainDueDays:0} days. Kept +{Tuning.PromiseKept:0} trust, broken -{Tuning.PromiseBroken:0}. ");
         text += c.BargainDeclined
             ? "They refuse to start without your word. Say it to them."
-            : FormattableString.Invariant($"Without it: about {PushChance(c) * 100:0}% {c.Pronoun ?? "they"} start{(c.Pronoun is null ? "" : "s")}, -{Tuning.BargainPushedTrust:0} trust. Say it to them.");
+            : FormattableString.Invariant($"Without it: about {PushChance(c) * 100:0}% {StartsText(c)}, -{Tuning.BargainPushedTrust:0} trust. Say it to them.");
         return text;
     }
+
+    /// <summary>"she starts", "he starts", or "they start" when the sheet has no pronoun.</summary>
+    public static string StartsText(CrewMember c) => c.Pronoun is { } p ? p + " starts" : "they start";
 
     /// <summary>The key of the condition any of these listeners has open (the test reader reads "agreed" as that promise), or null.</summary>
     public string? OpenBargainKey(IEnumerable<CrewMember> hearers) => hearers.Select(BargainOf).FirstOrDefault(b => b != null)?.Key;

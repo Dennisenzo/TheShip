@@ -146,7 +146,8 @@ public class BargainTests
     [Fact]
     public void A_different_word_leaves_the_bargain_open()
     {
-        var (v, mara, f) = Setup();
+        // Low enough in the wary band that the small trust of an ordinary promise keeps her there (leaving the band lapses it).
+        var (v, mara, f) = Setup(trust: 50);
         v.Assign(mara, f, patch: false);
         var trust = mara.Trust;
         v.Say("I promise to open the logs.", Promise("show_logs"), new[] { mara });
@@ -250,8 +251,10 @@ public class BargainTests
         Assert.NotNull(v.BargainOf(mara));
         f.State = FaultState.Repaired;
         Assert.Null(v.BargainOf(mara));
-        Assert.Null(mara.OpenBargain);
         Assert.Null(v.BargainText(mara));
+        // BargainOf only reads; the next step clears it.
+        v.Go();
+        Assert.Null(mara.OpenBargain);
     }
 
     [Fact]

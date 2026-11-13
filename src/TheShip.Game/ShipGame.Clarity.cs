@@ -20,9 +20,10 @@ public sealed partial class ShipGame
         var asker = v.Awake.FirstOrDefault(c => c.PendingQuestion != null && v.HasFact(c.PendingQuestion));
         if (asker != null)
             return asker.Name + " is waiting for an answer.";
-        var bargainer = v.Awake.FirstOrDefault(c => v.BargainOf(c) != null);
+        // A condition matters only while the fault still waits on that person (nobody else has taken it on).
+        var bargainer = v.Awake.FirstOrDefault(v.AwaitsWord);
         if (bargainer != null)
-            return bargainer.Name + " wants your word before " + (bargainer.Pronoun ?? "they") + " starts.";
+            return bargainer.Name + " wants your word before " + Voyage.StartsText(bargainer) + ".";
         var thawing = v.Crew.FirstOrDefault(c => c.State == CrewState.Thawing);
         var awake = v.Awake.ToList();
         // While the crew hold the cold-sleep bay, waking and sleeping are theirs: a line that would say to wake or sleep someone

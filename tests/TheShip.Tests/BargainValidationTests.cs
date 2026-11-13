@@ -197,4 +197,49 @@ public class BargainValidationTests
         Assert.Equal(0, Count(v, "promise_broken", mara));
         Assert.Equal("released", v.Ledger().Single(e => e.Person == mara && e.Key == "show_logs").State);
     }
+
+    // ---- 6. BargainOf only reads; the lapse happens in the steps; the next-step and stakes text ----
+
+    [Fact]
+    public void BargainOf_only_reads_and_the_next_step_drops_a_stale_condition()
+    {
+        var (v, mara, f) = Offered();
+        var open = mara.OpenBargain;
+        f.State = FaultState.Lost;
+        Assert.Null(v.BargainOf(mara));
+        Assert.Equal(open, mara.OpenBargain);
+        v.Go();
+        Assert.Null(mara.OpenBargain);
+    }
+
+    [Fact]
+    public void A_condition_lapses_at_the_next_step_when_trust_leaves_the_wary_band()
+    {
+        var (v, mara, _) = Offered();
+        mara.Trust = 75;
+        v.Go();
+        Assert.Null(mara.OpenBargain);
+    }
+
+    [Fact]
+    public void The_word_is_not_awaited_once_someone_else_works_the_fault()
+    {
+        var (v, mara, f) = Offered();
+        Assert.True(v.AwaitsWord(mara));
+        var tomas = v.Find("tomas")!;
+        tomas.State = CrewState.Awake;
+        tomas.WorkingOn = f.Id;
+        Assert.NotNull(v.BargainOf(mara));
+        Assert.Equal(f.People > 1, v.AwaitsWord(mara));
+    }
+
+    [Fact]
+    public void The_push_odds_read_they_start_without_a_pronoun()
+    {
+        var c = new CrewMember { Id = "x", Name = "X", Role = "r", Skills = new(), Traits = Array.Empty<Trait>(), Want = Want.WakePartner };
+        Assert.Equal("they start", Voyage.StartsText(c));
+        var (v, mara, _) = Offered();
+        Assert.Equal("she starts", Voyage.StartsText(mara));
+        Assert.Contains("% she starts,", v.BargainText(mara));
+    }
 }

@@ -26,6 +26,7 @@ public sealed partial class Voyage
         Apply(text, reading, listeners);
         foreach (var l in listeners)
             Clamp(l);
+        LapseBargains();
         return true;
     }
 
