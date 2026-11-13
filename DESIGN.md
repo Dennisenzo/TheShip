@@ -523,8 +523,8 @@ The first build is the Short haul mode in text only, smaller than the mode table
 - **Alerts, in order:** coolant leak, death in sleep (a pod fails and its sleeper dies; a bank neighbour has a sleeper illness: Medicine 2, 12 hours, clock = thaw 6 h + work + the run's slack, untreated the patient dies, and every awake crew member says "You let them die in there" and loses 4 trust; the alert report names the patient), navigation drift (clock thaw + 12 h + slack; side fault drawn per seed from hydroponics blight and power sag, filtered by who is alive with the skill), signal from Earth (quiet; only returning patches), pod controller fault (clock thaw + 4 h + slack; power sag always as its side fault; the person woken for it refuses to go back to sleep). Power sag is temporary: an Engineering 2 repair of 14 h in the reactor until power routing exists.
 - **Facts:** about 20, with knowers and the statement record.
 - **Numbers on screen:** trust and morale are shown, so the rules can be judged. So are the stakes of an open question (in morale, trust and work hours) and, on the Repair button, the chance that the repair holds for the selected person (no odds when no spare parts are left: the button reads "REPAIR: NO PARTS").
-- **Opening notes:** the first lines of the log state the goal (how many alive and of working age on arrival), what a thaw costs, the spare parts, and where the stakes and the record are.
-- **One lockout:** the logs.
+- **Opening briefing:** a popup at the start of the voyage (and behind the BRIEFING button) states the goal (how many alive and of working age on arrival) and what a thaw costs; one opening line in the log says where the stakes and the record are. The spare parts are in the header (PARTS, with a tooltip), not in the briefing.
+- **Two lockouts:** the logs, and the cold-sleep bay ("Losing control").
 - **One ending screen:** survivors and the full record of what you said.
 - **Ship plan:** a wireframe schematic with sections, doors (only locking has an effect), coolant and power lines, pods and fault markers.
 - **Conversations (designed, not built):** bargains with promises and work terms set by the briefing; see "Conversations".
@@ -562,7 +562,7 @@ Measured with the harness (`dotnet test --filter Category=Balance`, 200 seeds, f
 
 - **Working age 64 (user's design value 50; the code had 65).** The honest bot thaws 13.2 times a run (Thrifty 9.8) at 3 to 5 years each, so under 50 is nearly
   unreachable (Landfall at 50: Honest 0%, Careless 0%, Silent 0.5%, Liar 1%, Thrifty 8.5%). Landfall for the honest bot by working age: 50 = 0%, 60 = 20.5%, 63 = 38.5%,
-  64 = 48.5%, 65 = 53.5%, 66 = 59.5%. 64 is the lowest value in the 45-55% band. The full table by bot is in CLAUDE.md, "Decisions for the user to review".
+  64 = 48.5%, 65 = 53.5%, 66 = 59.5%. 64 is the lowest value in the 45-55% band. The full table by bot is in CLAUDE.md, "Decisions for the user to review". (Measured at B1. Since morale sets the work speed, the honest bot at 64 lands in 43.5% of runs: CLAUDE.md, "Balance table".)
 - **Power-low sleeper death 10% to 5%, patch-failure sleeper death 15% to 10%, thaw risk per pod wear 0.012 to 0.008.** Fewer sleepers lost to the
   chain of faults: the 4-alive condition is the other wall (3.6 survivors before).
 - **A lost or still-patched failed pod adds 6 pod wear (was 3), a pod controller 8 (was 4).** Measured: most of these faults end patched and give way at the last drift, so this
