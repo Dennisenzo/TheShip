@@ -791,6 +791,15 @@ public sealed partial class Voyage
             MaybeReturnBay(c);
     }
 
+    /// <summary>What the promise means to the person it was made to, for their line ("never to wake you from the pod again").</summary>
+    public static string PromiseToYou(string? key) => key switch
+    {
+        "wake_partner" => "to wake your partner",
+        "show_logs" => "to open the logs to you",
+        "no_more_thaws" => "never to wake you from the pod again",
+        _ => "something the game can't check",
+    };
+
     public static string PromiseText(string? key) => key switch
     {
         "wake_partner" => "to wake their partner",

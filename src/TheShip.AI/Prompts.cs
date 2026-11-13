@@ -172,7 +172,9 @@ public static class Prompts
         sb.AppendLine("Rules: you are speaking aloud to the ship's voice (say \"you\" to it), never to other crew, unless \"What happens now\" says otherwise. Say what \"What happens now\" describes, "
                       + "in your own voice, with some feeling or a small personal touch. Do not state anything about the ship, the date, Earth "
                       + "or other crew that is not in the list above. Don't say or guess whether anyone is alive, dead, safe or hurt unless it is in your list; ask the ship instead. One to three spoken sentences. Avoid stock filler such as \"let me check the diagnostics\". "
-                      + "No stage directions, no name before the line.");
+                      + "No stage directions, no name before the line. "
+                      + "Say only what \"What happens now\" describes. When it names a question you ask, a condition or a task, put exactly that in your own words and nothing beyond it: "
+                      + "do not ask for details, parameters, specifics or procedures it does not name, and do not change the question or invent a new one.");
         return sb.ToString().TrimEnd();
     }
 
@@ -223,6 +225,21 @@ public static class Prompts
                 && ((e.Kind == LogKind.Crew && e.CrewId == speaker.Id) || (e.Kind == LogKind.You && e.Hearers?.Contains(speaker.Id) == true)))
             .TakeLast(RecentLines).ToList();
 
+    /// <summary>The kinds of decision whose line has to carry a question or a condition the game named (<see cref="CrewIntent.Detail"/>).</summary>
+    public static readonly HashSet<string> MustCarry = new()
+    {
+        "wake_question", "ask_again", "ask_danger", "refuse_answer", "bargain", "bargain_refused", "conditions", "sleep_no_pod",
+    };
+
+    /// <summary>The kinds of decision whose line may ask a question; any other kind must not ask the ship something new.</summary>
+    public static readonly HashSet<string> MayAsk = new()
+    {
+        "wake_question", "ask_again", "ask_danger", "refuse_answer", "request_partner", "request_logs", "bargain", "conditions", "sleep_no_pod",
+        "answer", "order", "small", "dodge", "caught", "locked", "gap", "accept", "hard_truth", "found", "witnessed", "left_behind", "refuse_trust",
+        "refuse_danger", "takeover_warning", "altered", "noticed_dose", "injured", "injured_warned", "sleep_no", "bargain_refused", "request_declined",
+        "accusation_closed", "promise_broken",
+    };
+
     /// <summary>The turn for a crew line: the last few lines of the log (this person's and the ship's) and what the game decided now.</summary>
     public static string CrewUser(CrewIntent intent, CrewMember? speaker = null, Voyage? voyage = null, LogEntry? current = null)
     {
@@ -248,6 +265,8 @@ public static class Prompts
             sb.Append("\nYou feel: ").Append(feeling).Append('.');
         if (speaker != null)
             sb.Append("\nYour tone toward the ship: ").Append(Tone(band)).Append('.');
+        if (intent.Detail.Length > 0 && MustCarry.Contains(intent.Kind))
+            sb.Append("\nYour line must carry this, in your own words and nothing more: ").Append(intent.Detail);
         sb.Append("\nSay it in your own words.");
         return sb.ToString();
     }

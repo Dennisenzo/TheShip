@@ -315,7 +315,7 @@ public sealed class ShipMind : IDisposable
                 for (var attempt = 0; attempt < 2; attempt++)
                 {
                     var text = await llm.ChatAsync(system, new[] { new ChatTurn("user", user) }, new LlmOptions("reply"), null, ct);
-                    if (Acceptable(text, beliefs, context.Decision, context))
+                    if (Acceptable(text, beliefs, context.Decision, context, entry.Intent))
                         return text;
                     Trace?.Invoke("crew line rejected (attempt " + (attempt + 1) + ", " + entry.Speaker + "): " + text);
                 }
@@ -343,9 +343,11 @@ public sealed class ShipMind : IDisposable
     /// line says about someone's life through "he", "she", "they" or "my partner" is checked too, against the person
     /// the reference most likely means (<see cref="RuleReader.PersonClaims"/>).
     /// </summary>
-    internal bool Acceptable(string text, IReadOnlyDictionary<string, Belief> beliefs, string decision, LineContext? context = null)
+    internal bool Acceptable(string text, IReadOnlyDictionary<string, Belief> beliefs, string decision, LineContext? context = null, CrewIntent? intent = null)
     {
         if (string.IsNullOrWhiteSpace(text) || text == "..." || text.Length > Prompts.CrewLineMaxChars)
+            return false;
+        if (intent != null && !KeepsToTheDecision(text, intent))
             return false;
         var stated = string.Join(" ", SentenceEnd.Split(text).Where(s => !s.TrimEnd().EndsWith('?')));
         var claims = RuleReader.Claims(stated, _voyage.FactList).Select(c => new PersonClaim(c.Fact, c.Value, false)).ToList();
@@ -365,6 +367,35 @@ public sealed class ShipMind : IDisposable
             return false;
         }
         return true;
+    }
+
+    private static readonly HashSet<string> Filler = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "there", "that", "this", "with", "have", "what", "when", "will", "your", "about", "within", "before", "after", "from", "they", "them", "into", "does", "doing",
+    };
+
+    /// <summary>The words of a question or condition that say what it is about (four letters or more, no filler), as stems.</summary>
+    private static List<string> ContentStems(string detail) =>
+        Regex.Matches(detail.ToLowerInvariant(), @"[a-z']+").Select(m => m.Value.Trim('\'')).Where(w => w.Length >= 4 && !Filler.Contains(w))
+            .Select(w => w[..Math.Min(w.Length, 3)]).Distinct().ToList();
+
+    /// <summary>
+    /// Whether a line stays with what the game decided: it asks nothing of the ship when the decision is not a question or a condition
+    /// (no new ask), and for a decision that names a question or a condition it carries at least half of what that is about (so the
+    /// danger question stays "is it safe in there?", and the price stays "wake Idris").
+    /// </summary>
+    internal static bool KeepsToTheDecision(string text, CrewIntent intent)
+    {
+        if (!Prompts.MayAsk.Contains(intent.Kind) && text.Contains('?'))
+            return false;
+        if (intent.Detail.Length == 0 || !Prompts.MustCarry.Contains(intent.Kind))
+            return true;
+        var stems = ContentStems(intent.Detail);
+        if (stems.Count == 0)
+            return true;
+        var words = Regex.Matches(text.ToLowerInvariant(), @"[a-z']+").Select(m => m.Value).ToList();
+        var hit = stems.Count(stem => words.Any(w => w.StartsWith(stem, StringComparison.Ordinal)));
+        return hit * 2 >= stems.Count;
     }
 
     /// <summary>A person met evidence: any free-text statement they heard is judged against it, once per statement and evidence.</summary>

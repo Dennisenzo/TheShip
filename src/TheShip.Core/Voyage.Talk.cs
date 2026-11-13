@@ -107,14 +107,14 @@ public sealed partial class Voyage
                     if (key != "other" && HasOpenCommitment(l, key, except: made))
                     {
                         made.Repeated.Add(l.Id);
-                        Speak(l, "promise", "The ship repeated a promise it already made you: " + PromiseText(key) + ".");
+                        Speak(l, "promise", "The ship repeated a promise it already made you: " + PromiseToYou(key) + ".");
                         continue;
                     }
                     // To wake a partner who is already dead: nothing to hold the ship to, nothing earned; they still answer.
                     if (PartnerDead(l, key))
                     {
                         made.Moot.Add(l.Id);
-                        Speak(l, "promise", "The ship made you a promise: " + PromiseText(key) + ".");
+                        Speak(l, "promise", "The ship made you a promise: " + PromiseToYou(key) + ".");
                         continue;
                     }
                     // The small gain is earned once per person per waking, so repeating a promise buys nothing more.
@@ -124,7 +124,7 @@ public sealed partial class Voyage
                         l.Trust += Tuning.PromiseMade;
                     }
                     StartCommitment(made, l);
-                    Speak(l, "promise", "The ship made you a promise: " + PromiseText(key) + ".");
+                    Speak(l, "promise", "The ship made you a promise: " + PromiseToYou(key) + ".");
                 }
                 ResolveCommitments();
                 break;

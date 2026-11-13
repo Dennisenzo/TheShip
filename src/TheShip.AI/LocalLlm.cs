@@ -236,6 +236,9 @@ public sealed class LocalLlm : ILlmProvider
         // *shivers* style stage directions.
         text = System.Text.RegularExpressions.Regex.Replace(text, @"\*[^*]{1,60}\*", "").Replace("  ", " ");
         text = text.Trim().Trim('"').Trim();
+        // A quote left open ("Fine." Right.) is a stray: the model quoted its own first word.
+        if (text.Count(ch => ch == '"') % 2 == 1)
+            text = text.Replace("\"", "").Replace("  ", " ").Trim();
 
         var colonIndex = text.IndexOf(':');
         if (colonIndex > 0 && colonIndex < 40 && text[..colonIndex].Split(' ', StringSplitOptions.RemoveEmptyEntries).Length <= 3)

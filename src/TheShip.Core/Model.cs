@@ -381,7 +381,8 @@ public sealed class Alert
 public enum LogKind { Ship, Crew, You, Recorded, Help }
 
 /// <summary>What the game decided a crew member does or feels; the model only puts it into words.</summary>
-public sealed record CrewIntent(string Kind, string Decision);
+/// <param name="Detail">The question, condition or task the line is about, when the line must carry it ("How is Idris?", "wake Idris").</param>
+public sealed record CrewIntent(string Kind, string Decision, string Detail = "");
 
 public sealed class LogEntry
 {

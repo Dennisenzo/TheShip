@@ -140,7 +140,7 @@ public class ReadingItemsTests
         Assert.True(mara.RequestDeclined);
         Assert.Equal(trust - Tuning.RequestIgnored, mara.Trust, 3);
         Assert.DoesNotContain(v.Statements.Skip(before), s => s.Kind == StatementKind.Promise);
-        Assert.Empty(v.Ledger().Where(e => e.Key == "no_more_thaws"));
+        Assert.DoesNotContain(v.Ledger(), e => e.Key == "no_more_thaws");
         // Declining is not charged again at sleep, and the request leaves "Waiting on you".
         Assert.DoesNotContain(v.OpenItems(new[] { mara }), i => i.Kind == "request");
     }

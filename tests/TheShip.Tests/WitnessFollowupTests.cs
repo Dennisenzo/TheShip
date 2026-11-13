@@ -149,7 +149,7 @@ public class WitnessFollowupTests
                 await Gate.Task;
             }
             CallCompleted?.Invoke(new LlmCallStats(options.Kind, 0, 0, TimeSpan.Zero, TimeSpan.Zero));
-            return "All right.";
+            return "All right, but tell me how Idris is.";
         }
 
         public void Dispose() { }
