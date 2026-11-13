@@ -67,4 +67,69 @@ public class AccusationValidationTests
         Assert.True(storesLie.FoundOutBy.ContainsKey("mara"));
         Assert.Equal(2, mara.CaughtLies);
     }
+
+    private static string Wrong(Voyage v, string key)
+    {
+        var f = v.GetFact(key);
+        return f.Values.First(x => !f.Same(x, f.Truth));
+    }
+
+    /// <summary>
+    /// A correction covers the statement as it was said. A log rewrite the ship left in place after correcting someone, read and
+    /// believed again, is a new deception: found out later, it costs as a lie (before, the correction kept it free for ever).
+    /// </summary>
+    [Fact]
+    public void A_corrected_log_rewrite_believed_again_is_a_new_lie()
+    {
+        var v = new Voyage(1);
+        var lin = v.Find("lin")!;
+        v.Wake(lin);
+        v.Go();
+        Assert.Equal(CrewState.Awake, lin.State);
+        lin.Trust = 70;
+        var stores = v.GetFact("stores");
+        var fake = Wrong(v, "stores");
+        v.SetLog("stores", LogAccess.Altered, fake);
+        v.ReadLog(lin, stores);
+        Assert.True(stores.Same(lin.Beliefs["stores"].Value, fake));
+        var rewrite = v.Statements.Single(s => s.InLog);
+
+        SayValue(v, lin, "stores", stores.Truth);
+        Assert.True(rewrite.Corrected.ContainsKey("lin"));
+
+        // The log still reads the rewrite; she reads it again and believes it.
+        v.ReadLog(lin, stores);
+        Assert.True(stores.Same(lin.Beliefs["stores"].Value, fake));
+
+        // The ship opens the log; she reads the truth and finds the rewrite she believed after the correction.
+        var trust = lin.Trust;
+        v.SetLog("stores", LogAccess.Open);
+        v.ReadLog(lin, stores);
+        Assert.Equal(1, lin.CaughtLies);
+        Assert.True(trust - lin.Trust >= Tuning.LieTrust - 0.001);
+        // The first rewrite stays corrected for her; the new deception is its own record.
+        Assert.True(rewrite.Corrected.ContainsKey("lin"));
+        Assert.False(rewrite.FoundOutBy.ContainsKey("lin"));
+        Assert.Contains(v.Statements, s => s.InLog && s != rewrite && s.FoundOutBy.ContainsKey("lin"));
+    }
+
+    [Fact]
+    public void A_corrected_log_rewrite_not_read_again_stays_free()
+    {
+        var v = new Voyage(1);
+        var lin = v.Find("lin")!;
+        v.Wake(lin);
+        v.Go();
+        lin.Trust = 70;
+        var stores = v.GetFact("stores");
+        v.SetLog("stores", LogAccess.Altered, Wrong(v, "stores"));
+        v.ReadLog(lin, stores);
+        SayValue(v, lin, "stores", stores.Truth);
+        var trust = lin.Trust;
+        v.SetLog("stores", LogAccess.Open);
+        v.ReadLog(lin, stores);
+        Assert.Equal(0, lin.CaughtLies);
+        Assert.Equal(trust, lin.Trust, 3);
+        Assert.Single(v.Statements, s => s.InLog);
+    }
 }

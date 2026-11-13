@@ -420,6 +420,17 @@ public sealed partial class Voyage
         if (!LogsLocked && f.Access == LogAccess.Altered && f.AlteredValue is { } fake && !f.IsTrue(fake))
         {
             var s = Statements.LastOrDefault(x => x.InLog && x.FactKey == f.Key && x.Value == fake);
+            // A correction covers the rewrite as they read it then. Left in the log and read again, it deceives them anew: a new
+            // record of the same text, unfound and uncorrected for this reader (DESIGN.md, "How a lie is caught").
+            if (s != null && s.Corrected.ContainsKey(c.Id))
+            {
+                s = new Statement
+                {
+                    Id = _nextStatement++, Year = Year, Text = s.Text, Kind = StatementKind.False,
+                    FactKey = f.Key, Value = fake, TruthThen = f.Truth, InLog = true,
+                };
+                Statements.Add(s);
+            }
             if (s != null && !s.Hearers.Contains(c.Id))
                 s.Hearers.Add(c.Id);
             if (c.SkillOf(Skill.Engineering) >= 1 && _rng.NextDouble() < Tuning.EngineerSpotsAlteredLog)
