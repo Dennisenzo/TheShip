@@ -154,6 +154,32 @@ public class LieTemptationTests
     }
 
     [Fact]
+    public void Switching_between_two_good_answers_is_no_relief()
+    {
+        // Earth matters to Tomas: "no word" and "good news" are both good answers, so going from one to the other is no relief.
+        var v = new Voyage(1);
+        var tomas = Woken(v, "tomas");
+        tomas.Morale = 50;
+        tomas.Trust = 90;
+        Tell(v, tomas, "earth", "no word");
+        Assert.Equal(50 + Tuning.ReliefMorale, tomas.Morale);
+        for (var i = 0; i < 4; i++)
+        {
+            Tell(v, tomas, "earth", "good news");
+            Tell(v, tomas, "earth", "no word");
+        }
+        Assert.Equal(50 + Tuning.ReliefMorale, tomas.Morale);
+        tomas.PendingQuestion = "earth";
+        Assert.Equal(Relief.None, v.StakesOf(tomas)!.Relief);
+
+        // After the hard answer, the good one is a relief again.
+        Tell(v, tomas, "earth", "programme ended");
+        var morale = tomas.Morale;
+        Tell(v, tomas, "earth", "good news");
+        Assert.Equal(morale + Tuning.ReliefMorale, tomas.Morale);
+    }
+
+    [Fact]
     public void A_lie_earns_no_credit_at_the_drift()
     {
         var v = new Voyage(1);

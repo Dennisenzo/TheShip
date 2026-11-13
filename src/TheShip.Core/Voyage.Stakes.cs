@@ -47,11 +47,12 @@ public sealed partial class Voyage
 
     /// <summary>
     /// Whether hearing <paramref name="value"/> from the ship is a relief to this person: the fact has a hard value and this is not it,
-    /// it is news to them, they asked or it matters to them, and they believe it.
+    /// it is news to them (they held no belief, or the hard one: going from one good value to another is no relief), they asked or it
+    /// matters to them, and they believe it.
     /// </summary>
     private bool Relieves(CrewMember c, Fact f, string value, Belief? old, bool asked) =>
         f.Hardness.Count > 0 && f.HardnessOf(value) == 0
-        && (old is null || !f.Same(old.Value, value))
+        && (old is null || f.HardnessOf(old.Value) > 0)
         && (asked || Matters(c, f))
         && DoubtScore(c, f) < Tuning.DoubtThreshold;
 
