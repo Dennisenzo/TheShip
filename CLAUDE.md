@@ -61,8 +61,9 @@ real-time stamp and a tag per line. The game's opening note gives the file's pat
   sub-agent per step, in order; tasks that touch mostly different files may run in parallel worktrees. Sub-agents may start their own
   sub-agents if they stay on the same branch.
 - **Tests.** Dev and bugfix agents run targeted tests (`dotnet test --filter`); the validator runs the full suite.
-- **Validation.** Dev/bugfix branch, then `ship-validator`, then the merge. With several tasks running, validate once all are done; fix what
-  it finds with `ship-bugfix` agents without asking, then validate again.
+- **Validation.** Dev/bugfix branch, then the merge into `main` (build and tests), then `ship-validator` on `main` (the user's rule,
+  2026-11-13: the validator runs on main after a merge, not on the branch). With several tasks running, merge them all and validate once;
+  fix what it finds with `ship-bugfix` agents without asking, merge the fixes, then validate `main` again.
 - **The real model.** Before loading it (probes, runs), check no `TheShip` process is running (the game's exe is `TheShip.exe`): the user may be playing.
 
 ## Rules for the code
