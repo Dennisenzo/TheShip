@@ -135,6 +135,8 @@ public class VoyageTests
         Assert.Empty(lie.FoundOutBy);
         var trust = mara.Trust;
 
+        // The pod clock is tight: a shaken Mara works slower and would miss it (morale sets work speed), so she is steady here.
+        mara.Morale = 70;
         // Patched, so the work finishes whatever the parts: a failed repair on the last part now stops it.
         v.Assign(mara, v.FindFault("pod")!, patch: true);
         FinishAlert(v);
@@ -372,6 +374,7 @@ public class VoyageTests
         v.Assign(mara, fault, patch: false);
         Assert.Equal(fault.Id, mara.WorkingOn);
         Assert.Equal(0, fault.Progress, 3);
+        mara.Morale = Tuning.MoraleRateNeutral;
         v.Stores = 0;
         mara.HoursHungry = Tuning.StarveDays * 24 - 2;
         v.Go();
