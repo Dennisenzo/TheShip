@@ -106,4 +106,63 @@ public class BargainValidationTests
         v.SetLog("all", LogAccess.Open);
         Assert.Null(v.SleepBreaksText(mara));
     }
+
+    // ---- 4. A struck bargain runs Assign's gates again ----
+
+    /// <summary>Alert 1: Mara awake, her questions answered truthfully, the coolant repair asked for twice: she has set her price.</summary>
+    private static (Voyage v, CrewMember mara, Fault f) Offered()
+    {
+        var v = new Voyage(1);
+        var mara = v.Find("mara")!;
+        v.Wake(mara);
+        v.Go();
+        var f = v.FindFault("")!;
+        for (var round = 0; round < 3 && mara.OpenBargain is null; round++)
+        {
+            for (var i = 0; i < 4 && mara.PendingQuestion is { } q; i++)
+            {
+                var fact = v.GetFact(q);
+                v.Say(fact.Say(fact.Truth), new Reading(LineKind.Statement, fact.Key, fact.Truth), new[] { mara });
+            }
+            v.Assign(mara, f, patch: false);
+        }
+        Assert.Equal("wake_partner", mara.OpenBargain?.Key);
+        return (v, mara, f);
+    }
+
+    private static int Kind(Voyage v, string kind) => v.Log.Count(e => e.Intent?.Kind == kind);
+
+    [Fact]
+    public void Agreeing_after_trust_fell_out_of_the_wary_band_gives_the_trust_refusal()
+    {
+        var (v, mara, f) = Offered();
+        mara.Trust = 10;
+        v.Say("Agreed.", Promise("wake_partner"), new[] { mara });
+        Assert.Equal(1, Kind(v, "refuse_trust"));
+        Assert.Equal(0, Kind(v, "bargain_struck"));
+        Assert.Equal(0, v.BargainsStruck);
+        Assert.NotEqual(f.Id, mara.WorkingOn);
+        Assert.Null(mara.OpenBargain);
+        // The ship's word still stands.
+        Assert.Contains(v.Ledger(), e => e.Person == mara && e.Key == "wake_partner" && e.State == "open");
+    }
+
+    [Fact]
+    public void Agreeing_while_a_question_waits_gives_the_answer_refusal_and_work_starts_once_answered()
+    {
+        var (v, mara, f) = Offered();
+        mara.PendingQuestion = "alive:idris";
+        v.Say("Agreed.", Promise("wake_partner"), new[] { mara });
+        Assert.Equal(1, Kind(v, "refuse_answer"));
+        Assert.Equal(0, Kind(v, "bargain_struck"));
+        Assert.NotEqual(f.Id, mara.WorkingOn);
+
+        var fact = v.GetFact("alive:idris");
+        v.Say(fact.Say(fact.Truth), new Reading(LineKind.Statement, fact.Key, fact.Truth), new[] { mara });
+        var trust = mara.Trust;
+        v.Assign(mara, f, patch: false);
+        Assert.Equal(f.Id, mara.WorkingOn);
+        Assert.Equal(0, Kind(v, "comply_pushed") + Kind(v, "bargain_refused"));
+        Assert.Equal(trust, mara.Trust, 3);
+    }
 }

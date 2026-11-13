@@ -302,7 +302,10 @@ public sealed partial class Voyage
 
     /// <summary>
     /// A promise with the open bargain's key has been given to this person: the commitment is recorded with its due date, no
-    /// trust gain, and the work starts. False (the bargain is dropped) when the work can no longer be done.
+    /// trust gain, and the work starts. False (the bargain is dropped, the promise is an ordinary one) when the work can no longer
+    /// be done. When one of <see cref="Assign"/>'s gates now stops them (trust fell, a question is waiting, the danger), they say
+    /// that refusal instead: the bargain is closed, the ship's word stands as an ordinary promise (no trust gain, no line of its
+    /// own), and a later Repair or Patch starts the work once the gate is clear, without a new price.
     /// </summary>
     private bool StrikeBargain(Statement made, CrewMember c, Bargain b)
     {
@@ -311,6 +314,11 @@ public sealed partial class Voyage
         if (f is null || f.Resolved || Locked(f.Section) || (!b.Patch && Parts <= 0)
             || c.State != CrewState.Awake || (c.WorkingOn != null && c.WorkingOn != f.Id))
             return false;
+        if (Refuses(c, f))
+        {
+            StartCommitment(made, c);
+            return true;
+        }
         StartCommitment(made, c, Tuning.BargainDueDays);
         made.Bargained.Add(c.Id);
         BargainsStruck++;
