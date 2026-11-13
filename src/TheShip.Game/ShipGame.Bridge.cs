@@ -453,7 +453,7 @@ public sealed partial class ShipGame
         var typed = _input.ToString();
         if (typed.Length > room)
             typed = typed[^room..];
-        var cursor = DateTime.UtcNow.Millisecond < 500 ? "_" : " ";
+        var cursor = _now % 1.0 < 0.5 ? "_" : " ";
         _p.Text(_p.Body, "VOICE > " + typed + cursor, rect.X + 14, inputTop + 12, Painter.Bright);
         DrawHoldNote(new Rectangle(rect.X, inputTop, rect.Width, rect.Bottom - inputTop));
     }

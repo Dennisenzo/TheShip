@@ -32,6 +32,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     private int _prevWheel;
     private ButtonState _prevLeft = ButtonState.Released;
     private bool _click;
+    /// <summary>Seconds since the game started; the clock of everything that moves in the interface (<see cref="Motion"/>).</summary>
+    private double _now;
+    private bool _handCursor;
 
     private SpriteBatch _batch = null!;
     private Texture2D _pixel = null!;
@@ -56,6 +59,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     public ShipGame(Options options)
     {
         _options = options;
+        // The tour's screenshots must not depend on timing: nothing moves while it runs.
+        Motion.Speed = options.TourDir is null ? 1f : 0f;
         _graphics = new GraphicsDeviceManager(this)
         {
             PreferredBackBufferWidth = Painter.ScreenWidth,
@@ -231,7 +236,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     {
         if (_mind is not { Holding: true })
             return;
-        var dots = new string('.', 1 + (int)(DateTime.UtcNow.TimeOfDay.TotalMilliseconds / 400 % 3));
+        var dots = new string('.', 1 + (int)(_now * 1000 / 400 % 3));
         var text = (_held.Count > 0 ? "reading your line, your click waits" : "reading your line") + dots.PadRight(3);
         _p.TextRight(_p.Small, text, inputLine.Right - 14, inputLine.Y + 14, Painter.Dim);
     }
@@ -245,8 +250,22 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         return (scale, (width - Painter.ScreenWidth * scale) / 2f, (height - Painter.ScreenHeight * scale) / 2f);
     }
 
+    /// <summary>A popup or a transition is up: the screen below gets no clicks, no hover and no typing.</summary>
+    private bool OverlayUp => false;
+
+    /// <summary>Enter or Esc while an overlay is up; returns true when it was used.</summary>
+    private bool OverlayKey(bool enter) => false;
+
+    /// <summary>Draws whatever overlay is up, on top of the dimmed screen.</summary>
+    private void DrawOverlay(Voyage v)
+    {
+    }
+
     protected override void Update(GameTime gameTime)
     {
+        _now = gameTime.TotalGameTime.TotalSeconds;
+        if (_p != null)
+            _p.Now = _now;
         if (_loading is { IsCompleted: true } done)
         {
             _loading = null;
@@ -281,6 +300,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         if (_prevLeft == ButtonState.Pressed && mouse.LeftButton == ButtonState.Released && IsActive)
             _click = true;
         _prevLeft = mouse.LeftButton;
+        if (_p != null)
+            _p.Down = mouse.LeftButton == ButtonState.Pressed && IsActive;
         _scroll += (mouse.ScrollWheelValue - _prevWheel) / 40;
         _prevWheel = mouse.ScrollWheelValue;
 
@@ -307,7 +328,9 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             if (_fatal)
                 Exit();
-            if (_screen == Screen.Record && _voyage is { Phase: Phase.Ended })
+            if (OverlayUp)
+                OverlayKey(enter: false);
+            else if (_screen == Screen.Record && _voyage is { Phase: Phase.Ended })
                 _screen = Screen.Ending;
             else if (_screen != Screen.Bridge)
                 _screen = Screen.Bridge;
@@ -319,6 +342,13 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         while (_typed.Count > 0)
         {
             var ch = _typed.Dequeue();
+            if (OverlayUp)
+            {
+                // Nothing is typed into the voice line while a popup or a transition is up; Enter confirms it.
+                if (ch == '\r' || ch == '\n')
+                    OverlayKey(enter: true);
+                continue;
+            }
             if (_screen != Screen.Bridge)
                 continue;
             if (ch == '\b')
@@ -396,8 +426,14 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
 
     protected override void Draw(GameTime gameTime)
     {
+        _p.Delta = (float)gameTime.ElapsedGameTime.TotalSeconds;
         DrawScene();
         _click = false;
+        if (_p.Hand != _handCursor)
+        {
+            _handCursor = _p.Hand;
+            Mouse.SetCursor(_handCursor ? MouseCursor.Hand : MouseCursor.Arrow);
+        }
         base.Draw(gameTime);
     }
 
@@ -407,6 +443,17 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         GraphicsDevice.Clear(Painter.Ground);
         var view = View();
         _p.Click = _click;
+        _p.BeginFrame();
+        // Under an overlay the screen is drawn as if the mouse were elsewhere; the overlay then gets the real mouse and click.
+        var overlay = _voyage is not null && OverlayUp;
+        var mouse = _p.Mouse;
+        var down = _p.Down;
+        if (overlay)
+        {
+            _p.Click = false;
+            _p.Down = false;
+            _p.Mouse = new Vector2(-1000, -1000);
+        }
         _batch.Begin(transformMatrix: Matrix.CreateScale(view.Scale, view.Scale, 1f) * Matrix.CreateTranslation(view.X, view.Y, 0f));
         if (_voyage is null)
         {
@@ -430,6 +477,14 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             DrawBridge(_voyage);
         }
+        if (overlay)
+        {
+            _p.Click = _click;
+            _p.Down = down;
+            _p.Mouse = mouse;
+            DrawOverlay(_voyage!);
+        }
+        _p.EndFrame();
         _batch.End();
     }
 

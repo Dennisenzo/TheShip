@@ -44,6 +44,22 @@ internal sealed class Painter
     /// <summary>The mouse in the 1600 x 900 space, and whether the left button was released since the last frame drawn.</summary>
     public Vector2 Mouse { get; set; }
     public bool Click { get; set; }
+    /// <summary>The left button is held down.</summary>
+    public bool Down { get; set; }
+    /// <summary>Seconds since the game started, and seconds since the last frame drawn.</summary>
+    public double Now { get; set; }
+    public float Delta { get; set; }
+    /// <summary>Set during a frame when the mouse is over something clickable: the game shows the hand cursor.</summary>
+    public bool Hand { get; set; }
+    /// <summary>Set during a frame when a disabled button was clicked: the game plays the refusal tone.</summary>
+    public bool Denied { get; set; }
+
+    private readonly Dictionary<string, float> _eased = new();
+    private readonly HashSet<string> _easedThisFrame = new();
+    private string? _tip;
+    private Rectangle _tipRect;
+    private Rectangle _tipLastRect;
+    private double _tipSince;
 
     public Painter(SpriteBatch batch, Texture2D pixel, FontSystem fonts)
     {
@@ -59,6 +75,79 @@ internal sealed class Painter
     }
 
     public void Fill(Rectangle r, Color color) => _batch.Draw(_pixel, r, color);
+
+    /// <summary>A colour at an opacity of 0 to 1 (premultiplied, as the sprite batch blends).</summary>
+    public static Color Fade(Color color, float alpha) => color * Math.Clamp(alpha, 0f, 1f);
+
+    /// <summary>
+    /// A value kept per <paramref name="id"/> that moves towards <paramref name="target"/> over <paramref name="seconds"/>:
+    /// the only animation state of hover and highlight. An id not asked for during a frame is forgotten.
+    /// </summary>
+    public float Ease(string id, float target, float seconds = Motion.Hover)
+    {
+        _easedThisFrame.Add(id);
+        var length = Motion.Seconds(seconds);
+        var value = _eased.TryGetValue(id, out var was) ? was : 0f;
+        if (length <= 0f)
+            value = target;
+        else
+        {
+            var step = Delta / length;
+            value = value < target ? Math.Min(target, value + step) : Math.Max(target, value - step);
+        }
+        _eased[id] = value;
+        return value;
+    }
+
+    /// <summary>A tooltip for whatever is in <paramref name="r"/>; the last one asked for under the mouse is the one shown.</summary>
+    public void Tip(Rectangle r, string text)
+    {
+        if (text.Length == 0 || !Over(r))
+            return;
+        _tip = text;
+        _tipRect = r;
+    }
+
+    /// <summary>Call at the start of a frame's drawing.</summary>
+    public void BeginFrame()
+    {
+        _tip = null;
+        Hand = false;
+        Denied = false;
+    }
+
+    /// <summary>Draws the tooltip once the mouse has rested on its rectangle, and forgets eased values nobody asked for. Call last.</summary>
+    public void EndFrame()
+    {
+        if (_tip is null)
+            _tipLastRect = Rectangle.Empty;
+        else
+        {
+            if (_tipRect != _tipLastRect)
+            {
+                _tipLastRect = _tipRect;
+                _tipSince = Now;
+            }
+            if (Now - _tipSince >= Motion.Seconds(Motion.TipDelay))
+            {
+                var lines = Wrap(_tip, 44);
+                var width = (int)(lines.Max(l => l.Length) * SmallWidth) + 20;
+                var height = lines.Count * 19 + 14;
+                var x = (int)Math.Clamp(Mouse.X + 16, 4, ScreenWidth - width - 4);
+                var y = (int)Mouse.Y + 22;
+                if (y + height > ScreenHeight - 4)
+                    y = (int)Mouse.Y - height - 8;
+                var box = new Rectangle(x, y, width, height);
+                Fill(box, Ground);
+                Frame(box, Bright);
+                for (var i = 0; i < lines.Count; i++)
+                    Text(Small, lines[i], x + 10, y + 7 + i * 19, Ink);
+            }
+        }
+        foreach (var id in _eased.Keys.Where(id => !_easedThisFrame.Contains(id)).ToList())
+            _eased.Remove(id);
+        _easedThisFrame.Clear();
+    }
 
     public void Frame(Rectangle r, Color color, int thickness = 1)
     {
@@ -84,15 +173,24 @@ internal sealed class Painter
         _batch.Draw(_pixel, a, null, color, MathF.Atan2(d.Y, d.X), new Vector2(0f, 0.5f), new Vector2(length, thickness), SpriteEffects.None, 0f);
     }
 
-    public void Dashed(Vector2 a, Vector2 b, Color color, float dash = 7f, float gap = 5f, float thickness = 1.5f)
+    public void Dashed(Vector2 a, Vector2 b, Color color, float dash = 7f, float gap = 5f, float thickness = 1.5f, float offset = 0f)
     {
         var d = b - a;
         var length = d.Length();
         if (length < 0.01f)
             return;
         var unit = d / length;
-        for (var at = 0f; at < length; at += dash + gap)
-            Line(a + unit * at, a + unit * Math.Min(length, at + dash), color, thickness);
+        // A positive offset moves the dashes along the line (the coolant crawls).
+        var first = offset % (dash + gap);
+        if (first > 0f)
+            first -= dash + gap;
+        for (var at = first; at < length; at += dash + gap)
+        {
+            var from = Math.Max(0f, at);
+            var to = Math.Min(length, at + dash);
+            if (to > from)
+                Line(a + unit * from, a + unit * to, color, thickness);
+        }
     }
 
     public void Poly(IReadOnlyList<Vector2> points, Color color, float thickness = 1.5f, bool closed = true, bool dashed = false)
@@ -165,9 +263,18 @@ internal sealed class Painter
     /// A button. Solid when <paramref name="primary"/>, outlined otherwise, greyed when disabled. Returns true when it
     /// was clicked this frame.
     /// </summary>
-    public bool Button(Rectangle r, string label, bool enabled = true, bool primary = false, bool selected = false)
+    public bool Button(Rectangle r, string label, bool enabled = true, bool primary = false, bool selected = false, string? tip = null)
     {
         var over = enabled && Over(r);
+        if (tip != null)
+            Tip(r, tip);
+        // Hover fades in and out; a held button is drawn a shade darker.
+        var hot = Ease("button:" + r.X + ":" + r.Y + ":" + label, over ? 1f : 0f);
+        var pressed = over && Down;
+        if (over)
+            Hand = true;
+        if (!enabled && Hit(r))
+            Denied = true;
         Color ink;
         if (!enabled)
         {
@@ -176,14 +283,15 @@ internal sealed class Painter
         }
         else if (primary || selected)
         {
-            Fill(r, over ? Bright : primary ? Accent : Ink);
+            var fill = Color.Lerp(primary ? Accent : Ink, Bright, hot);
+            Fill(r, pressed ? Color.Lerp(fill, Ground, 0.25f) : fill);
             ink = Ground;
         }
         else
         {
-            if (over)
-                Fill(r, Track);
-            Frame(r, over ? Bright : Wire);
+            if (hot > 0.01f)
+                Fill(r, Fade(pressed ? Edge : Track, hot));
+            Frame(r, Color.Lerp(Wire, Bright, hot));
             ink = Bright;
         }
         TextCentre(Small, label, r.X + r.Width / 2f, r.Y + (r.Height - 16) / 2f, ink);
