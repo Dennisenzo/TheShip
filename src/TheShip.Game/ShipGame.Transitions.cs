@@ -146,7 +146,7 @@ public sealed partial class ShipGame
         if (t.Beat == 0)
             return new Rectangle(centre - 150, PlanRect.Y + PlanRect.Height / 2 - 62, 300, 124);
         if (t.Beat == 1)
-            return new Rectangle(centre - ReportWidth / 2, PlanRect.Y + 48, ReportWidth, 196 + _p.Lines(ReportText(t), ReportWidth - 48) * 19 + 76);
+            return new Rectangle(centre - ReportWidth / 2, PlanRect.Y + 48, ReportWidth, 100 + ReportRowHeight * 4 + (DriftDead(v, t).Count > 0 ? 28 : 0) + 6 + _p.Lines(ReportText(t), ReportWidth - 48) * 19 + 76);
         if (t.Beat == 2 && (float)(_now - t.Start) < Motion.Seconds(Motion.AlertTitle))
         {
             var width = Math.Max(360, (int)(v.Current.Title.Length * _p.HeadWidth) + 64);
@@ -154,6 +154,13 @@ public sealed partial class ShipGame
         }
         return null;
     }
+
+    /// <summary>Height of one row of the drift report's table: the numbers, then the before and after bars.</summary>
+    private const int ReportRowHeight = 44;
+
+    /// <summary>Who was alive before the drift and is dead now.</summary>
+    private static List<string> DriftDead(Voyage v, Transition t) =>
+        v.Crew.Where(c => !c.Alive && t.From.Crew.TryGetValue(c.Id, out var was) && was.State != CrewState.Dead).Select(c => c.Name).ToList();
 
     private static string ReportText(Transition t) => t.Report.Length > 0 ? t.Report : "The years pass.";
 
@@ -365,18 +372,30 @@ public sealed partial class ShipGame
             y += 26;
             _p.Text(_p.Head, "Year " + N(Math.Floor(t.From.Clock / Tuning.HoursPerYear)) + " to year " + N(Math.Floor(v.Year)), x, y, Painter.Bright);
             y += 44;
-            void Row(string label, string was, string now, bool worse, bool harm = false)
+            // A small table: each row has its label, the numbers before and after, and two bars on one scale (before above, after below).
+            var tableWidth = width - 48;
+            var rows = ScreenRules.DriftRows(t.From.Stores, v.Stores, t.From.Parts, v.Parts, t.From.PodWear, v.PodWear,
+                t.From.Crew.Values.Count(c => c.State != CrewState.Dead), v.Crew.Count(c => c.Alive), v.Crew.Count);
+            foreach (var row in rows)
             {
-                _p.Text(_p.Small, label, x, y, Painter.Dim);
-                _p.Text(_p.Small, was + " to " + now, x + 160, y, harm && worse ? Painter.Danger : worse ? Painter.Accent : Painter.Ink);
-                y += 24;
+                var unit = row.Label == "STORES" ? " d" : "";
+                var changeInk = !row.Changed ? Painter.Ink : row.Harm && row.Worse ? Painter.Danger : row.Worse ? Painter.Accent : Painter.Blue;
+                _p.Text(_p.Small, row.Label, x, y, Painter.Dim);
+                _p.TextRight(_p.Small, N(row.Was) + unit + "  to  " + N(row.Now) + unit, x + tableWidth, y, changeInk);
+                var bar = new Rectangle(x, y + 22, tableWidth, 5);
+                _p.Fill(bar, Painter.Track);
+                _p.Fill(new Rectangle(bar.X, bar.Y, (int)(bar.Width * row.WasFill), bar.Height), Painter.Wire);
+                var after = new Rectangle(x, y + 29, tableWidth, 5);
+                _p.Fill(after, Painter.Track);
+                _p.Fill(new Rectangle(after.X, after.Y, (int)(after.Width * row.NowFill), after.Height), changeInk);
+                y += ReportRowHeight;
             }
-            Row("STORES", N(t.From.Stores) + " d", N(v.Stores) + " d", v.Stores < t.From.Stores - 0.5);
-            Row("SPARE PARTS", t.From.Parts.ToString(CultureInfo.InvariantCulture), v.Parts.ToString(CultureInfo.InvariantCulture), v.Parts < t.From.Parts);
-            Row("POD WEAR", t.From.PodWear.ToString(CultureInfo.InvariantCulture), v.PodWear.ToString(CultureInfo.InvariantCulture), v.PodWear > t.From.PodWear);
-            var alive = v.Crew.Count(c => c.Alive);
-            var aliveBefore = t.From.Crew.Values.Count(c => c.State != CrewState.Dead);
-            Row("ALIVE", aliveBefore.ToString(CultureInfo.InvariantCulture), alive.ToString(CultureInfo.InvariantCulture), alive < aliveBefore, harm: true);
+            if (DriftDead(v, t) is { Count: > 0 } dead)
+            {
+                _p.Text(_p.Small, "LOST", x, y, Painter.Danger);
+                _p.Text(_p.Small, string.Join(", ", dead), x + 80, y, Painter.Danger);
+                y += 28;
+            }
             y = _p.Paragraph(text, x, y + 6, width - 48, Painter.Ink) + 16;
             // A click anywhere on the card is CONTINUE (on to the new alert); a click or key elsewhere closes it and goes through.
             _ = _p.Button(new Rectangle(x, y, 200, 44), "CONTINUE", primary: true);
