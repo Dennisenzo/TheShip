@@ -14,9 +14,20 @@ internal sealed class Painter
     public const int ScreenWidth = 1600;
     public const int ScreenHeight = 900;
 
+    // ---- The palette and what each colour means ----
+    // Surfaces:  Ground = the window; Panel = a boxed panel (with a 1 px inner top highlight, see Box); Room = a ship section's fill;
+    //            Track = the empty part of a meter and a hovered button; Edge = a panel's frame and a divider, also a selected button's fill.
+    // Lines:     Hull and Faint = the ship's hull and mesh, decoration only (Faint is below 3:1 on a panel: never use it for text);
+    //            Wire = a section outline, a frame that is live (an awake card, an outline button); Power = the power bus.
+    // Text:      Dim = labels and secondary text; Ink = ordinary text, including ordinary SHIP lines; Bright = values, names, what you
+    //            said, a hovered or selected thing. Blue = a crew member's spoken line, and the coolant lines.
+    // Meaning:   Accent (amber) = "this needs you": an alert, a fault that is open, a question waiting, the next step, a trust or
+    //            morale change, a LIE or PROMISE tag, the drift line, a locked door, a lockout; a solid amber button is the next step.
+    //            Danger (red-orange) = harm: a death, a fault in the last quarter of its clock, a failed pod. Used sparingly,
+    //            never for decoration. Dead = a dead person's pod and glyph (a dead card's text is Dim; Dead is readable, about 4.7:1).
     public static readonly Color Ground = new(11, 17, 20);
-    public static readonly Color Panel = new(15, 24, 28);
-    public static readonly Color Room = new(15, 26, 31);
+    public static readonly Color Panel = new(18, 28, 33);
+    public static readonly Color Room = new(18, 30, 36);
     public static readonly Color Edge = new(35, 53, 61);
     public static readonly Color Track = new(27, 42, 48);
     public static readonly Color Faint = new(40, 64, 73);
@@ -26,9 +37,10 @@ internal sealed class Painter
     public static readonly Color Ink = new(213, 227, 230);
     public static readonly Color Bright = new(234, 243, 245);
     public static readonly Color Accent = new(242, 176, 76);
+    public static readonly Color Danger = new(238, 104, 78);
     public static readonly Color Blue = new(124, 196, 232);
     public static readonly Color Power = new(140, 122, 78);
-    public static readonly Color Dead = new(74, 95, 103);
+    public static readonly Color Dead = new(110, 134, 143);
 
     private readonly SpriteBatch _batch;
     private readonly Texture2D _pixel;
@@ -225,6 +237,8 @@ internal sealed class Painter
     {
         Fill(r, Panel);
         Frame(r, edge);
+        // A 1 px light edge just inside the top: the panel catches the light.
+        Fill(new Rectangle(r.X + 1, r.Y + 1, r.Width - 2, 1), Fade(Bright, 0.07f));
     }
 
     private readonly Dictionary<int, Texture2D> _cross = new();
@@ -542,10 +556,11 @@ internal sealed class Painter
     public bool Hit(Rectangle r) => Click && Over(r);
 
     /// <summary>
-    /// A button. Solid when <paramref name="primary"/>, outlined otherwise, greyed when disabled. Returns true when it
-    /// was clicked this frame.
+    /// A button. Three weights: <paramref name="primary"/> is solid amber (the next step), <paramref name="strong"/> is solid light (the main
+    /// action of a repeated row, such as WAKE on a crew card), everything else is an outline; <paramref name="selected"/> is an outline on a
+    /// lighter fill (a state that is on). Greyed when disabled. Returns true when it was clicked this frame.
     /// </summary>
-    public bool Button(Rectangle r, string label, bool enabled = true, bool primary = false, bool selected = false, string? tip = null)
+    public bool Button(Rectangle r, string label, bool enabled = true, bool primary = false, bool selected = false, string? tip = null, bool strong = false)
     {
         var over = enabled && Over(r);
         if (tip != null)
@@ -563,11 +578,17 @@ internal sealed class Painter
             Frame(r, Faint);
             ink = Dim;
         }
-        else if (primary || selected)
+        else if (primary || strong)
         {
             var fill = Color.Lerp(primary ? Accent : Ink, Bright, hot);
             Fill(r, pressed ? Color.Lerp(fill, Ground, 0.25f) : fill);
             ink = Ground;
+        }
+        else if (selected)
+        {
+            Fill(r, pressed ? Track : Color.Lerp(Edge, Wire, 0.35f + 0.25f * hot));
+            Frame(r, Bright);
+            ink = Bright;
         }
         else
         {
