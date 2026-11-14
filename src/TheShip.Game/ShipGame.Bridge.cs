@@ -362,8 +362,7 @@ public sealed partial class ShipGame
         foreach (var run in ShipPlan.Coolant)
         {
             var points = Pts(run);
-            for (var i = 0; i + 1 < points.Length; i++)
-                _p.Dashed(points[i], points[i + 1], Painter.Blue, offset: Motion.Still ? 0f : (float)(_now * 10 % 12));
+            _p.DashedPath(points, Painter.Blue, offset: Motion.Still ? 0f : (float)(_now * 10 % 12));
         }
 
         // Where the people who are up stand, worked out before the doors: a marker can sit over a door's click area
@@ -395,14 +394,13 @@ public sealed partial class ShipGame
             switch (s.DoorState)
             {
                 case DoorState.Open:
-                    _p.Fill(r, Painter.Ground);
-                    _p.Frame(r, Painter.Bright);
+                    _p.Capsule(r, Painter.Bright, 1f, Painter.Ground);
                     break;
                 case DoorState.Closed:
-                    _p.Fill(r, Painter.Wire);
+                    _p.Capsule(r, Painter.Wire);
                     break;
                 default:
-                    _p.Fill(r, Painter.Accent);
+                    _p.Capsule(r, Painter.Accent);
                     break;
             }
             var reach = new Rectangle(r.X - 8, r.Y - 8, r.Width + 16, r.Height + 16);
@@ -511,7 +509,7 @@ public sealed partial class ShipGame
             var urgent = ShownLeft(v, f) < 0.25 * f.ClockHours;
             var beat = 0.55f + 0.45f * Motion.Pulse(_now, urgent ? 0.5f : 1.8f);
             _p.Diamond(centre, 13 + 4 * faultLit, Painter.Fade(f.Critical || faultLit > 0.5f ? Painter.Bright : Painter.Accent, beat), f.Critical ? 3f : 2f);
-            _p.TextCentre(_p.Small, index.ToString(CultureInfo.InvariantCulture), centre.X, centre.Y - 8, Painter.Accent);
+            _p.TextCentre(_p.Body, index.ToString(CultureInfo.InvariantCulture), centre.X, centre.Y - 9, Painter.Accent);
             var above = s.Spot.Y < 235;
             if (above && labelsAbove >= aboveRows.Length || !above && labelsBelow >= belowRows.Length)
                 above = !above;
