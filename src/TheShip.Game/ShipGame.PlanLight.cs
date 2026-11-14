@@ -22,7 +22,7 @@ public sealed partial class ShipGame
     /// </summary>
     private double PlanClock()
     {
-        if (Motion.Still && _options.TourTime is null)
+        if (Motion.Still && !_options.FixedTime)
             return 0;
         return _transition is { } t ? t.Start : _p.Now;
     }

@@ -6,6 +6,15 @@ namespace TheShip.Tests;
 public class TourHelperTests
 {
     [Fact]
+    public void Tour_time_counts_only_in_a_tour()
+    {
+        // --tour-time without --tour is play: the sky and the plan run on real time.
+        Assert.False(TheShip.Game.Motion.FixedTime(null, 100));
+        Assert.False(TheShip.Game.Motion.FixedTime("shots", null));
+        Assert.True(TheShip.Game.Motion.FixedTime("shots", 100));
+    }
+
+    [Fact]
     public void Reading_the_log_after_a_lie_opens_an_accusation_with_text()
     {
         var v = new Voyage(1);

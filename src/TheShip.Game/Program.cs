@@ -5,7 +5,11 @@ namespace TheShip.Game;
 /// <param name="TourDir">Dev tool (--tour): play a fixed script, save screenshots here, then exit.</param>
 /// <param name="TourTime">Dev tool (--tour-time seconds): the tour runs at this fixed animation time, so animated things are shot at a fixed phase.</param>
 /// <param name="TourWidth">Dev tool (--tour-size WxH): the pixel size of the tour's screenshots, as a window of that size would show the game.</param>
-public sealed record Options(int Seed, string? Llm, int GpuLayers, string? TourDir = null, int TourWidth = Painter.ScreenWidth, int TourHeight = Painter.ScreenHeight, double? TourTime = null);
+public sealed record Options(int Seed, string? Llm, int GpuLayers, string? TourDir = null, int TourWidth = Painter.ScreenWidth, int TourHeight = Painter.ScreenHeight, double? TourTime = null)
+{
+    /// <summary>A tour at a fixed animation time: <c>--tour-time</c> counts only with <c>--tour</c>, never in play.</summary>
+    public bool FixedTime => Motion.FixedTime(TourDir, TourTime);
+}
 
 internal static class Program
 {
