@@ -16,7 +16,7 @@ public sealed partial class ShipGame
         const int top = 72;
         var bottom = Painter.ScreenHeight - 16;
 
-        // Who: one button per person.
+        // Who: one row per person; the selected one is an outline with an amber bar, not a block.
         var y = top;
         foreach (var other in v.Crew)
         {
@@ -28,7 +28,19 @@ public sealed partial class ShipGame
                 CrewState.Asleep => "asleep",
                 _ => "dead",
             };
-            if (_p.Button(new Rectangle(16, y, 210, 48), other.Name.ToUpperInvariant() + " - " + line, selected: other == c))
+            var row = new Rectangle(16, y, 210, 48);
+            var selected = other == c;
+            var over = _p.Over(row);
+            var hot = _p.Ease("dossier-row:" + other.Id, over ? 1f : 0f);
+            if (over)
+                _p.Hand = true;
+            _p.Fill(row, selected ? Painter.Panel : Painter.Fade(Painter.Track, hot));
+            _p.Frame(row, selected ? Painter.Wire : Color.Lerp(Painter.Edge, Painter.Wire, hot));
+            if (selected)
+                _p.Fill(new Rectangle(row.X, row.Y, 4, row.Height), Painter.Accent);
+            _p.Text(_p.Small, other.Name.ToUpperInvariant(), row.X + 16, row.Y + 7, other.Alive ? Painter.Bright : Painter.Dim);
+            _p.Text(_p.Small, line, row.X + 16, row.Y + 26, other.Alive ? Painter.Dim : Painter.Danger);
+            if (_p.Hit(row))
                 Do(() => _dossier = person);
             y += 56;
         }
@@ -44,22 +56,34 @@ public sealed partial class ShipGame
         var x = rect.X + 16;
         var width = rect.Width - 32;
 
-        // A low-poly bust: head, neck and shoulders as faceted outlines.
+        // A low-poly bust in a framed panel; each person has their own head (ScreenRules.HeadOf).
         var frame = new Rectangle(x, rect.Y + 16, width, 190);
         _p.Fill(frame, Painter.Ground);
         _p.Frame(frame, Painter.Edge);
+        foreach (var (cx, cy, dx, dy) in new[] { (frame.X, frame.Y, 1, 1), (frame.Right - 1, frame.Y, -1, 1), (frame.X, frame.Bottom - 1, 1, -1), (frame.Right - 1, frame.Bottom - 1, -1, -1) })
+        {
+            _p.Fill(new Rectangle(dx > 0 ? cx : cx - 13, dy > 0 ? cy : cy, 14, 2), Painter.Wire);
+            _p.Fill(new Rectangle(dx > 0 ? cx : cx, dy > 0 ? cy : cy - 13, 2, 14), Painter.Wire);
+        }
         var ox = frame.X + (frame.Width - 240) / 2f;
         var oy = frame.Y - 5f;
         Vector2 P(float px, float py) => new Vector2(ox + px, oy + py);
+        Vector2 Q((float X, float Y) p) => P(p.X, p.Y);
         var ink = c.Alive ? Painter.Wire : Painter.Dead;
-        _p.Poly(new[] { P(82, 38), P(120, 70), P(158, 38) }, Painter.Faint, 1f, closed: false);
-        _p.Poly(new[] { P(66, 78), P(120, 70), P(174, 78) }, Painter.Faint, 1f, closed: false);
-        _p.Poly(new[] { P(76, 122), P(120, 104), P(164, 122) }, Painter.Faint, 1f, closed: false);
-        _p.Poly(new[] { P(120, 22), P(120, 146) }, Painter.Faint, 1f, closed: false);
-        _p.Poly(new[] { P(66, 78), P(120, 104), P(174, 78) }, Painter.Faint, 1f, closed: false);
+        var look = ScreenRules.HeadOf(c.Id);
+        var right = ScreenRules.HeadRight(look);
+        var (brow, cheek, jaw, chin) = (right[0], right[1], right[2], right[3]);
+        var crown = (120f, 22f + look.Brow);
+        _p.Poly(new[] { Q(ScreenRules.Mirror(brow)), P(120, 70), Q(brow) }, Painter.Faint, 1f, closed: false);
+        _p.Poly(new[] { Q(ScreenRules.Mirror(cheek)), P(120, 70), Q(cheek) }, Painter.Faint, 1f, closed: false);
+        _p.Poly(new[] { Q(ScreenRules.Mirror(jaw)), P(120, 104), Q(jaw) }, Painter.Faint, 1f, closed: false);
+        _p.Poly(new[] { Q(crown), P(120, 146 + look.Chin) }, Painter.Faint, 1f, closed: false);
+        _p.Poly(new[] { Q(ScreenRules.Mirror(cheek)), P(120, 104), Q(cheek) }, Painter.Faint, 1f, closed: false);
         _p.Poly(new[] { P(36, 186), P(120, 195), P(204, 186) }, Painter.Faint, 1f, closed: false);
-        _p.Poly(new[] { P(120, 22), P(158, 38), P(174, 78), P(164, 122), P(140, 146), P(100, 146), P(76, 122), P(66, 78), P(82, 38) }, ink);
-        _p.Poly(new[] { P(100, 146), P(140, 146), P(146, 168), P(94, 168) }, ink);
+        _p.Poly(ScreenRules.HeadOutline(look).Select(Q).ToArray(), ink);
+        foreach (var strand in ScreenRules.Hair(look))
+            _p.Poly(strand.Select(Q).ToArray(), ink, 1f, closed: false);
+        _p.Poly(new[] { Q(ScreenRules.Mirror(chin)), Q(chin), P(146, 168), P(94, 168) }, ink);
         _p.Poly(new[] { P(94, 168), P(146, 168), P(204, 186), P(216, 195), P(24, 195), P(36, 186) }, ink);
 
         var y = frame.Bottom + 14;
@@ -158,9 +182,19 @@ public sealed partial class ShipGame
         _p.Box(rect, Painter.Edge);
         var x = rect.X + 16;
         var width = rect.Width - 32;
-        _p.Text(_p.Small, "WHAT " + c.Name.ToUpperInvariant() + " KNOWS", x, rect.Y + 14, Painter.Dim);
-        _p.TextRight(_p.Small, "HOW, YEAR", x + width, rect.Y + 14, Painter.Dim);
-        var y = rect.Y + 44;
+        var head = rect.Y + 14;
+        if (c.Sheet is { } sheet)
+        {
+            // Who they are, in a calm block above what they know: where they come from and their habits.
+            _p.Text(_p.Small, "WHO " + c.Name.ToUpperInvariant() + " IS", x, head, Painter.Dim);
+            head = _p.Paragraph(sheet.Background, x, head + 26, width, Painter.Ink) + 6;
+            head = _p.Paragraph(sheet.Details, x, head, width, Painter.Dim) + 12;
+            _p.Fill(new Rectangle(x, head, width, 1), Painter.Edge);
+            head += 16;
+        }
+        _p.Text(_p.Small, "WHAT " + c.Name.ToUpperInvariant() + " KNOWS", x, head, Painter.Dim);
+        _p.TextRight(_p.Small, "HOW, YEAR", x + width, head, Painter.Dim);
+        var y = head + 30;
         var limit = rect.Bottom - 16 - (c.Doubts.Count > 0 ? 90 : 0);
         var textWidth = width - 190;
         if (c.Beliefs.Count == 0)
@@ -432,8 +466,11 @@ public sealed partial class ShipGame
         var (first, count) = ListWindow(items.Select(i => i.height).ToList(), _recordSkip, top, rect.Bottom - 8, rect.Bottom - 38);
         _recordSkip = first;
         var y = top;
-        foreach (var (s, tag, hot, note, quote, _) in items.Skip(first).Take(count))
+        foreach (var (s, tag, hot, note, quote, height) in items.Skip(first).Take(count))
         {
+            var rowRect = new Rectangle(rect.X + 4, y - 6, rect.Width - 8, height);
+            if (_p.Over(rowRect))
+                _p.Fill(rowRect, Painter.Track);
             Tag(tag, x, y, hot);
             var to = s.Hearers.Count == 0 ? "the log" : Names(s.Hearers);
             _p.Text(_p.Small, "year " + N(Math.Floor(s.Year)) + ", to " + to, x + (int)(tag.Length * _p.SmallWidth) + 28, y + 2, Painter.Dim);
@@ -530,8 +567,8 @@ public sealed partial class ShipGame
     // ---- The ending ----
 
     /// <summary>
-    /// The ending's own screen: the title and what happened, who is left, what they believe about you, and the record of what you said
-    /// (scrolls with the wheel and PageUp/PageDown).
+    /// The ending's own screen: its name over a small drawing of the ship, what happened, the crew as a row of cards, then what they
+    /// believe about you and the record of what you said (scrolls with the wheel and PageUp/PageDown).
     /// </summary>
     private void DrawEnding(Voyage v, Ending ending)
     {
@@ -546,44 +583,47 @@ public sealed partial class ShipGame
 
         const int top = 72;
         var bottom = Painter.ScreenHeight - 16;
-        const int leftWidth = 500;
-        const int midWidth = 440;
-        var left = new Rectangle(16, top, leftWidth, bottom - top);
-        var mid = new Rectangle(left.Right + 12, top, midWidth, bottom - top);
-        var rec = new Rectangle(mid.Right + 12, top, Painter.ScreenWidth - 16 - (mid.Right + 12), bottom - top);
+        var look = ScreenRules.LookOf(ending.Title);
 
-        _p.Box(left, Painter.Edge);
-        var x = left.X + 16;
-        var width = left.Width - 32;
-        var y = left.Y + 18;
-        _p.Text(_p.Small, "HOW IT ENDED", x, y, Painter.Dim);
-        y += 30;
-        foreach (var line in Painter.Wrap(ending.Title, (int)(width / _p.HeadWidth)))
-        {
-            _p.Text(_p.Head, line, x, y, Painter.Accent);
-            y += 34;
-        }
-        y = _p.Paragraph(ending.Summary, x, y + 4, width, Painter.Bright) + 22;
-        _p.Text(_p.Small, "THE CREW", x, y, Painter.Dim);
-        y += 28;
-        foreach (var line in ending.Crew)
-            y = _p.Paragraph(line, x, y, width, line.Contains("dead", StringComparison.OrdinalIgnoreCase) ? Painter.Dim : Painter.Ink) + 6;
+        // The hero: the name, the ship, the summary, the crew.
+        var hero = new Rectangle(16, top, Painter.ScreenWidth - 32, 408);
+        _p.Box(hero, Painter.Edge);
+        var centre = hero.X + hero.Width / 2;
+        var titleInk = look is EndingLook.Landfall or EndingLook.LandfallWithout ? Painter.Bright : look == EndingLook.Adrift ? Painter.Accent : Painter.Ink;
+        _p.TextCentre(_p.Big, ending.Title, centre, hero.Y + 20, titleInk);
+        var art = new Rectangle(centre - 300, hero.Y + 76, 600, 160);
+        DrawShipPicture(v, look, art, hero);
+        var summaryTop = hero.Y + 252;
+        var summaryLines = Painter.Wrap(ending.Summary, (int)(1000 / _p.BodyWidth));
+        for (var i = 0; i < Math.Min(3, summaryLines.Count); i++)
+            _p.TextCentre(_p.Body, summaryLines[i], centre, summaryTop + i * 24, Painter.Ink);
+        DrawEndingCrew(v, new Rectangle(hero.X + 24, hero.Bottom - 24 - 64, hero.Width - 48, 64));
+
+        // Below: what they believe, and the record.
+        const int midWidth = 560;
+        var lowTop = hero.Bottom + 12;
+        var mid = new Rectangle(16, lowTop, midWidth, bottom - lowTop);
+        var rec = new Rectangle(mid.Right + 12, lowTop, Painter.ScreenWidth - 16 - (mid.Right + 12), bottom - lowTop);
 
         _p.Box(mid, Painter.Edge);
-        x = mid.X + 16;
-        width = mid.Width - 32;
-        y = mid.Y + 18;
+        var x = mid.X + 16;
+        var width = mid.Width - 32;
+        var y = mid.Y + 16;
         _p.Text(_p.Small, "WHAT THEY BELIEVE ABOUT YOU", x, y, Painter.Dim);
         y += 30;
         if (ending.Beliefs.Count == 0)
             _p.Paragraph("Nobody is left who could believe anything about you.", x, y, width, Painter.Dim);
         foreach (var line in ending.Beliefs)
-            y = _p.Paragraph(line, x, y, width, Painter.Ink) + 10;
+        {
+            if (y + 19 > mid.Bottom - 12)
+                break;
+            y = _p.Paragraph(line, x, y, width, Painter.Ink) + 8;
+        }
 
         _p.Box(rec, Painter.Edge);
         x = rec.X + 16;
         width = rec.Width - 32;
-        _p.Text(_p.Small, "THE RECORD OF WHAT YOU SAID", x, rec.Y + 18, Painter.Dim);
+        _p.Text(_p.Small, "THE RECORD OF WHAT YOU SAID", x, rec.Y + 16, Painter.Dim);
         var lines = new List<string>();
         if (ending.Record.Count == 0)
             lines.Add("You said nothing that was recorded.");
@@ -592,7 +632,7 @@ public sealed partial class ShipGame
             lines.AddRange(Painter.Wrap(entry, (int)(width / _p.SmallWidth)));
             lines.Add("");
         }
-        var areaTop = rec.Y + 48;
+        var areaTop = rec.Y + 44;
         var visible = (rec.Bottom - 34 - areaTop) / 19;
         var maxOffset = Math.Max(0, lines.Count - visible);
         _scroll = Math.Clamp(_scroll, 0, maxOffset);
@@ -601,5 +641,136 @@ public sealed partial class ShipGame
             _p.Text(_p.Small, lines[i], x, areaTop + (i - first) * 19, Painter.Ink);
         if (maxOffset > 0)
             _p.TextRight(_p.Small, "lines " + (first + 1) + " to " + Math.Min(lines.Count, first + visible) + " of " + lines.Count + "  (mouse wheel, PageUp, PageDown)", rec.Right - 16, rec.Bottom - 26, Painter.Dim);
+    }
+
+    /// <summary>The crew as a row of small cards: a person glyph, name and role, alive with an age or dead.</summary>
+    private void DrawEndingCrew(Voyage v, Rectangle row)
+    {
+        var n = Math.Max(1, v.Crew.Count);
+        const int gap = 12;
+        var cardWidth = (row.Width - (n - 1) * gap) / n;
+        for (var i = 0; i < v.Crew.Count; i++)
+        {
+            var c = v.Crew[i];
+            var card = new Rectangle(row.X + i * (cardWidth + gap), row.Y, cardWidth, row.Height);
+            _p.Fill(card, c.Alive ? Painter.Room : Painter.Ground);
+            _p.Frame(card, c.Alive ? Painter.Edge : Painter.Faint);
+            _p.Marker(new Vector2(card.X + 24, card.Y + card.Height / 2f), c.Alive ? Painter.Wire : Painter.Dead);
+            var tx = card.X + 48;
+            _p.Text(_p.Small, c.Name, tx, card.Y + 11, c.Alive ? Painter.Bright : Painter.Dim);
+            _p.TextRight(_p.Small, Cap(c.Role), card.Right - 12, card.Y + 11, Painter.Dim);
+            if (c.Alive)
+                _p.Text(_p.Small, "alive, age " + N(c.Age), tx, card.Y + 34, Painter.Ink);
+            else
+                _p.Text(_p.Small, "dead", tx, card.Y + 34, Painter.Danger);
+        }
+    }
+
+    /// <summary>
+    /// The hull of the ship plan, small, in <paramref name="area"/>, turned by <paramref name="angle"/> radians about its centre and shifted by
+    /// <paramref name="shift"/> pixels. <paramref name="lit"/> draws the section outlines and a light in each section.
+    /// </summary>
+    private void DrawHullSmall(Voyage v, Rectangle area, Color hull, Color? rooms, Color? lights, float angle = 0f, float shift = 0f)
+    {
+        var hullW = PlanLayout.HullX1 - PlanLayout.HullX0;
+        var hullH = PlanLayout.HullY1 - PlanLayout.HullY0;
+        var k = Math.Min(area.Width / hullW, area.Height / hullH);
+        var cx = (PlanLayout.HullX0 + PlanLayout.HullX1) / 2f;
+        var cy = (PlanLayout.HullY0 + PlanLayout.HullY1) / 2f;
+        var (sin, cos) = MathF.SinCos(angle);
+        Vector2 P(float px, float py)
+        {
+            var dx = (px - cx) * k;
+            var dy = (py - cy) * k;
+            return new Vector2(area.X + area.Width / 2f + shift + dx * cos - dy * sin, area.Y + area.Height / 2f + dx * sin + dy * cos);
+        }
+        _p.Poly(ShipPlan.Hull.Select(p => P(p.X, p.Y)).ToArray(), hull, 1.5f);
+        foreach (var wall in ShipPlan.Corridor)
+            _p.Line(P(wall.X1, wall.Y), P(wall.X2, wall.Y), hull, 1f);
+        if (rooms is { } roomInk)
+            foreach (var s in v.Sections)
+                _p.Poly(s.Outline.Select(p => P(p.X, p.Y)).ToArray(), roomInk, 1f);
+        if (lights is { } lightInk)
+            foreach (var s in v.Sections)
+            {
+                var at = P(s.Spot.X, s.Spot.Y);
+                _p.Line(at - new Vector2(0.5f, 0), at + new Vector2(0.5f, 0), lightInk, 4f);
+            }
+    }
+
+    /// <summary>A filled disc (a round-capped line of no length), for the planet.</summary>
+    private void Disc(Vector2 centre, float diameter, Color color) =>
+        _p.Line(centre - new Vector2(0.01f, 0), centre, color, diameter);
+
+    /// <summary>
+    /// The picture over the ending's name. Landfall: the hull lit, a planet ahead with a pale rim. Adrift: the hull alone, dim and turned,
+    /// streaks behind it. The quiet ship: the hull dark over a line of stars.
+    /// </summary>
+    private void DrawShipPicture(Voyage v, EndingLook look, Rectangle area, Rectangle panel)
+    {
+        switch (look)
+        {
+            case EndingLook.Landfall:
+            case EndingLook.LandfallWithout:
+            {
+                var lit = look == EndingLook.Landfall;
+                DrawHullSmall(v, area, Painter.Wire, Painter.Hull, lit ? Painter.Accent : Painter.Dim, 0f, -150f);
+                var planet = new Vector2(area.X + area.Width / 2f + 240, area.Y + area.Height / 2f + 6);
+                const float radius = 78f;
+                Disc(planet, radius * 2, Painter.Fade(Painter.Blue, 0.55f));
+                Disc(planet + new Vector2(radius * 0.07f, radius * 0.05f), radius * 2 * 0.95f, new Color(14, 30, 38));
+                for (var i = -1; i <= 1; i++)
+                {
+                    var arc = new List<Vector2>();
+                    var half = MathF.Sqrt(Math.Max(0f, 1f - MathF.Pow(i * 0.42f, 2f))) * radius * 0.92f;
+                    for (var s = -4; s <= 4; s++)
+                        arc.Add(planet + new Vector2(s / 4f * half, i * radius * 0.42f + (1f - MathF.Abs(s) / 4f) * 5f));
+                    _p.Poly(arc, Painter.Fade(Painter.Blue, 0.22f), 1f, closed: false);
+                }
+                Stars(panel, area, 14, 0.35f);
+                break;
+            }
+            case EndingLook.Adrift:
+            {
+                DrawHullSmall(v, area with { Y = area.Y + 20, Height = 120 }, Painter.Hull, Painter.Faint, null, -0.13f, 0f);
+                // Streaks trail behind the drifting hull: the ship goes right, the streaks fade to the left.
+                for (var i = 0; i < 9; i++)
+                {
+                    var y = area.Y + 18 + i * 17 % (area.Height - 30);
+                    var length = 40 + i * 37 % 70;
+                    var x1 = area.X - 70 + i * 53 % 90;
+                    _p.Line(new Vector2(x1, y), new Vector2(x1 + length, y), Painter.Fade(Painter.Wire, 0.22f), 1f);
+                }
+                Stars(panel, area, 22, 0.3f);
+                break;
+            }
+            default:
+            {
+                DrawHullSmall(v, area with { Height = area.Height - 22 }, Painter.Faint, null, null, 0f, 0f);
+                // A line of stars along the horizon, brightest at the ends and gone behind the ship.
+                var y = area.Bottom - 4;
+                for (var x = panel.X + 60; x <= panel.Right - 60; x += 34)
+                {
+                    var off = Math.Abs(x - (area.X + area.Width / 2f)) / (panel.Width / 2f);
+                    var alpha = Math.Clamp((off - 0.12f) * 0.9f, 0f, 0.7f);
+                    if (alpha > 0.02f)
+                        _p.Fill(new Rectangle(x, y, 2, 2), Painter.Fade(Painter.Dim, alpha));
+                }
+                break;
+            }
+        }
+    }
+
+    /// <summary>A few fixed stars in the band of the picture, outside the hull's box.</summary>
+    private void Stars(Rectangle panel, Rectangle art, int count, float alpha)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            var x = panel.X + 30 + (int)((i * 977u + 131u) % (uint)(panel.Width - 60));
+            var y = art.Y + (int)((i * 619u + 53u) % (uint)art.Height);
+            if (Math.Abs(x - (art.X + art.Width / 2)) < art.Width / 2 + 10)
+                continue;
+            _p.Fill(new Rectangle(x, y, 2, 2), Painter.Fade(Painter.Bright, alpha * (0.5f + i % 3 * 0.25f)));
+        }
     }
 }

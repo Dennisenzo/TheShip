@@ -515,7 +515,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             DrawDossier(_voyage, _dossier);
         }
-        else if (_screen == Screen.Ending && _voyage.Ending is { } ending)
+        else if (_screen == Screen.Ending && (_endingOverride ?? _voyage.Ending) is { } ending)
         {
             DrawEnding(_voyage, ending);
         }

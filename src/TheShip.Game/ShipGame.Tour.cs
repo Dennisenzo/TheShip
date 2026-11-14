@@ -305,14 +305,55 @@ public sealed partial class ShipGame
                 Shoot(dir, tag + "-drift-roll");
                 _tourDrift = null;
             }
+            var beforeDrift = Snapshot(v);
             Act("drift to the next alert", v.Drift, snapshot: true);
             foreach (var w in Settle()) yield return w;
+            if (v.Phase != Phase.Ended)
+            {
+                // The drift transition does not run in a tour: put its report card up (beat 1) for one shot.
+                var driftLine = v.Log.Skip(beforeDrift.LogCount).FirstOrDefault(e => e.Kind == LogKind.Ship && e.Text.StartsWith("DRIFT:", StringComparison.Ordinal));
+                _transition = new Transition
+                {
+                    Kind = SkipKind.Drift, From = beforeDrift, Start = _now, Beat = 1,
+                    Report = driftLine is null ? "" : driftLine.Text["DRIFT:".Length..].Trim(),
+                };
+                Shoot(dir, tag + "-drift-report");
+                _transition = null;
+            }
             if (v.Phase != Phase.Ended)
                 Shoot(dir, tag + "-drift");
         }
         foreach (var w in Settle()) yield return w;
         Shoot(dir, "ending");
+        // The other endings' pictures, with the real crew and record under a made-up title (a tour only: the game never shows these).
+        if (v.Ending is { } real)
+            foreach (var (title, summary) in new[]
+                     {
+                         ("Landfall", "4 of 6 reach the surface, 3 of them of working age. You still have your voice and your records."),
+                         ("Landfall without you", "4 of 6 reach the surface, 3 of them of working age. They hold the cold-sleep bay and the landing is theirs."),
+                         ("The quiet ship", "The ship arrives with too few people able to land it."),
+                     })
+            {
+                var mock = new Ending { Title = title, Summary = summary };
+                mock.Crew.AddRange(real.Crew);
+                mock.Record.AddRange(real.Record);
+                mock.Beliefs.AddRange(real.Beliefs);
+                _endingOverride = mock;
+                Shoot(dir, "ending-" + title.ToLowerInvariant().Replace(' ', '-'));
+            }
+        _endingOverride = null;
+        // Every person's dossier once (the heads differ), the dead included.
+        _screen = Screen.Dossier;
+        foreach (var c in v.Crew)
+        {
+            _dossier = c;
+            Shoot(dir, "dossier-end-" + c.Name.ToLowerInvariant());
+        }
+        _screen = Screen.Ending;
     }
+
+    /// <summary>The tour's made-up ending, drawn in place of the real one for a shot.</summary>
+    private Ending? _endingOverride;
 
     private static string Capitalise(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
 }
