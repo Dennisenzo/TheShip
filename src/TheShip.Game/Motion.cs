@@ -23,6 +23,13 @@ internal static class Motion
     public const float EndingFade = 1.5f;
     public const float LogFade = 0.3f;
 
+    /// <summary>A crew line types out in the log at this many characters a second (<see cref="LogReveal"/>).</summary>
+    public const double CharsPerSecond = 90;
+    /// <summary>Each waiting line behind the one typing adds this share to the typing speed.</summary>
+    public const double BacklogSpeedUp = 1.0;
+    /// <summary>With this many lines waiting behind the one typing, everything is shown at once.</summary>
+    public const int BacklogInstant = 6;
+
     /// <summary>True when nothing should move (the tour).</summary>
     public static bool Still => Speed <= 0f;
 

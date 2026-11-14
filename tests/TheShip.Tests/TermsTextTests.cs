@@ -105,22 +105,8 @@ public class TermsTextTests
     /// <summary>Rows of the "Waiting on you" panel a text takes: word wrap at 45 columns (326 px at 7.19 px a character, as <c>Painter.Wrap</c>).</summary>
     internal static int WaitingRows(string text) => Rows(text, 45);
 
-    /// <summary>Rows a text takes word-wrapped at <paramref name="columns"/> characters, as <c>Painter.Wrap</c> does.</summary>
-    internal static int Rows(string text, int columns)
-    {
-        var rows = 0;
-        var line = 0;
-        foreach (var word in text.Split(' '))
-        {
-            if (line > 0 && line + 1 + word.Length > columns)
-            {
-                rows++;
-                line = 0;
-            }
-            line += (line > 0 ? 1 : 0) + word.Length;
-        }
-        return rows + (line > 0 ? 1 : 0);
-    }
+    /// <summary>Rows a text takes word-wrapped at <paramref name="columns"/> characters: the game's own wrap (<c>TextLayout.Wrap</c>, linked in), line breaks included.</summary>
+    internal static int Rows(string text, int columns) => TheShip.Game.TextLayout.Wrap(text, columns).Count;
 
     [Fact]
     public void The_short_terms_fit_two_rows_of_waiting_for_every_person_fault_and_belief()

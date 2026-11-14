@@ -155,6 +155,81 @@ public class ConditionsTests
     }
 
     [Fact]
+    public void A_question_settled_by_watching_him_die_does_not_start_the_work()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, f.DangerFact!);
+        var idris = v.Find("idris")!;
+        v.Wake(idris);
+        // The thaw fails and kills him in front of her.
+        idris.Health = 1;
+        v.PodWear = 1000;
+        var from = v.Log.Count;
+        while (idris.State == CrewState.Thawing && v.Phase == Phase.Alert)
+            v.Go();
+        Assert.False(idris.Alive);
+        Assert.Equal("dead", mara.Beliefs["alive:idris"].Value);
+        // She grieves: no relieved start, and the job is off until the player asks again.
+        Assert.NotEqual(f.Id, mara.WorkingOn);
+        Assert.Null(mara.Job);
+        Assert.Empty(v.JobChecklist(mara));
+        Assert.DoesNotContain(v.Log.Skip(from), e => e.Intent is { } i && i.Decision.Contains("what you asked for", StringComparison.Ordinal));
+        // Asked again, she can take it on.
+        v.Assign(mara, f, patch: false);
+        Assert.Equal(f.Id, mara.WorkingOn);
+    }
+
+    [Fact]
+    public void Work_resumed_by_what_she_saw_says_what_met_it()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, f.DangerFact!);
+        var idris = v.Find("idris")!;
+        v.Wake(idris);
+        var from = v.Log.Count;
+        while (idris.State == CrewState.Thawing && v.Phase == Phase.Alert)
+            v.Go();
+        Assert.Equal(f.Id, mara.WorkingOn);
+        var line = v.Log.Skip(from).Last(e => e.Intent is { Kind: "comply" }).Intent!;
+        Assert.DoesNotContain("what you asked for", line.Decision);
+        Assert.Contains("Idris is alive", line.Decision);
+    }
+
+    [Fact]
+    public void Work_resumed_by_waking_the_partner_says_so()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, "alive:idris");
+        Tell(v, mara, f.DangerFact!);
+        var from = v.Log.Count;
+        v.Wake(v.Find("idris")!);
+        Assert.Equal(f.Id, mara.WorkingOn);
+        var line = v.Log.Skip(from).Last(e => e.Intent is { Kind: "comply" }).Intent!;
+        Assert.Contains("waking Idris", line.Decision);
+        Assert.DoesNotContain("what you asked for", line.Decision);
+    }
+
+    [Fact]
+    public void Work_resumed_by_the_bay_taken_says_the_word_no_longer_counts()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, "alive:idris");
+        Tell(v, mara, f.DangerFact!);
+        Assert.True(v.OnlyPriceLeft(mara));
+        v.Lockouts.Bay = true;
+        var from = v.Log.Count;
+        v.Say("Hold on.", new Reading(LineKind.Plain), new[] { mara });
+        Assert.Equal(f.Id, mara.WorkingOn);
+        var line = v.Log.Skip(from).Last(e => e.Intent is { Kind: "comply" }).Intent!;
+        Assert.Contains("cold-sleep bay", line.Decision);
+        Assert.DoesNotContain("what you asked for", line.Decision);
+    }
+
+    [Fact]
     public void Refusing_the_terms_while_questions_are_open_is_no_push()
     {
         var (v, mara, f) = Alert1();
@@ -226,8 +301,12 @@ public class ConditionsTests
             Assert.Contains(v.StakesText(mara), tip);
             Assert.Contains(v.BargainText(mara)!, tip);
             // 8 rows of 45 columns are what "Waiting on you" has with every crew card shown.
-            var rows = text.Split('\n').Sum(TermsTextTests.WaitingRows);
-            Assert.True(rows <= 8, seed + ": " + rows + " rows: " + text);
+            // Counted on what is drawn: the game's wrap, which breaks at each "\n" (it once showed them as "?" on one line).
+            var drawn = TheShip.Game.TextLayout.Wrap(text, 45);
+            Assert.True(drawn.Count <= 8, seed + ": " + drawn.Count + " rows: " + text);
+            Assert.Equal(text.Count(ch => ch == '?'), string.Concat(drawn).Count(ch => ch == '?'));
+            Assert.Contains(drawn, l => l.StartsWith("Answer: ", StringComparison.Ordinal));
+            Assert.Contains(drawn, l => l.StartsWith("Your word: ", StringComparison.Ordinal));
             // Without the stakes (another person's are shown) there is no Answer sub-line.
             Assert.DoesNotContain("Answer:", v.JobItem(mara, withStakes: false)!.Value.Text);
         }
@@ -244,7 +323,7 @@ public class ConditionsTests
         Assert.False(v.JobHoldsQuestion(mara));
         var (text, _) = v.JobItem(mara, withStakes: true)!.Value;
         Assert.Contains("without it about", text);
-        Assert.True(text.Split('\n').Sum(TermsTextTests.WaitingRows) <= 8);
+        Assert.True(TheShip.Game.TextLayout.Wrap(text, 45).Count <= 8);
     }
 
     /// <summary>An obedient person short of trusting, woken for the coolant leak, asked to repair: Asha at trust 45.</summary>

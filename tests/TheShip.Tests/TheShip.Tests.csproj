@@ -27,6 +27,8 @@
     <Compile Include="..\..\src\TheShip.Game\Music.cs" Link="Music.cs" />
     <Compile Include="..\..\src\TheShip.Game\PcmFeed.cs" Link="PcmFeed.cs" />
     <Compile Include="..\..\src\TheShip.Game\LogReveal.cs" Link="LogReveal.cs" />
+    <Compile Include="..\..\src\TheShip.Game\TextLayout.cs" Link="TextLayout.cs" />
+    <Compile Include="..\..\src\TheShip.Game\Motion.cs" Link="Motion.cs" />
   </ItemGroup>
 
 </Project>

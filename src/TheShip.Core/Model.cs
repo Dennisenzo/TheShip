@@ -304,7 +304,11 @@ public sealed record OpenItem(CrewMember Who, string Id, string Kind, string Tex
 public sealed record JobCondition(string Kind, string Key, string Text);
 
 /// <summary>The job a person stated their conditions for, and which conditions they stated (all at once, on the first Repair or Patch).</summary>
-public sealed record JobTerms(string FaultId, bool Patch, List<JobCondition> Stated);
+public sealed record JobTerms(string FaultId, bool Patch, List<JobCondition> Stated)
+{
+    /// <summary>The conditions still open at the last look: when none are left, these are the ones the last step met (the line that starts the work says what met them).</summary>
+    public List<JobCondition> Open { get; set; } = new();
+}
 
 public enum LineKind { Statement, Promise, Order, Question, Dodge, Plain }
 

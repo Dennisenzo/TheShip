@@ -569,7 +569,8 @@ public sealed partial class ShipGame
     /// <summary>Which log entries are on screen: each waits for the one before it to be shown in full (<see cref="LogReveal"/>).</summary>
     private readonly LogReveal _reveal = new();
     private readonly List<RevealItem> _revealItems = new();
-    private int LogVisible => _reveal.Visible;
+    /// <summary>Log entries up to the last one on screen (the player's own line shows early, below a crew line still being worded).</summary>
+    private int LogVisible => _reveal.Extent;
 
     /// <summary>Called once per update: moves the reveal on. A key or a click that skips a transition also finishes the typing.</summary>
     private void StepLogReveal(double dt, bool skip)
@@ -581,13 +582,14 @@ public sealed partial class ShipGame
         for (var i = 0; i < v.Log.Count; i++)
         {
             var e = v.Log[i];
-            var text = e.Kind switch
+            // The length of what DrawLog shows ("SHIP - ...", "Mara - ..."), counted without building the string every update.
+            var length = e.Kind switch
             {
-                LogKind.Ship => "SHIP - " + e.Text,
-                LogKind.Crew => e.Speaker + " - " + e.Text,
-                _ => "",
+                LogKind.Ship => "SHIP - ".Length + e.Text.Length,
+                LogKind.Crew => (e.Speaker?.Length ?? 0) + " - ".Length + e.Text.Length,
+                _ => 0,
             };
-            _revealItems[i] = new RevealItem(e.Kind == LogKind.Crew, e.Pending, text.Length);
+            _revealItems[i] = new RevealItem(e.Kind == LogKind.Crew, e.Pending, length, Own: e.Kind == LogKind.You);
         }
         _reveal.Update(_revealItems, ShownLogCount(v), dt, skip, Motion.Still);
     }
@@ -624,6 +626,8 @@ public sealed partial class ShipGame
         foreach (var entry in v.Log.Take(count))
         {
             entryIndex++;
+            if (!_reveal.IsOnScreen(entryIndex))
+                continue;
             var head = entryIndex == _reveal.Shown && _reveal.HeadVisible;
             var color = entry.Kind switch
             {
