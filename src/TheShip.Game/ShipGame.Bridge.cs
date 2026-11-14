@@ -321,6 +321,8 @@ public sealed partial class ShipGame
 
     private void DrawPlan(Voyage v, Rectangle rect)
     {
+        var spritesBefore = _p.Sprites;
+        var lightTime = PlanClock();
         _p.Box(rect, Painter.Edge);
         _p.Text(_p.Small, "SHIP PLAN", rect.X + 14, rect.Y + 10, Painter.Dim);
         // The next useful step, where the eye already is.
@@ -358,15 +360,17 @@ public sealed partial class ShipGame
         if (v.GetSection("core") is { } youSection)
             boxes.Add(new PlanBox(youSection.Spot.X - 24, youSection.Spot.Y + 30, -_p.SmallWidth * 1.5f, 0, _p.SmallWidth * 3, 16));
         var fit = PlanLayout.Compute(v.Sections, shownFaults.Select(f => new PlanFault(f.Index, f.Section.Id, f.Slot, _p.Small.MeasureString(f.Label).X)).ToList(),
-            boxes, new RectF(rect.X + 4, rect.Y + 34, rect.Width - 8, rect.Height - 40), _p.SmallWidth);
+            boxes, new RectF(rect.X + 4 + ExhaustPx, rect.Y + 34, rect.Width - 8 - ExhaustPx, rect.Height - 40), _p.SmallWidth);
         var k = fit.K;
         Vector2 P(float px, float py) { var (x, y) = fit.P(px, py); return new Vector2(x, y); }
         Vector2[] Pts((float X, float Y)[] points) => points.Select(p => P(p.X, p.Y)).ToArray();
+        DrawPlanLightBack(v, fit, lightTime, shownFaults.Select(f => (f.Fault, f.Section.Id)).ToList());
 
         _p.Poly(Pts(ShipPlan.Hull), Painter.Hull);
         foreach (var wall in ShipPlan.Corridor)
             _p.Line(P(wall.X1, wall.Y), P(wall.X2, wall.Y), Painter.Hull);
         _p.Line(P(ShipPlan.PowerBus.X1, ShipPlan.PowerBus.Y), P(ShipPlan.PowerBus.X2, ShipPlan.PowerBus.Y), Painter.Power, 1f);
+        DrawPlanBus(v, fit, lightTime);
 
         var hotFault = _hotFault is null ? null : v.Current.Faults.FirstOrDefault(f => f.Id == _hotFault);
         foreach (var s in v.Sections)
@@ -394,10 +398,11 @@ public sealed partial class ShipGame
             _p.TextCentre(_p.Small, "YOU", you.X, you.Y, Painter.Ink);
         }
 
+        var coolantLost = CoolantLost(v);
         foreach (var run in ShipPlan.Coolant)
         {
             var points = Pts(run);
-            _p.DashedPath(points, Painter.Blue, offset: Motion.Still ? 0f : (float)(_now * 10 % 12));
+            _p.DashedPath(points, coolantLost ? Painter.Fade(Painter.Dead, 0.55f) : Painter.Blue, offset: (float)(lightTime * PlanLight.CoolantSpeed(coolantLost) % 12));
         }
 
         // Where the people who are up stand, worked out before the doors: a marker can sit over a door's click area
@@ -418,6 +423,8 @@ public sealed partial class ShipGame
                 continue;
             var corner = P(d.X, d.Y);
             var r = new Rectangle((int)corner.X, (int)corner.Y, Math.Max(4, (int)(d.W * k)), Math.Max(4, (int)(d.H * k)));
+            if (s.DoorState == DoorState.Locked)
+                DrawDoorTint(r, lightTime);
             switch (s.DoorState)
             {
                 case DoorState.Open:
@@ -488,7 +495,10 @@ public sealed partial class ShipGame
             switch (shown)
             {
                 case CrewState.Asleep:
-                    _p.Poly(outline, Painter.Wire);
+                    var breath = PlanLightOn ? PlanLight.PodBreath(ShownPodWear(v), Tuning.PodsWornAt, lightTime, PlanLight.SeedOf(c.Id)) : 1f;
+                    if (PlanLightOn)
+                        FillPlanShape(fit, ShipPlan.PodOutline(pod.X, pod.Y), Painter.Fade(Painter.Blue, 0.07f * breath), 8f);
+                    _p.Poly(outline, Painter.Fade(Painter.Wire, breath));
                     _p.TextCentre(_p.Small, tag, centre.X, centre.Y - 8, Painter.Ink);
                     break;
                 case CrewState.Thawing:
@@ -556,6 +566,7 @@ public sealed partial class ShipGame
             if (_target == c || _hotCrew == c.Id)
                 _p.Frame(new Rectangle(backing.X - 2, backing.Y - 2, backing.Width + 4, backing.Height + 4), _target == c ? Painter.Accent : Painter.Bright);
         }
+        PlanSprites = _p.Sprites - spritesBefore;
 
     }
 

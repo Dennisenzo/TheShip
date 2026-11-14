@@ -145,6 +145,7 @@ internal sealed class Painter
     {
         if (x1 <= x0 || y1 <= y0)
             return;
+        Sprites++;
         _batch.Draw(_pixel, new Vector2(PixelGrid.Layout(x0, Scale, OriginX), PixelGrid.Layout(y0, Scale, OriginY)), null, color, 0f,
             Vector2.Zero, new Vector2((x1 - x0) / Scale, (y1 - y0) / Scale), SpriteEffects.None, 0f);
     }
@@ -292,6 +293,9 @@ internal sealed class Painter
     public GraphicsDevice Device => _pixel.GraphicsDevice;
 
     /// <summary>A premultiplied texture stretched over a layout rectangle (tint = colour x opacity).</summary>
+    /// <summary>Sprites this painter has queued (fills, lines, discs and glyph masks; text glyphs and images are not counted). A dev counter: read before and after a part of a frame.</summary>
+    public int Sprites { get; private set; }
+
     public void Image(Texture2D texture, Rectangle r, Color tint) =>
         _batch.Draw(texture, new Vector2(r.X, r.Y), null, tint, 0f, Vector2.Zero, new Vector2((float)r.Width / texture.Width, (float)r.Height / texture.Height), SpriteEffects.None, 0f);
 
@@ -304,6 +308,7 @@ internal sealed class Painter
         var w = deviceWidth + (int)MathF.Round(stretch * Scale);
         var left = (int)MathF.Round(OriginX + x * Scale - w / 2f);
         var top = (int)MathF.Round(OriginY + y * Scale - deviceHeight / 2f);
+        Sprites++;
         _batch.Draw(texture, new Vector2(PixelGrid.Layout(left, Scale, OriginX), PixelGrid.Layout(top, Scale, OriginY)), null, tint, 0f, Vector2.Zero,
             new Vector2(w / Scale / texture.Width, deviceHeight / Scale / texture.Height), SpriteEffects.None, 0f);
     }
@@ -349,6 +354,7 @@ internal sealed class Painter
         }
         var n = LineProfile.Texels(width);
         var texture = Cross(width);
+        Sprites++;
         _batch.Draw(texture, a, null, color, MathF.Atan2(d.Y, d.X), new Vector2(0f, n / 2f),
             new Vector2(length, LineProfile.Extent(width) / Scale / n), SpriteEffects.None, 0f);
         if (round)
@@ -383,9 +389,13 @@ internal sealed class Painter
         return (new Vector2((middle - OriginX) / Scale, PixelGrid.Layout(s0, Scale, OriginY)), new Vector2((middle - OriginX) / Scale, PixelGrid.Layout(s1, Scale, OriginY)));
     }
 
+    /// <summary>A soft round dot of <paramref name="diameter"/> layout pixels centred on a point (not snapped to pixels: a moving dot must be able to sit between them).</summary>
+    public void Dot(Vector2 centre, Color color, float diameter) => SoftLine(centre, centre, color, Math.Max(2, PixelGrid.Thickness(diameter, Scale)), true);
+
     private void Disc(Vector2 centre, Color color, int width)
     {
         var n = LineProfile.Texels(width);
+        Sprites++;
         _batch.Draw(Discs(width), centre, null, color, 0f, new Vector2(n / 2f), LineProfile.Extent(width) / Scale / n, SpriteEffects.None, 0f);
     }
 
@@ -516,6 +526,7 @@ internal sealed class Painter
         var top = MathF.Round(centre.Y) - GlyphSize / 2;
         var (x0, x1) = PixelGrid.Span(left, left + GlyphSize, Scale, OriginX);
         var (y0, y1) = PixelGrid.Span(top, top + GlyphSize, Scale, OriginY);
+        Sprites++;
         _batch.Draw(_person, new Vector2(PixelGrid.Layout(x0, Scale, OriginX), PixelGrid.Layout(y0, Scale, OriginY)), null, color, 0f, Vector2.Zero,
             new Vector2((x1 - x0) / Scale / _person.Width, (y1 - y0) / Scale / _person.Height), SpriteEffects.None, 0f);
     }
