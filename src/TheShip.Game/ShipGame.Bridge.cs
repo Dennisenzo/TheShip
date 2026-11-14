@@ -311,6 +311,11 @@ public sealed partial class ShipGame
 
     // ---- The ship plan ----
 
+    /// <summary>The short label of a fault on the plan: "02 COOLANT LEAK 12 h" (a returning patch has no prefix; a critical fault shows by its diamond's thick border).</summary>
+    private static string PlanFaultLabel(int index, Fault f, double hoursLeft) =>
+        index.ToString("00", CultureInfo.InvariantCulture) + " " + f.PlainName.ToUpperInvariant() + " "
+        + (hoursLeft >= 48 ? (hoursLeft / 24).ToString("0", CultureInfo.InvariantCulture) + " d" : hoursLeft.ToString("0", CultureInfo.InvariantCulture) + " h");
+
     private void DrawPlan(Voyage v, Rectangle rect)
     {
         _p.Box(rect, Painter.Edge);
@@ -318,14 +323,41 @@ public sealed partial class ShipGame
         // The next useful step, where the eye already is.
         _p.TextRight(_p.Small, "NEXT: " + NextStep(v), rect.Right - 14, rect.Y + 10, Drifting ? Painter.Dim : Painter.Accent);
 
-        const float planTop = 24f;
-        // In the header row, clear of the plan below it (the drawing starts planTop px down).
-        MusicButton(new Rectangle(rect.X + 140, rect.Y + 2, 120, (int)planTop - 2));
+        // The speaker button sits in the header row, right of the title.
+        MusicButton(new Rectangle(rect.X + 100, rect.Y + 6, 32, 22));
 
-        var k = (rect.Width - 8) / ShipPlan.Width;
-        var ox = rect.X + 4f;
-        var oy = rect.Y + 34f;
-        Vector2 P(float px, float py) => new Vector2(ox + px * k, oy + (py - planTop) * k);
+        // What is on the plan: the faults to label (numbered as in the issue list) and who is up where.
+        var shownFaults = new List<(int Index, Fault Fault, Section Section, int Slot, string Label)>();
+        var inSection = new Dictionary<string, int>();
+        var index = 0;
+        foreach (var f in v.Current.Faults)
+        {
+            index++;
+            if (f.Resolved || index > FaultsRevealed(v) || v.GetSection(f.Section) is not { } fs)
+                continue;
+            var slot = inSection.TryGetValue(fs.Id, out var seen) ? seen : 0;
+            inSection[fs.Id] = slot + 1;
+            shownFaults.Add((index, f, fs, slot, PlanFaultLabel(index, f, ShownLeft(v, f))));
+        }
+        var standing = new List<(CrewMember Person, float PlanX, float PlanY)>();
+        var placed = new Dictionary<string, int>();
+        foreach (var c in v.Awake)
+        {
+            var where = v.LocationOf(c);
+            var n = placed.TryGetValue(where, out var count) ? count : 0;
+            placed[where] = n + 1;
+            if (v.GetSection(where) is { } ws)
+                standing.Add(ws.Id.StartsWith("pod", StringComparison.Ordinal) ? (c, (ws.Id == "podA" ? 400 : 580) + n * 80, 235) : (c, ws.Spot.X - 44, ws.Spot.Y + 38 + n * 18));
+            else
+                standing.Add((c, 290 + n * 90, 235));
+        }
+        var boxes = standing.Select(m => new PlanBox(m.PlanX, m.PlanY, -8, -9, _p.Small.MeasureString(m.Person.Name.ToUpperInvariant()).X + 28, 18)).ToList();
+        if (v.GetSection("core") is { } youSection)
+            boxes.Add(new PlanBox(youSection.Spot.X - 24, youSection.Spot.Y + 30, -_p.SmallWidth * 1.5f, 0, _p.SmallWidth * 3, 16));
+        var fit = PlanLayout.Compute(v.Sections, shownFaults.Select(f => new PlanFault(f.Index, f.Section.Id, f.Slot, _p.Small.MeasureString(f.Label).X)).ToList(),
+            boxes, new RectF(rect.X + 4, rect.Y + 34, rect.Width - 8, rect.Height - 40), _p.SmallWidth);
+        var k = fit.K;
+        Vector2 P(float px, float py) { var (x, y) = fit.P(px, py); return new Vector2(x, y); }
         Vector2[] Pts((float X, float Y)[] points) => points.Select(p => P(p.X, p.Y)).ToArray();
 
         _p.Poly(Pts(ShipPlan.Hull), Painter.Hull);
@@ -342,8 +374,8 @@ public sealed partial class ShipGame
             // The section of the fault under the mouse (on its card or on the plan) lights up.
             var lit = _p.Ease("section:" + s.Id, hotFault != null && hotFault.Section == s.Id ? 1f : 0f);
             _p.Poly(outline, Color.Lerp(Painter.Wire, Painter.Bright, lit), 1.5f + lit);
-            var at = P(s.Label.X, s.Label.Y - 12);
-            _p.Text(_p.Small, s.Name, at.X, at.Y, Painter.Dim);
+            var name = fit.Names[s.Id];
+            _p.Text(_p.Small, s.Name, name.X, name.Y, Painter.Dim);
 
             var here = v.Awake.Where(c => v.LocationOf(c) == s.Id).Select(c => c.Name).ToList();
             var faults = v.Current.Faults.Where(f => !f.Resolved && f.Section == s.Id).Select(f => IssueCardLayout.CardName(f)).ToList();
@@ -368,17 +400,9 @@ public sealed partial class ShipGame
         // Where the people who are up stand, worked out before the doors: a marker can sit over a door's click area
         // (the idle spot in the corridor does), and then the marker wins.
         var markers = new List<(CrewMember Person, Vector2 At, string Name, Rectangle Backing)>();
-        var placed = new Dictionary<string, int>();
-        foreach (var c in v.Awake)
+        foreach (var (c, planX, planY) in standing)
         {
-            var where = v.LocationOf(c);
-            var n = placed.TryGetValue(where, out var count) ? count : 0;
-            placed[where] = n + 1;
-            Vector2 at;
-            if (v.GetSection(where) is { } s)
-                at = s.Id.StartsWith("pod", StringComparison.Ordinal) ? P((s.Id == "podA" ? 400 : 580) + n * 80, 235) : P(s.Spot.X - 44, s.Spot.Y + 38 + n * 18);
-            else
-                at = P(290 + n * 90, 235);
+            var at = P(planX, planY);
             var name = c.Name.ToUpperInvariant();
             markers.Add((c, at, name, new Rectangle((int)at.X - 8, (int)at.Y - 9, (int)(_p.Small.MeasureString(name).X + 28), 18)));
         }
@@ -483,52 +507,28 @@ public sealed partial class ShipGame
             }
         }
 
-        // Faults, numbered as in the issue list, with a leader to a label outside the hull.
-        // Faults in the same section sit side by side, and their labels stack, so none covers another.
-        var index = 0;
-        var inSection = new Dictionary<string, int>();
-        var labelsAbove = 0;
-        var labelsBelow = 0;
-        // Label rows in plan units: four above the hull, two below it (clear of the section names and the legend).
-        var aboveRows = new[] { 36f, 54f, 72f, 90f };
-        var belowRows = new[] { 404f, 388f };
-        foreach (var f in v.Current.Faults)
+        // Faults, numbered as in the issue list: a diamond in its section, a bent leader out to a label in a row above or below the hull
+        // (placed by PlanLayout so no label overlaps another and no leader runs through text).
+        foreach (var (idx, f, section, slot, label) in shownFaults)
         {
-            index++;
-            if (f.Resolved || index > FaultsRevealed(v) || v.GetSection(f.Section) is not { } s)
-                continue;
-            var slot = inSection.TryGetValue(s.Id, out var seen) ? seen : 0;
-            inSection[s.Id] = slot + 1;
-            var centre = P(s.Spot.X + slot * 34, s.Spot.Y);
+            var placedLabel = fit.Labels.First(l => l.Index == idx);
+            var centre = new Vector2(placedLabel.Diamond.X + placedLabel.Diamond.W / 2, placedLabel.Diamond.Y + placedLabel.Diamond.H / 2);
             var mark = new Rectangle((int)centre.X - 15, (int)centre.Y - 15, 30, 30);
-            if (_p.Over(mark))
+            var text = new Rectangle((int)placedLabel.Text.X - 2, (int)placedLabel.Text.Y - 1, (int)placedLabel.Text.W + 4, (int)placedLabel.Text.H + 2);
+            var tip = IssueCardLayout.CardName(f) + (f.Critical ? " (critical)" : "") + ": " + Voyage.Hours(ShownLeft(v, f)) + " left.";
+            if (_p.Over(mark) || _p.Over(text))
                 _hotFaultNext = f.Id;
-            _p.Tip(mark, IssueCardLayout.CardName(f) + (f.Critical ? " (critical)" : "") + ": " + Voyage.Hours(ShownLeft(v, f)) + " left.");
+            _p.Tip(mark, tip);
+            _p.Tip(text, tip);
             var faultLit = _p.Ease("fault:" + f.Id, _hotFault == f.Id ? 1f : 0f);
             // A fault pulses, and faster once under a quarter of its clock is left.
             var urgent = LogTones.IsFinal(ShownLeft(v, f), f.ClockHours);
             var beat = 0.55f + 0.45f * Motion.Pulse(_now, urgent ? 0.5f : 1.8f);
             _p.Diamond(centre, 13 + 4 * faultLit, Painter.Fade(f.Critical || faultLit > 0.5f ? Painter.Bright : urgent ? Painter.Danger : Painter.Accent, beat), f.Critical ? 3f : 2f);
-            _p.TextCentre(_p.Body, index.ToString(CultureInfo.InvariantCulture), centre.X, centre.Y - 9, urgent ? Painter.Danger : Painter.Accent);
+            _p.TextCentre(_p.Body, idx.ToString(CultureInfo.InvariantCulture), centre.X, centre.Y - 9, urgent ? Painter.Danger : Painter.Accent);
             var leader = urgent ? Painter.Danger : Painter.Accent;
-            var above = s.Spot.Y < 235;
-            if (above && labelsAbove >= aboveRows.Length || !above && labelsBelow >= belowRows.Length)
-                above = !above;
-            var end = P(s.Spot.X + slot * 34, above ? aboveRows[labelsAbove++] : belowRows[labelsBelow++]);
-            _p.Line(new Vector2(centre.X, centre.Y + (above ? -13 : 13)), end, leader, 1f);
-            var label = index.ToString("00", CultureInfo.InvariantCulture) + " " + f.Name.ToUpperInvariant() + (f.Critical ? " (CRITICAL)" : "") + " - " + Voyage.Hours(ShownLeft(v, f));
-            // The label runs left of its leader; where that would leave the plan panel, it runs right instead.
-            var labelWidth = _p.Small.MeasureString(label).X;
-            if (end.X - 14 - labelWidth < rect.X + 8)
-            {
-                _p.Line(end, end + new Vector2(10, 0), leader, 1f);
-                _p.Text(_p.Small, label, Math.Min(end.X + 14, rect.Right - 8 - labelWidth), end.Y - 8, leader);
-            }
-            else
-            {
-                _p.Line(end, end + new Vector2(-10, 0), leader, 1f);
-                _p.TextRight(_p.Small, label, end.X - 14, end.Y - 8, leader);
-            }
+            _p.Poly(placedLabel.Leader.Select(p => new Vector2(p.X, p.Y)).ToArray(), leader, 1f, closed: false);
+            _p.Text(_p.Small, label, placedLabel.Text.X, placedLabel.Text.Y, leader);
         }
 
         // Who is up, and where (placed above, before the doors).
@@ -554,7 +554,6 @@ public sealed partial class ShipGame
                 _p.Frame(new Rectangle(backing.X - 2, backing.Y - 2, backing.Width + 4, backing.Height + 4), _target == c ? Painter.Accent : Painter.Bright);
         }
 
-        _p.Text(_p.Small, "rest the mouse on anything for what it is   door: outlined open, grey closed, amber locked", rect.X + 14, rect.Bottom - 20, Painter.Dim);
     }
 
     // ---- The log and the voice line ----

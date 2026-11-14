@@ -33,6 +33,7 @@
     <Compile Include="..\..\src\TheShip.Game\PersonGlyph.cs" Link="PersonGlyph.cs" />
     <Compile Include="..\..\src\TheShip.Game\LineProfile.cs" Link="LineProfile.cs" />
     <Compile Include="..\..\src\TheShip.Game\LogTones.cs" Link="LogTones.cs" />
+    <Compile Include="..\..\src\TheShip.Game\PlanLayout.cs" Link="PlanLayout.cs" />
   </ItemGroup>
 
 </Project>
