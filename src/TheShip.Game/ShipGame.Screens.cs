@@ -698,9 +698,8 @@ public sealed partial class ShipGame
             }
     }
 
-    /// <summary>A filled disc (a round-capped line of no length), for the planet.</summary>
-    private void Disc(Vector2 centre, float diameter, Color color) =>
-        _p.Line(centre - new Vector2(0.01f, 0), centre, color, diameter);
+    /// <summary>A filled disc, for the planet (one shared texture scaled, so a window drag builds nothing).</summary>
+    private void Disc(Vector2 centre, float diameter, Color color) => _p.FilledDisc(centre, diameter, color);
 
     /// <summary>
     /// The picture over the ending's name. Landfall: the hull lit, a planet ahead with a pale rim. Adrift: the hull alone, dim and turned,

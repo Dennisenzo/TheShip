@@ -53,6 +53,35 @@ internal static class LineProfile
     }
 
     /// <summary>
+    /// The widest disc (in device pixels) given a texture of its own, a cap or join of an ordinary line. Wider discs (the planet, a thick dot at a large
+    /// window) are drawn from one shared <see cref="BigDiscTexels"/> texture scaled by the batch, so no texture is built per window size.
+    /// </summary>
+    public const int MaxOwnDisc = 32;
+
+    /// <summary>Texels across the shared texture of wide discs.</summary>
+    public const int BigDiscTexels = 256;
+
+    /// <summary>Whether a disc of <paramref name="width"/> device pixels gets its own exact texture (else the shared big one, scaled).</summary>
+    public static bool OwnDisc(int width) => width <= MaxOwnDisc;
+
+    /// <summary>
+    /// The shared wide disc: <paramref name="n"/> texels square, a disc <c>n - 2</c> texels across with a one-texel falloff (premultiplied coverage, row by
+    /// row). Scaled up, the edge falls off over about a device pixel.
+    /// </summary>
+    public static float[] BigDisc(int n = BigDiscTexels)
+    {
+        var data = new float[n * n];
+        for (var y = 0; y < n; y++)
+        for (var x = 0; x < n; x++)
+        {
+            var dx = x + 0.5f - n / 2f;
+            var dy = y + 0.5f - n / 2f;
+            data[y * n + x] = Coverage(MathF.Sqrt(dx * dx + dy * dy), n - 2);
+        }
+        return data;
+    }
+
+    /// <summary>
     /// The runs of a dash pattern that fall on a segment of <paramref name="length"/>: dashes of length <paramref name="dash"/>, <paramref name="gap"/>
     /// apart, one starting at <paramref name="shift"/> (any value, taken modulo the period). Each run is shortened by <paramref name="cap"/> at both
     /// ends, since a round end adds that much (a run shorter than that becomes a dot at its middle, <c>From == To</c>). Runs are cut at the ends of the segment.

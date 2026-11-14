@@ -392,8 +392,19 @@ internal sealed class Painter
     /// <summary>A soft round dot of <paramref name="diameter"/> layout pixels centred on a point (not snapped to pixels: a moving dot must be able to sit between them).</summary>
     public void Dot(Vector2 centre, Color color, float diameter) => SoftLine(centre, centre, color, Math.Max(2, PixelGrid.Thickness(diameter, Scale)), true);
 
+    /// <summary>A filled soft disc <paramref name="diameter"/> layout pixels across (the planet): one shared texture, scaled, at any size.</summary>
+    public void FilledDisc(Vector2 centre, float diameter, Color color) => Disc(centre, color, Math.Max(2, PixelGrid.Thickness(diameter, Scale)));
+
     private void Disc(Vector2 centre, Color color, int width)
     {
+        if (!LineProfile.OwnDisc(width))
+        {
+            // A wide disc: the shared texture, its disc (n - 2 texels) scaled to the width in device pixels.
+            var big = BigDisc();
+            Sprites++;
+            _batch.Draw(big, centre, null, color, 0f, new Vector2(big.Width / 2f), width / Scale / (big.Width - 2), SpriteEffects.None, 0f);
+            return;
+        }
         var n = LineProfile.Texels(width);
         Sprites++;
         _batch.Draw(Discs(width), centre, null, color, 0f, new Vector2(n / 2f), LineProfile.Extent(width) / Scale / n, SpriteEffects.None, 0f);
@@ -415,6 +426,25 @@ internal sealed class Painter
         return _cross[width] = texture;
     }
 
+    private Texture2D? _bigDisc;
+
+    private Texture2D BigDisc()
+    {
+        if (_bigDisc is { } cached)
+            return cached;
+        var data = LineProfile.BigDisc();
+        var texels = new Color[data.Length];
+        for (var i = 0; i < data.Length; i++)
+        {
+            var v = (byte)Math.Round(data[i] * 255f);
+            texels[i] = new Color(v, v, v, v);
+        }
+        var texture = new Texture2D(_pixel.GraphicsDevice, LineProfile.BigDiscTexels, LineProfile.BigDiscTexels);
+        texture.SetData(texels);
+        return _bigDisc = texture;
+    }
+
+    /// <summary>The exact texture of a cap or join of <paramref name="width"/> device pixels (at most <see cref="LineProfile.MaxOwnDisc"/>, so the cache stays small).</summary>
     private Texture2D Discs(int width)
     {
         if (_discs.TryGetValue(width, out var cached))
