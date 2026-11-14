@@ -184,6 +184,8 @@ internal sealed class Painter
     /// <summary>Call at the start of a frame's drawing.</summary>
     public void BeginFrame()
     {
+        (_covered, _coveredNow) = (_coveredNow, _covered);
+        _coveredNow.Clear();
         _tip = null;
         Hand = false;
         Denied = false;
@@ -255,6 +257,15 @@ internal sealed class Painter
         // A 1 px light edge just inside the top: the panel catches the light.
         Fill(new Rectangle(r.X + 1, r.Y + 1, r.Width - 2, 1), Fade(Bright, 0.07f));
     }
+
+    private List<Rectangle> _covered = new();
+    private List<Rectangle> _coveredNow = new();
+
+    /// <summary>Marks an area that holds text on the bare ground (an unfilled card): the sky leaves it clear, from the next frame on.</summary>
+    public void Cover(Rectangle r) => _coveredNow.Add(r);
+
+    /// <summary>The areas marked by <see cref="Cover"/> in the frame before this one.</summary>
+    public IReadOnlyList<Rectangle> Covered => _covered;
 
     public const int TopLightDepth = 20;
     public const float TopLightAlpha = 0.045f;

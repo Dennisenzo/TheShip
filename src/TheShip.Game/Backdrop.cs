@@ -53,9 +53,23 @@ internal sealed class Backdrop
             var size = star.Big ? 5 : 3;
             var stretch = StarField.Stretch(star, _drift);
             var x = StarField.X(star, _phase, Painter.ScreenWidth);
-            p.Stamp(_dot, x, star.Y * Painter.ScreenHeight, size, size, stretch, Painter.Fade(Painter.Bright, StarField.AlphaOf(star, _brightness)));
+            var y = star.Y * Painter.ScreenHeight;
+            if (y < HeaderHeight || Covered(p, x, y, size / 2f + 3f + StarField.Stretch(star, _drift)))
+                continue;
+            p.Stamp(_dot, x, y, size, size, stretch, Painter.Fade(Painter.Bright, StarField.AlphaOf(star, _brightness)));
         }
         p.Image(_vignette, new Rectangle(0, 0, Painter.ScreenWidth, Painter.ScreenHeight), Color.White);
+    }
+
+    /// <summary>The header is text on bare ground: no stars there (the panels and filled cards cover the sky by being drawn after it).</summary>
+    private const int HeaderHeight = 60;
+
+    private static bool Covered(Painter p, float x, float y, float reach)
+    {
+        foreach (var r in p.Covered)
+            if (x >= r.X - reach && x <= r.Right + reach && y >= r.Y - reach && y <= r.Bottom + reach)
+                return true;
+        return false;
     }
 
     /// <summary>A soft round dot, premultiplied white; drawn at 3 or 5 device pixels it has a bright core and a feathered edge.</summary>

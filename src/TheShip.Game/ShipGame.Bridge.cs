@@ -132,6 +132,7 @@ public sealed partial class ShipGame
                 _hotFaultNext = f.Id;
             var edge = f.Resolved ? Painter.Edge : f.State == FaultState.InRepair ? Painter.Wire : Painter.Accent;
             _p.Frame(card, Color.Lerp(edge, Painter.Bright, _p.Ease("issue:" + f.Id, _hotFault == f.Id ? 1f : 0f)));
+            _p.Cover(card);
             y += 10;
         }
 
@@ -267,6 +268,7 @@ public sealed partial class ShipGame
             var done = f.State switch { FaultState.Repaired => "REPAIRED", FaultState.Patched => "PATCHED", _ => "LOST" };
             _p.Text(_p.Small, Clip(tag + " - " + done + " - " + IssueCardLayout.CardName(f), inner, _p.SmallWidth), ix, y + 6, Painter.Dim);
             _p.Frame(new Rectangle(x, cardTop, width, IssueCardLayout.ResolvedRow), Painter.Edge);
+            _p.Cover(new Rectangle(x, cardTop, width, IssueCardLayout.ResolvedRow));
             return cardTop + IssueCardLayout.ResolvedRow + IssueCardLayout.Gap;
         }
         y += 8;
@@ -306,6 +308,7 @@ public sealed partial class ShipGame
         if (_p.Over(card))
             _hotFaultNext = f.Id;
         _p.Frame(card, Color.Lerp(f.State == FaultState.InRepair ? Painter.Wire : Painter.Accent, Painter.Bright, _p.Ease("issue:" + f.Id, _hotFault == f.Id ? 1f : 0f)));
+        _p.Cover(card);
         return cardTop + height + IssueCardLayout.Gap;
     }
 
