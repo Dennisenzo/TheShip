@@ -147,7 +147,7 @@ public sealed partial class ShipGame
 
     /// <summary>How far the header's numbers reach left of their right edge (<see cref="DrawStats"/>).</summary>
     private float StatsWidth(Voyage v) =>
-        Stats(v).Sum(s => _p.Small.MeasureString(s.Text).X + _p.Small.MeasureString(s.Label).X + 7 + 20) - 20;
+        Stats(v).Sum(s => _p.Body.MeasureString(s.Text).X + _p.Small.MeasureString(s.Label).X + 7 + 20) - 20;
 
     /// <summary>The ship's numbers in the header, each with its own colour, tooltip and change flash. Drawn from the right edge leftwards.</summary>
     private void DrawStats(Voyage v, int right)
@@ -161,15 +161,16 @@ public sealed partial class ShipGame
         void Stat(string label, string text, bool warn, string key, double value, string tip)
         {
             Track(key, value, hold, out var flash, out var delta);
-            var textWidth = _p.Small.MeasureString(text).X;
+            var textWidth = _p.Body.MeasureString(text).X;
             var labelWidth = _p.Small.MeasureString(label).X;
             x -= textWidth;
-            var ink = warn ? Painter.Accent : Painter.Ink;
-            _p.Text(_p.Small, text, x, 21, Color.Lerp(ink, Painter.Bright, flash));
+            // The status numbers are the most important thing in the header: the value in the larger font and bright, the label dim.
+            var ink = warn ? Painter.Accent : Painter.Bright;
+            _p.Text(_p.Body, text, x, 19, Color.Lerp(ink, Painter.Bright, flash));
             if (flash > 0f)
                 _p.Fill(new Rectangle((int)x, 40, (int)textWidth, 2), Painter.Fade(Painter.Bright, flash));
             if (delta.Length > 0)
-                _p.Text(_p.Small, delta, x, 38, Painter.Accent);
+                _p.Text(_p.Small, delta, x, 39, Painter.Accent);
             x -= labelWidth + 7;
             _p.Text(_p.Small, label, x, 21, Painter.Dim);
             _p.Tip(new Rectangle((int)x - 4, 10, (int)(labelWidth + 7 + textWidth) + 8, 38), tip);

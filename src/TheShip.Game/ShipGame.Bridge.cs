@@ -560,10 +560,8 @@ public sealed partial class ShipGame
 
     // ---- The log and the voice line ----
 
-    /// <summary>How many log entries the last frame showed, and from which entry on (and since when) lines are fading in.</summary>
-    private int _logKnown;
-    private int _logFadeFrom;
-    private double _logFadeAt;
+    /// <summary>When each log entry first showed on screen (the clock of its fade-in), so an entry held back behind a pending line fades in when it is released, not before.</summary>
+    private readonly Dictionary<int, double> _logAppeared = new();
     /// <summary>The log's length at the last clock move: entries from here on are new since then.</summary>
     private int _logMark;
     /// <summary>Which log entries are on screen: each waits for the one before it to be shown in full (<see cref="LogReveal"/>).</summary>
@@ -611,15 +609,9 @@ public sealed partial class ShipGame
         const int step = 20;
         var visible = Math.Max(1, (areaBottom - areaTop) / step);
 
-        // Lines that are new since the last frame fade in; lines since the last clock move have a mark in the margin.
+        // Lines fade in from the frame they first show (an entry held back behind a pending line shows later than the ones after it);
+        // lines since the last clock move have a mark in the margin.
         var count = LogVisible;
-        if (count > _logKnown)
-        {
-            _logFadeFrom = _logKnown;
-            _logFadeAt = _now;
-        }
-        _logKnown = count;
-        var fresh = Motion.Progress(_now, _logFadeAt, Motion.LogFade);
 
         var lines = new List<(string Text, Color Color, int Entry)>();
         var entryIndex = -1;
@@ -628,6 +620,7 @@ public sealed partial class ShipGame
             entryIndex++;
             if (!_reveal.IsOnScreen(entryIndex))
                 continue;
+            _logAppeared.TryAdd(entryIndex, _now);
             var head = entryIndex == _reveal.Shown && _reveal.HeadVisible;
             var color = entry.Kind switch
             {
@@ -660,7 +653,8 @@ public sealed partial class ShipGame
         var y = areaBottom - (last - first) * step;
         for (var i = first; i < last; i++, y += step)
         {
-            var isFresh = lines[i].Entry >= _logFadeFrom && fresh < 1f;
+            var fresh = Motion.Progress(_now, _logAppeared.GetValueOrDefault(lines[i].Entry, _now), Motion.LogFade);
+            var isFresh = fresh < 1f;
             _p.Text(_p.Small, lines[i].Text, rect.X + 14, y, isFresh ? Painter.Fade(lines[i].Color, 0.2f + 0.8f * fresh) : lines[i].Color);
             if (_logMark > 0 && lines[i].Entry >= _logMark)
                 _p.Fill(new Rectangle(rect.X + 5, y + 2, 2, 15), Painter.Fade(Painter.Accent, 0.7f));
