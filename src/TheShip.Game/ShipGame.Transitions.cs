@@ -38,6 +38,8 @@ public sealed partial class ShipGame
         public int Beat;
         public string Report = "";
         public string Banner = "";
+        /// <summary>A drift's own end, before the next alert started (the report's numbers and deaths).</summary>
+        public DriftOutcome? Drift;
     }
 
     /// <summary>Where the ship plan sits on the bridge; the drift plays over it.</summary>
@@ -91,7 +93,7 @@ public sealed partial class ShipGame
         // opened another screen: the clock move they asked for brings them back to the bridge to see it.
         _screen = Screen.Bridge;
         _picker = null;
-        _transition = new Transition { Kind = kind, From = before, Start = _now, Banner = banner, Report = report };
+        _transition = new Transition { Kind = kind, From = before, Start = _now, Banner = banner, Report = report, Drift = kind == SkipKind.Drift ? v.LastDrift : null };
         if (kind == SkipKind.Drift)
             _sounds.Drift();
     }
@@ -146,7 +148,7 @@ public sealed partial class ShipGame
         if (t.Beat == 0)
             return new Rectangle(centre - 150, PlanRect.Y + PlanRect.Height / 2 - 62, 300, 124);
         if (t.Beat == 1)
-            return new Rectangle(centre - ReportWidth / 2, PlanRect.Y + 48, ReportWidth, 100 + ReportRowHeight * 4 + (DriftDead(v, t).Count > 0 ? 28 : 0) + 6 + _p.Lines(ReportText(t), ReportWidth - 48) * 19 + 76);
+            return new Rectangle(centre - ReportWidth / 2, PlanRect.Y + 48, ReportWidth, 100 + ReportRowHeight * 4 + (DriftReportOf(v, t).Lost.Count > 0 ? 28 : 0) + 6 + _p.Lines(ReportText(t), ReportWidth - 48) * 19 + 76);
         if (t.Beat == 2 && (float)(_now - t.Start) < Motion.Seconds(Motion.AlertTitle))
         {
             var width = Math.Max(360, (int)(v.Current.Title.Length * _p.HeadWidth) + 64);
@@ -158,9 +160,9 @@ public sealed partial class ShipGame
     /// <summary>Height of one row of the drift report's table: the numbers, then the before and after bars.</summary>
     private const int ReportRowHeight = 44;
 
-    /// <summary>Who was alive before the drift and is dead now.</summary>
-    private static List<string> DriftDead(Voyage v, Transition t) =>
-        v.Crew.Where(c => !c.Alive && t.From.Crew.TryGetValue(c.Id, out var was) && was.State != CrewState.Dead).Select(c => c.Name).ToList();
+    /// <summary>The drift report's rows and who died in the drift itself (not in the alert that followed it).</summary>
+    private static (List<ReportRow> Rows, IReadOnlyList<string> Lost) DriftReportOf(Voyage v, Transition t) =>
+        ScreenRules.DriftReport(t.From.Stores, t.From.Parts, t.From.PodWear, t.From.Crew.Values.Count(c => c.State != CrewState.Dead), v.Crew.Count, t.Drift);
 
     private static string ReportText(Transition t) => t.Report.Length > 0 ? t.Report : "The years pass.";
 
@@ -374,8 +376,7 @@ public sealed partial class ShipGame
             y += 44;
             // A small table: each row has its label, the numbers before and after, and two bars on one scale (before above, after below).
             var tableWidth = width - 48;
-            var rows = ScreenRules.DriftRows(t.From.Stores, v.Stores, t.From.Parts, v.Parts, t.From.PodWear, v.PodWear,
-                t.From.Crew.Values.Count(c => c.State != CrewState.Dead), v.Crew.Count(c => c.Alive), v.Crew.Count);
+            var (rows, lost) = DriftReportOf(v, t);
             foreach (var row in rows)
             {
                 var unit = row.Label == "STORES" ? " d" : "";
@@ -390,7 +391,7 @@ public sealed partial class ShipGame
                 _p.Fill(new Rectangle(after.X, after.Y, (int)(after.Width * row.NowFill), after.Height), changeInk);
                 y += ReportRowHeight;
             }
-            if (DriftDead(v, t) is { Count: > 0 } dead)
+            if (lost is { Count: > 0 } dead)
             {
                 _p.Text(_p.Small, "LOST", x, y, Painter.Danger);
                 _p.Text(_p.Small, string.Join(", ", dead), x + 80, y, Painter.Danger);

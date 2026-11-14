@@ -1085,6 +1085,7 @@ public sealed partial class Voyage
             }
             Clock = target * Tuning.HoursPerYear;
             SyncFacts();
+            LastDrift = new DriftOutcome(Stores, Parts, PodWear, Crew.Count(c => c.Alive), deaths.ToArray());
             // Limited to working sensors; the prototype loses none, so the report is complete (DESIGN.md, "Drift").
             Ship($"DRIFT: {years:0} years pass. Year {Math.Floor(Year):0}. "
                  + string.Concat(events.Select(e => e + " "))

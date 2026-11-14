@@ -52,6 +52,17 @@ internal static class ScreenRules
     }
 
     /// <summary>
+    /// The drift report's rows and the names it lists as lost, from the snapshot before the drift click and the drift's own end
+    /// (<see cref="Core.Voyage.LastDrift"/>), never the state after it: by then the next alert has started, and its scripted
+    /// events (alert 2's pod death) belong to that alert, not to the drift. With no outcome (none recorded) nothing changed.
+    /// </summary>
+    public static (List<ReportRow> Rows, IReadOnlyList<string> Lost) DriftReport(double storesWas, int partsWas, int wearWas, int aliveWas, int crew, Core.DriftOutcome? end)
+    {
+        end ??= new Core.DriftOutcome(storesWas, partsWas, wearWas, aliveWas, Array.Empty<string>());
+        return (DriftRows(storesWas, end.Stores, partsWas, end.Parts, wearWas, end.PodWear, aliveWas, end.Alive, crew), end.Deaths);
+    }
+
+    /// <summary>
     /// A head for a person, the same every time: width of cheek and jaw, chin depth, brow height and a hair style, all drawn from
     /// the id (FNV-1a hash). Values are offsets in layout pixels, symmetric about the head's centre line.
     /// </summary>

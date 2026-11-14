@@ -1,3 +1,4 @@
+using TheShip.Core;
 using TheShip.Game;
 using Xunit;
 
@@ -24,6 +25,44 @@ public class ScreenRulesTests
         Assert.True(rows[3].Worse && rows[3].Harm);
         // Pod wear going down would be an improvement, not a worsening.
         Assert.False(ScreenRules.DriftRows(1, 1, 1, 1, 14, 10, 6, 6, 6)[2].Worse);
+    }
+
+    [Fact]
+    public void The_drift_report_shows_the_drift_not_the_next_alerts_scripted_death()
+    {
+        // Into alert 2: its scripted pod death happens as the alert starts, after the drift and its "No deaths." report.
+        var v = new Voyage(1);
+        var mara = VoyageTests.HonestFirstAlert(v);
+        VoyageTests.SleepWhenAllowed(v, mara);
+        var stores = v.Stores;
+        var parts = v.Parts;
+        var wear = v.PodWear;
+        var alive = v.Crew.Count(c => c.Alive);
+        v.Drift();
+        Assert.Equal(2, v.Current.Number);
+        Assert.True(v.Crew.Count(c => c.Alive) < alive); // the scripted death is in the voyage's state...
+        var line = v.Log.Last(e => e.Text.StartsWith("DRIFT:"));
+        Assert.EndsWith("No deaths.", line.Text);
+
+        var (rows, lost) = ScreenRules.DriftReport(stores, parts, wear, alive, v.Crew.Count, v.LastDrift);
+        Assert.Empty(lost); // ...but not in the drift report
+        var aliveRow = rows.Single(r => r.Label == "ALIVE");
+        Assert.Equal(alive, aliveRow.Now);
+        Assert.False(aliveRow.Changed);
+        Assert.Equal(v.LastDrift!.Stores, rows.Single(r => r.Label == "STORES").Now);
+    }
+
+    [Fact]
+    public void Drift_report_lists_who_died_in_the_drift()
+    {
+        var end = new DriftOutcome(100, 1, 12, 4, new[] { "Asha", "Jonah" });
+        var (rows, lost) = ScreenRules.DriftReport(400, 2, 10, 6, 6, end);
+        Assert.Equal(new[] { "Asha", "Jonah" }, lost);
+        Assert.True(rows.Single(r => r.Label == "ALIVE").Worse);
+        // No outcome recorded: nothing changed and nobody is lost.
+        var (same, none) = ScreenRules.DriftReport(400, 2, 10, 6, 6, null);
+        Assert.Empty(none);
+        Assert.All(same, r => Assert.False(r.Changed));
     }
 
     [Fact]

@@ -35,6 +35,11 @@ public sealed partial class Voyage
     public double Stores { get; internal set; } = Tuning.StartStores;
     public int Parts { get; internal set; } = Tuning.StartParts;
     public int PodWear { get; internal set; }
+    /// <summary>
+    /// How the last drift ended, before the next alert started (read-only, for the drift report): what its DRIFT line says.
+    /// Null before the first drift.
+    /// </summary>
+    public DriftOutcome? LastDrift { get; private set; }
     public bool PowerLow { get; private set; }
     public bool NavLost { get; private set; }
     public bool LogsLocked { get => Lockouts.Logs; private set => Lockouts.Logs = value; }
