@@ -67,6 +67,14 @@ public sealed partial class ShipGame
         _p.Mouse = new Vector2(-1000, -1000);
         GraphicsDevice.SetRenderTarget(_tourTarget);
         DrawScene();
+        // The plan's sprite count with and without its light (own quads, lines and discs; text glyphs are not counted), then the real frame again.
+        var withLight = PlanSprites;
+        PlanLightOn = false;
+        DrawScene();
+        var without = PlanSprites;
+        PlanLightOn = true;
+        DrawScene();
+        _session?.Line("tour", "plan sprites in " + name + ": " + withLight + " with light, " + without + " without");
         GraphicsDevice.SetRenderTarget(null);
         _click = click;
         var file = (++_shotNumber).ToString("00") + "-" + name + ".png";

@@ -36,6 +36,7 @@
     <Compile Include="..\..\src\TheShip.Game\LogTones.cs" Link="LogTones.cs" />
     <Compile Include="..\..\src\TheShip.Game\StarField.cs" Link="StarField.cs" />
     <Compile Include="..\..\src\TheShip.Game\PlanLayout.cs" Link="PlanLayout.cs" />
+    <Compile Include="..\..\src\TheShip.Game\PlanLight.cs" Link="PlanLight.cs" />
   </ItemGroup>
 
 </Project>
