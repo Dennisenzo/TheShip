@@ -74,16 +74,14 @@ public sealed class MusicPlayer : IDisposable
     {
         if (voyage is null)
             return;
-        if (drifting)
+        var mood = MoodOf(voyage, drifting);
+        if (mood != MusicMood.Alert)
         {
-            Engine.SetMood(MusicMood.Drift);
+            Engine.SetMood(mood);
             return;
         }
         switch (voyage.Phase)
         {
-            case Phase.Ended:
-                Engine.SetMood(voyage.Ending?.Title == "Landfall" ? MusicMood.Landfall : MusicMood.Bleak);
-                break;
             case Phase.Alert:
                 // Reused every update: no allocation per frame.
                 _open.Clear();
@@ -100,11 +98,15 @@ public sealed class MusicPlayer : IDisposable
                 }
                 Engine.SetMood(MusicMood.Alert, MusicTension.Of(_open.Count, critical, shortest));
                 break;
-            default:
-                Engine.SetMood(MusicMood.Calm);
-                break;
         }
     }
+
+    /// <summary>The mood the game is in: the music follows it, and the sky behind the interface reads it too (read-only).</summary>
+    public static MusicMood MoodOf(Voyage voyage, bool drifting) =>
+        drifting ? MusicMood.Drift
+        : voyage.Phase == Phase.Ended ? (voyage.Ending?.Title == "Landfall" ? MusicMood.Landfall : MusicMood.Bleak)
+        : voyage.Phase == Phase.Alert ? MusicMood.Alert
+        : MusicMood.Calm;
 
     /// <summary>One block, on the feed's thread: the engine's floats as 16-bit little-endian stereo.</summary>
     private void Render(byte[] bytes)

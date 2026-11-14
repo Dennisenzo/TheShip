@@ -34,6 +34,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     private bool _click;
     /// <summary>Seconds since the game started; the clock of everything that moves in the interface (<see cref="Motion"/>).</summary>
     private double _now;
+    private readonly Backdrop _backdrop = new();
     private bool _handCursor;
     /// <summary>The screen the last frame showed, and when it was switched to (for the fade between screens).</summary>
     private Screen _shownScreen = Screen.Bridge;
@@ -68,6 +69,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         _options = options;
         // The tour's screenshots must not depend on timing: nothing moves while it runs.
         Motion.Speed = options.TourDir is null ? 1f : 0f;
+        // The sky is on in a tour only with --tour-time, so the shots of earlier steps stay comparable.
+        _backdrop.Enabled = options.TourDir is null || options.TourTime is not null;
         _graphics = new GraphicsDeviceManager(this)
         {
             PreferredBackBufferWidth = Painter.ScreenWidth,
@@ -166,6 +169,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     private void Start(ILlmProvider llm, string note)
     {
         _voyage = new Voyage(_options.Seed, Variation.Draw(_options.Seed));
+        _backdrop.Seed(_options.Seed);
         _session = new SessionLog("seed " + _options.Seed + ", variation " + _voyage.Variation + ", model " + llm.Name + " on " + llm.Backend);
         llm.CallCompleted += s => _session.Line("llm", s.Kind + ": " + s.PromptTokens + " prompt tokens, " + s.GeneratedTokens
                                                        + " generated, first token " + s.FirstToken.TotalSeconds.ToString("0.00") + " s, total "
@@ -275,7 +279,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
 
     protected override void Update(GameTime gameTime)
     {
-        _now = gameTime.TotalGameTime.TotalSeconds;
+        // --tour-time: the tour runs at one fixed animation time, so animated things are shot at a fixed phase.
+        _now = _options.TourDir is not null && _options.TourTime is { } fixedTime ? fixedTime : gameTime.TotalGameTime.TotalSeconds;
         if (_p != null)
             _p.Now = _now;
         if (_loading is { IsCompleted: true } done)
@@ -499,6 +504,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
             _p.Mouse = new Vector2(-1000, -1000);
         }
         _batch.Begin(transformMatrix: Matrix.CreateScale(view.Scale, view.Scale, 1f) * Matrix.CreateTranslation(view.X, view.Y, 0f));
+        DrawBackdrop();
         if (_voyage is null)
         {
             var row = 0;

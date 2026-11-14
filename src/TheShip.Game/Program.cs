@@ -3,12 +3,13 @@ namespace TheShip.Game;
 /// <param name="Llm">A path, or a file name in Content/Models/llm; null for the default model.</param>
 /// <param name="GpuLayers">Layers to offload to the GPU; 0 = CPU only.</param>
 /// <param name="TourDir">Dev tool (--tour): play a fixed script, save screenshots here, then exit.</param>
+/// <param name="TourTime">Dev tool (--tour-time seconds): the tour runs at this fixed animation time, so animated things are shot at a fixed phase.</param>
 /// <param name="TourWidth">Dev tool (--tour-size WxH): the pixel size of the tour's screenshots, as a window of that size would show the game.</param>
-public sealed record Options(int Seed, string? Llm, int GpuLayers, string? TourDir = null, int TourWidth = Painter.ScreenWidth, int TourHeight = Painter.ScreenHeight);
+public sealed record Options(int Seed, string? Llm, int GpuLayers, string? TourDir = null, int TourWidth = Painter.ScreenWidth, int TourHeight = Painter.ScreenHeight, double? TourTime = null);
 
 internal static class Program
 {
-    // Usage: TheShip [--seed <n>] [--llm <file.gguf>] [--gpu-layers <n>] [--tour <dir>] [--tour-size <w>x<h>] [--render-music <dir>]
+    // Usage: TheShip [--seed <n>] [--llm <file.gguf>] [--gpu-layers <n>] [--tour <dir>] [--tour-size <w>x<h>] [--tour-time <s>] [--render-music <dir>]
     // The game needs a GGUF model: without one it shows what is missing and does not start a voyage.
     private static void Main(string[] args)
     {
@@ -24,7 +25,8 @@ internal static class Program
             GpuLayers: int.TryParse(Argument(args, "--gpu-layers"), out var layers) ? layers : 99,
             TourDir: Argument(args, "--tour"),
             TourWidth: tourWidth,
-            TourHeight: tourHeight);
+            TourHeight: tourHeight,
+            TourTime: double.TryParse(Argument(args, "--tour-time"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var tourTime) ? tourTime : null);
         using var game = new ShipGame(options);
         game.Run();
     }

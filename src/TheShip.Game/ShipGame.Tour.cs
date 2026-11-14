@@ -39,6 +39,8 @@ public sealed partial class ShipGame
     }
 
     private bool _tourDone;
+    /// <summary>The drift strength the sky shows in the tour's drift-roll shot; null otherwise.</summary>
+    private float? _tourDrift;
 
     /// <summary>Writes tour.txt (once) and exits; <paramref name="failure"/> is why the tour could not run, or null.</summary>
     private void FinishTour(string dir, string? failure)
@@ -288,6 +290,13 @@ public sealed partial class ShipGame
                 Act("ask " + person.Name + " to sleep", () => v.AskSleep(person));
             }
             foreach (var w in Settle()) yield return w;
+            if (_options.TourTime is not null)
+            {
+                // The drift transition itself does not run in a tour: show the sky at the height of the roll.
+                _tourDrift = 1f;
+                Shoot(dir, tag + "-drift-roll");
+                _tourDrift = null;
+            }
             Act("drift to the next alert", v.Drift, snapshot: true);
             foreach (var w in Settle()) yield return w;
             if (v.Phase != Phase.Ended)
