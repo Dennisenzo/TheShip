@@ -181,6 +181,48 @@ public class ConditionsTests
     }
 
     [Fact]
+    public void A_partner_dead_and_told_to_her_ends_the_price_in_grief_not_in_a_relieved_start()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, f.DangerFact!);
+        Assert.NotNull(v.BargainOf(mara));
+        var idris = v.Find("idris")!;
+        // He dies in his pod; the ship tells her the truth. The price she set is gone, and she knows why.
+        v.Kill(idris, "died in sleep", quiet: true, witnessesSilent: true);
+        Tell(v, mara, "alive:idris");
+        Assert.Equal("dead", mara.Beliefs["alive:idris"].Value);
+        Assert.Null(v.BargainOf(mara));
+        Assert.NotEqual(f.Id, mara.WorkingOn);
+        Assert.Null(mara.Job);
+        // Asked again, she can take it on.
+        v.Assign(mara, f, patch: false);
+        Assert.Equal(f.Id, mara.WorkingOn);
+    }
+
+    [Fact]
+    public void A_partner_dying_unseen_ends_the_price_without_grief_and_without_telling_her()
+    {
+        var (v, mara, f) = Alert1();
+        v.Assign(mara, f, patch: false);
+        Tell(v, mara, "alive:idris");
+        Tell(v, mara, f.DangerFact!);
+        Assert.NotNull(v.BargainOf(mara));
+        var idris = v.Find("idris")!;
+        var from = v.Log.Count;
+        // He dies in his pod and nobody tells her: she believes he is alive, so the lapsed price is no grief.
+        v.Kill(idris, "died in sleep", quiet: true, witnessesSilent: true);
+        v.Go();
+        Assert.Equal("alive", mara.Beliefs["alive:idris"].Value);
+        Assert.Null(v.BargainOf(mara));
+        Assert.Equal(f.Id, mara.WorkingOn);
+        var line = v.Log.Skip(from).Last(e => e.Intent is { Kind: "comply" }).Intent!;
+        Assert.Contains("no longer holds you up", line.Decision);
+        Assert.DoesNotContain("dead", line.Decision, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("what you asked for", line.Decision);
+    }
+
+    [Fact]
     public void Work_resumed_by_what_she_saw_says_what_met_it()
     {
         var (v, mara, f) = Alert1();
