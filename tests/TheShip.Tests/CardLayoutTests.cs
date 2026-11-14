@@ -30,7 +30,7 @@ public class CardLayoutTests
             Assert.True(cut.Length <= max, cut);
             Assert.EndsWith("...", cut);
             var head = cut[..^3];
-            Assert.True(text.StartsWith(head));
+            Assert.StartsWith(head, text);
             // The next character in the text is a space: the cut is on a word boundary.
             Assert.True(head.Length == text.Length || text[head.Length] is ' ' or ',' or '.', $"\"{cut}\" from max {max}");
         }
