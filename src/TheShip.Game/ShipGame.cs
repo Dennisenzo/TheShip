@@ -503,7 +503,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             var row = 0;
             foreach (var line in Painter.Wrap(_loadingText, (int)((Painter.ScreenWidth - 80) / _p.BodyWidth)))
-                _p.Text(_p.Body, line, 40, 40 + 26 * row++, _fatal ? Painter.Accent : Painter.Ink);
+                _p.Text(_p.Body, line, 40, 40 + 26 * row++, _fatal ? Painter.Danger : Painter.Ink);
         }
         else if (_screen == Screen.Dossier && _dossier is not null)
         {

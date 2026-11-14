@@ -365,10 +365,10 @@ public sealed partial class ShipGame
             y += 26;
             _p.Text(_p.Head, "Year " + N(Math.Floor(t.From.Clock / Tuning.HoursPerYear)) + " to year " + N(Math.Floor(v.Year)), x, y, Painter.Bright);
             y += 44;
-            void Row(string label, string was, string now, bool worse)
+            void Row(string label, string was, string now, bool worse, bool harm = false)
             {
                 _p.Text(_p.Small, label, x, y, Painter.Dim);
-                _p.Text(_p.Small, was + " to " + now, x + 160, y, worse ? Painter.Accent : Painter.Ink);
+                _p.Text(_p.Small, was + " to " + now, x + 160, y, harm && worse ? Painter.Danger : worse ? Painter.Accent : Painter.Ink);
                 y += 24;
             }
             Row("STORES", N(t.From.Stores) + " d", N(v.Stores) + " d", v.Stores < t.From.Stores - 0.5);
@@ -376,7 +376,7 @@ public sealed partial class ShipGame
             Row("POD WEAR", t.From.PodWear.ToString(CultureInfo.InvariantCulture), v.PodWear.ToString(CultureInfo.InvariantCulture), v.PodWear > t.From.PodWear);
             var alive = v.Crew.Count(c => c.Alive);
             var aliveBefore = t.From.Crew.Values.Count(c => c.State != CrewState.Dead);
-            Row("ALIVE", aliveBefore.ToString(CultureInfo.InvariantCulture), alive.ToString(CultureInfo.InvariantCulture), alive < aliveBefore);
+            Row("ALIVE", aliveBefore.ToString(CultureInfo.InvariantCulture), alive.ToString(CultureInfo.InvariantCulture), alive < aliveBefore, harm: true);
             y = _p.Paragraph(text, x, y + 6, width - 48, Painter.Ink) + 16;
             // A click anywhere on the card is CONTINUE (on to the new alert); a click or key elsewhere closes it and goes through.
             _ = _p.Button(new Rectangle(x, y, 200, 44), "CONTINUE", primary: true);

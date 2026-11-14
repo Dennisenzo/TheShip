@@ -104,11 +104,11 @@ public sealed partial class ShipGame
         for (var i = 0; i < bands.Length; i++)
         {
             var on = bands[i] == c.Band;
-            _p.Fill(new Rectangle(x + i * (segment + 4), y, segment, 10), on ? Painter.Accent : Painter.Track);
+            _p.Fill(new Rectangle(x + i * (segment + 4), y, segment, 10), on ? BandInk(bands[i]) : Painter.Track);
             // The label wraps to the width of its segment ("wants" / "reasons") so neighbours never touch.
             var label = Painter.Wrap(CrewMember.BandText(bands[i]), Math.Max(8, (int)(segment / _p.SmallWidth) - 3));
             for (var row = 0; row < label.Count; row++)
-                _p.Text(_p.Small, label[row], x + i * (segment + 4), y + 16 + row * 19, on ? Painter.Accent : Painter.Dim);
+                _p.Text(_p.Small, label[row], x + i * (segment + 4), y + 16 + row * 19, on ? BandInk(bands[i]) : Painter.Dim);
         }
         y += 62;
         var manner = c.Band switch
@@ -138,7 +138,7 @@ public sealed partial class ShipGame
         if (partner != null)
         {
             _p.Text(_p.Small, "PARTNER", x, y, Painter.Dim);
-            _p.Text(_p.Small, partner.Name + (partner.Alive ? "" : " (dead)"), x + 150, y, partner.Alive ? Painter.Ink : Painter.Accent);
+            _p.Text(_p.Small, partner.Name + (partner.Alive ? "" : " (dead)"), x + 150, y, partner.Alive ? Painter.Ink : Painter.Danger);
         }
 
         if (c.State == CrewState.Awake && v.Phase != Phase.Ended)
@@ -352,6 +352,9 @@ public sealed partial class ShipGame
             _recordSkip = Math.Max(0, _recordSkip - notches);
     }
 
+    /// <summary>The trust band the person is in: amber when they will not just do as told (it needs you), light when they follow.</summary>
+    private static Color BandInk(TrustBand band) => band == TrustBand.Follows ? Painter.Bright : Painter.Accent;
+
     /// <summary>
     /// The scroll cue on the last line of a list that does not fit: which rows show, how many are above and below, and UP and DOWN
     /// buttons (queued with Do) next to the mouse wheel.
@@ -366,7 +369,7 @@ public sealed partial class ShipGame
         var below = Math.Max(0, total - first - shown);
         var text = noun + " " + (first + 1) + " to " + (first + shown) + " of " + total
             + (above > 0 ? ", " + above + " above" : "") + (below > 0 ? ", " + below + " below" : "") + " (mouse wheel)";
-        _p.Text(_p.Small, text, rect.X + 16, y + 3, Painter.Accent);
+        _p.Text(_p.Small, text, rect.X + 16, y + 3, Painter.Dim);
         var bx = rect.Right - 16 - 2 * 64 - 4;
         if (_p.Button(new Rectangle(bx, y, 64, 24), "UP", above > 0, tip: "Scroll this list up."))
             Do(up);
@@ -491,7 +494,7 @@ public sealed partial class ShipGame
             }
 
             var bx = x + width - buttons;
-            if (_p.Button(new Rectangle(bx, y, 84, 32), "OPEN", live, selected: access == LogAccess.Open, tip: "Anyone awake can read this entry."))
+            if (_p.Button(new Rectangle(bx, y, 84, 32), "OPEN", live, tip: "Anyone awake can read this entry."))
                 Act("log " + f.Key + " open", () => v.SetLog(f.Key, LogAccess.Open));
             if (_p.Button(new Rectangle(bx + 88, y, 84, 32), "RESTRICT", live, selected: access == LogAccess.Restricted, tip: "Hide this entry. A reader sees that something is missing."))
                 Act("log " + f.Key + " restricted", () => v.SetLog(f.Key, LogAccess.Restricted));

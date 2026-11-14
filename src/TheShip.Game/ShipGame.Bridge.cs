@@ -89,7 +89,7 @@ public sealed partial class ShipGame
             _p.Text(_p.Small, number.ToString("00", CultureInfo.InvariantCulture) + " - " + state + (f.Critical && !f.Resolved ? " - CRITICAL" : ""),
                 ix, y, f.Resolved ? Painter.Dim : Painter.Accent);
             if (!f.Resolved)
-                _p.TextRight(_p.Head, Voyage.Hours(ShownLeft(v, f)), x + width - 14, y - 4, Painter.Bright);
+                _p.TextRight(_p.Head, Voyage.Hours(ShownLeft(v, f)), x + width - 14, y - 4, LogTones.IsFinal(ShownLeft(v, f), f.ClockHours) ? Painter.Danger : Painter.Bright);
             y += 24;
             _p.Text(_p.Head, IssueCardLayout.CardName(f), ix, y, f.Resolved ? Painter.Dim : Painter.Bright);
             y += 32;
@@ -272,7 +272,7 @@ public sealed partial class ShipGame
         y += 8;
         var state = f.State switch { FaultState.Open => "OPEN", _ => f.Patching ? "PATCHING" : "IN REPAIR" };
         _p.Text(_p.Small, tag + " - " + state + (f.Critical ? " - CRITICAL" : ""), ix, y, Painter.Accent);
-        _p.TextRight(_p.Body, Voyage.Hours(ShownLeft(v, f)), x + width - 14, y - 2, Painter.Bright);
+        _p.TextRight(_p.Body, Voyage.Hours(ShownLeft(v, f)), x + width - 14, y - 2, LogTones.IsFinal(ShownLeft(v, f), f.ClockHours) ? Painter.Danger : Painter.Bright);
         y += 20;
         _p.Text(_p.Body, Clip(IssueCardLayout.CardName(f), inner, _p.BodyWidth), ix, y, Painter.Bright);
         y += 22;
@@ -331,7 +331,7 @@ public sealed partial class ShipGame
         _p.Poly(Pts(ShipPlan.Hull), Painter.Hull);
         foreach (var wall in ShipPlan.Corridor)
             _p.Line(P(wall.X1, wall.Y), P(wall.X2, wall.Y), Painter.Hull);
-        _p.Line(P(ShipPlan.PowerBus.X1, ShipPlan.PowerBus.Y), P(ShipPlan.PowerBus.X2, ShipPlan.PowerBus.Y), Painter.Power);
+        _p.Line(P(ShipPlan.PowerBus.X1, ShipPlan.PowerBus.Y), P(ShipPlan.PowerBus.X2, ShipPlan.PowerBus.Y), Painter.Power, 1f);
 
         var hotFault = _hotFault is null ? null : v.Current.Faults.FirstOrDefault(f => f.Id == _hotFault);
         foreach (var s in v.Sections)
@@ -476,8 +476,8 @@ public sealed partial class ShipGame
                     break;
                 default:
                     _p.Poly(outline, Painter.Dead);
-                    _p.Line(P(pod.X + 4, pod.Y + 6), P(pod.X + 40, pod.Y + 64), Painter.Dead);
-                    _p.Line(P(pod.X + 40, pod.Y + 6), P(pod.X + 4, pod.Y + 64), Painter.Dead);
+                    _p.Line(P(pod.X + 4, pod.Y + 6), P(pod.X + 40, pod.Y + 64), Painter.Danger, 1f);
+                    _p.Line(P(pod.X + 40, pod.Y + 6), P(pod.X + 4, pod.Y + 64), Painter.Danger, 1f);
                     _p.TextCentre(_p.Small, tag, centre.X, centre.Y - 8, Painter.Dim);
                     break;
             }
@@ -506,27 +506,28 @@ public sealed partial class ShipGame
             _p.Tip(mark, IssueCardLayout.CardName(f) + (f.Critical ? " (critical)" : "") + ": " + Voyage.Hours(ShownLeft(v, f)) + " left.");
             var faultLit = _p.Ease("fault:" + f.Id, _hotFault == f.Id ? 1f : 0f);
             // A fault pulses, and faster once under a quarter of its clock is left.
-            var urgent = ShownLeft(v, f) < 0.25 * f.ClockHours;
+            var urgent = LogTones.IsFinal(ShownLeft(v, f), f.ClockHours);
             var beat = 0.55f + 0.45f * Motion.Pulse(_now, urgent ? 0.5f : 1.8f);
-            _p.Diamond(centre, 13 + 4 * faultLit, Painter.Fade(f.Critical || faultLit > 0.5f ? Painter.Bright : Painter.Accent, beat), f.Critical ? 3f : 2f);
-            _p.TextCentre(_p.Body, index.ToString(CultureInfo.InvariantCulture), centre.X, centre.Y - 9, Painter.Accent);
+            _p.Diamond(centre, 13 + 4 * faultLit, Painter.Fade(f.Critical || faultLit > 0.5f ? Painter.Bright : urgent ? Painter.Danger : Painter.Accent, beat), f.Critical ? 3f : 2f);
+            _p.TextCentre(_p.Body, index.ToString(CultureInfo.InvariantCulture), centre.X, centre.Y - 9, urgent ? Painter.Danger : Painter.Accent);
+            var leader = urgent ? Painter.Danger : Painter.Accent;
             var above = s.Spot.Y < 235;
             if (above && labelsAbove >= aboveRows.Length || !above && labelsBelow >= belowRows.Length)
                 above = !above;
             var end = P(s.Spot.X + slot * 34, above ? aboveRows[labelsAbove++] : belowRows[labelsBelow++]);
-            _p.Line(new Vector2(centre.X, centre.Y + (above ? -13 : 13)), end, Painter.Accent, 1f);
+            _p.Line(new Vector2(centre.X, centre.Y + (above ? -13 : 13)), end, leader, 1f);
             var label = index.ToString("00", CultureInfo.InvariantCulture) + " " + f.Name.ToUpperInvariant() + (f.Critical ? " (CRITICAL)" : "") + " - " + Voyage.Hours(ShownLeft(v, f));
             // The label runs left of its leader; where that would leave the plan panel, it runs right instead.
             var labelWidth = _p.Small.MeasureString(label).X;
             if (end.X - 14 - labelWidth < rect.X + 8)
             {
-                _p.Line(end, end + new Vector2(10, 0), Painter.Accent, 1f);
-                _p.Text(_p.Small, label, Math.Min(end.X + 14, rect.Right - 8 - labelWidth), end.Y - 8, Painter.Accent);
+                _p.Line(end, end + new Vector2(10, 0), leader, 1f);
+                _p.Text(_p.Small, label, Math.Min(end.X + 14, rect.Right - 8 - labelWidth), end.Y - 8, leader);
             }
             else
             {
-                _p.Line(end, end + new Vector2(-10, 0), Painter.Accent, 1f);
-                _p.TextRight(_p.Small, label, end.X - 14, end.Y - 8, Painter.Accent);
+                _p.Line(end, end + new Vector2(-10, 0), leader, 1f);
+                _p.TextRight(_p.Small, label, end.X - 14, end.Y - 8, leader);
             }
         }
 
@@ -620,13 +621,7 @@ public sealed partial class ShipGame
                 continue;
             _logAppeared.TryAdd(entryIndex, _now);
             var head = entryIndex == _reveal.Shown && _reveal.HeadVisible;
-            var color = entry.Kind switch
-            {
-                LogKind.Ship => Painter.Accent,
-                LogKind.Crew => Painter.Blue,
-                LogKind.You => Painter.Bright,
-                _ => Painter.Dim,
-            };
+            var color = Painter.LogColor(LogTones.Of(entry.Kind, entry.Text));
             var text = entry.Kind switch
             {
                 LogKind.Ship => "SHIP - " + entry.Text,
@@ -722,6 +717,7 @@ public sealed partial class ShipGame
             // While the years roll the card keeps the state from before the drift, as the pod does (ShownState).
             var shown = ShownState(c);
             var ink = shown == CrewState.Dead ? Painter.Dim : shown == CrewState.Awake ? Painter.Bright : Painter.Ink;
+            var stateInk = shown == CrewState.Dead ? Painter.Danger : ink;
             _p.Text(_p.Body, c.Name, x + 12, y + 8, ink);
             _p.Text(_p.Small, c.Role + ", " + N(ShownAge(c)), x + 20 + c.Name.Length * _p.BodyWidth, y + 10, Painter.Dim);
             var state = shown switch
@@ -731,7 +727,7 @@ public sealed partial class ShipGame
                 CrewState.Awake => "AWAKE " + N(ShownHoursAwake(c) / 24) + " d" + (c.WorkingOn != null ? ", working" : ""),
                 _ => "dead",
             };
-            _p.Text(_p.Small, state, x + 12, y + 36, ink);
+            _p.Text(_p.Small, state, x + 12, y + 36, stateInk);
             if (shown != CrewState.Dead)
             {
                 // A change flashes and shows its size, but not before the line that explains it is in the log.
@@ -772,7 +768,7 @@ public sealed partial class ShipGame
                     : up >= Tuning.MaxAwake
                     ? Tuning.MaxAwake + " people are up already; that is the most at once."
                     : "The thaw takes " + N(Tuning.ThawHours) + " hours and ages " + c.Name + " " + Tuning.ThawAgeMin + " to " + Tuning.ThawAgeMax + " years.";
-                if (_p.Button(act, v.Lockouts.Bay ? "BAY TAKEN" : "WAKE", !ended && !v.Lockouts.Bay, tip: wakeTip))
+                if (_p.Button(act, v.Lockouts.Bay ? "BAY TAKEN" : "WAKE", !ended && !v.Lockouts.Bay, tip: wakeTip, strong: true))
                     Act("wake " + person.Name, () => v.Wake(person));
             }
             else if (c.State == CrewState.Awake)

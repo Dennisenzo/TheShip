@@ -104,6 +104,9 @@ public static class Tuning
     public const double QuestionIgnoredAtSleep = 4;
     /// <summary>How often a person repeats a question before they give up and check it themselves.</summary>
     public const int QuestionRepeatsMax = 2;
+
+    /// <summary>A fault is in its final stretch when less than this share of its clock is left: the interface turns it red-orange and pulses it faster.</summary>
+    public const double FaultFinalShare = 0.25;
     public const double LogGap = 5;
     public const double LockedDoor = 5;
     public const double ConfirmedTruth = 3;
