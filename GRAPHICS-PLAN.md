@@ -2,6 +2,11 @@
 
 Written 2026-11-14 (ship-planner), decisions by the user the same day. Same shape as `UI-PLAN.md`. Looks only: no rules, prompts or balance. DESIGN.md stays the leading document.
 
+## Status
+
+- **Step 1 (real-size rendering)** is built on `feature/gfx-resolution` (2026-11-14): `--tour-size`, fonts at real pixel size on the layout's character grid (the font's advance is a whole pixel per size, so a run is not drawn as one string when it would differ from the layout), `Painter.Scale`/`SetView`, `Fill`/`Frame`/text snapped to device pixels, header status values in `Body` and Bright, and the listed Low findings. Pure rules in `PixelGrid.cs`, tests in `PixelGridTests`. Sampler: the default linear sampler stays (text is on exact texels; the person glyph needs it); the back buffer of the tour is not resized. Before/after shots were compared at 1920x1080 and 2560x1440. Not merged yet.
+- Steps 2 to 8: not started.
+
 ## Goals
 
 1. Everything drawn is crisp at the window's real size, not only at 1600 x 900.

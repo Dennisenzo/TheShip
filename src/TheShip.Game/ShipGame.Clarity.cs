@@ -166,7 +166,7 @@ public sealed partial class ShipGame
             x -= textWidth;
             // The status numbers are the most important thing in the header: the value in the larger font and bright, the label dim.
             var ink = warn ? Painter.Accent : Painter.Bright;
-            _p.Text(_p.Body, text, x, 19, Color.Lerp(ink, Painter.Bright, flash));
+            _p.Text(_p.Body, text, x, 20, Color.Lerp(ink, Painter.Bright, flash));
             if (flash > 0f)
                 _p.Fill(new Rectangle((int)x, 40, (int)textWidth, 2), Painter.Fade(Painter.Bright, flash));
             if (delta.Length > 0)
