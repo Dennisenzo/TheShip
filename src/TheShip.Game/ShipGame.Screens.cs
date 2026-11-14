@@ -194,13 +194,13 @@ public sealed partial class ShipGame
             _p.Fill(new Rectangle(x, head, width, 1), Painter.Edge);
             head += 16;
         }
-        _p.Text(_p.Small, "WHAT " + c.Name.ToUpperInvariant() + " KNOWS", x, head, Painter.Dim);
+        _p.Text(_p.Small, ScreenRules.KnowsHeading(c.Name, c.Alive), x, head, Painter.Dim);
         _p.TextRight(_p.Small, "HOW, YEAR", x + width, head, Painter.Dim);
         var y = head + 30;
         var limit = rect.Bottom - 16 - (c.Doubts.Count > 0 ? 90 : 0);
         var textWidth = width - 190;
         if (c.Beliefs.Count == 0)
-            _p.Text(_p.Small, "Nothing yet.", x, y, Painter.Ink);
+            _p.Text(_p.Small, ScreenRules.KnowsNothing(c.Alive), x, y, Painter.Ink);
         foreach (var (key, belief) in c.Beliefs.OrderByDescending(b => b.Value.Year))
         {
             if (!v.HasFact(key))

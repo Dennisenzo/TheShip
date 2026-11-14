@@ -75,7 +75,7 @@ public sealed partial class ShipGame
         var hullGlow = PlanLight.HullGlow(low, t);
         _p.Poly(glowPoints, Painter.Fade(Painter.Blue, 0.09f * hullGlow), 5f);
 
-        // Engine exhaust at the stern (left): five lines licking out, fading outward.
+        // Engine exhaust at the stern (left): four lines licking out, fading outward.
         var ys = new[] { 160f, 205f, 265f, 310f };
         for (var i = 0; i < ys.Length; i++)
         {

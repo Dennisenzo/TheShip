@@ -62,6 +62,12 @@ internal static class ScreenRules
         return (DriftRows(storesWas, end.Stores, partsWas, end.Parts, wearWas, end.PodWear, aliveWas, end.Alive, crew), end.Deaths);
     }
 
+    /// <summary>The heading of the dossier's beliefs: what the living know, what the dead knew when they died.</summary>
+    public static string KnowsHeading(string name, bool alive) => "WHAT " + name.ToUpperInvariant() + (alive ? " KNOWS" : " KNEW");
+
+    /// <summary>The dossier's beliefs when there are none: still to come for the living, never for the dead.</summary>
+    public static string KnowsNothing(bool alive) => alive ? "Nothing yet." : "Nothing: died without learning anything on the voyage.";
+
     /// <summary>
     /// A head for a person, the same every time: width of cheek and jaw, chin depth, brow height and a hair style, all drawn from
     /// the id (FNV-1a hash). Values are offsets in layout pixels, symmetric about the head's centre line.

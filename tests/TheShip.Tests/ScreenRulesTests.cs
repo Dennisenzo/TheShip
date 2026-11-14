@@ -53,6 +53,15 @@ public class ScreenRulesTests
     }
 
     [Fact]
+    public void A_dead_persons_dossier_says_what_they_knew_not_nothing_yet()
+    {
+        Assert.Equal("WHAT MARA KNOWS", ScreenRules.KnowsHeading("Mara", alive: true));
+        Assert.Equal("WHAT IDRIS KNEW", ScreenRules.KnowsHeading("Idris", alive: false));
+        Assert.Equal("Nothing yet.", ScreenRules.KnowsNothing(alive: true));
+        Assert.DoesNotContain("yet", ScreenRules.KnowsNothing(alive: false));
+    }
+
+    [Fact]
     public void Drift_report_lists_who_died_in_the_drift()
     {
         var end = new DriftOutcome(100, 1, 12, 4, new[] { "Asha", "Jonah" });
