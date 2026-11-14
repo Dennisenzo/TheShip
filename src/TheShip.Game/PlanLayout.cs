@@ -58,6 +58,29 @@ internal static class PlanLayout
     public const float JogStep = 24f;
     public const int JogSteps = 16;
 
+    [ThreadStatic] private static PlanLayoutInputs? _lastInputs;
+    [ThreadStatic] private static PlanLayoutResult? _lastResult;
+
+    /// <summary>
+    /// <see cref="Compute"/>, kept from the last call while its inputs are the same (the bridge draws the plan every frame, and the layout
+    /// changes only when a fault, a label's hours, a person standing about or the panel changes). One cache per thread (the game draws on one).
+    /// </summary>
+    public static PlanLayoutResult Cached(IReadOnlyList<Section> sections, IReadOnlyList<PlanFault> faults, IReadOnlyList<PlanBox> boxes, RectF area, float charWidth, float lineHeight = 16f)
+    {
+        var inputs = new PlanLayoutInputs(sections, faults.ToArray(), boxes.ToArray(), area, charWidth, lineHeight);
+        if (_lastResult is { } kept && inputs.Same(_lastInputs))
+            return kept;
+        _lastInputs = inputs;
+        return _lastResult = Compute(sections, faults, boxes, area, charWidth, lineHeight);
+    }
+
+    /// <summary>What a layout depends on. Sections are compared by reference: their geometry is fixed for a voyage.</summary>
+    private sealed record PlanLayoutInputs(IReadOnlyList<Section> Sections, PlanFault[] Faults, PlanBox[] Boxes, RectF Area, float CharWidth, float LineHeight)
+    {
+        public bool Same(PlanLayoutInputs? o) => o is not null && ReferenceEquals(Sections, o.Sections) && Area == o.Area && CharWidth == o.CharWidth
+                                                 && LineHeight == o.LineHeight && Faults.AsSpan().SequenceEqual(o.Faults) && Boxes.AsSpan().SequenceEqual(o.Boxes);
+    }
+
     /// <summary>The plan's fit and layout inside <paramref name="area"/> (the part of the panel below its header).</summary>
     public static PlanLayoutResult Compute(IReadOnlyList<Section> sections, IReadOnlyList<PlanFault> faults, IReadOnlyList<PlanBox> boxes, RectF area, float charWidth, float lineHeight = 16f)
     {

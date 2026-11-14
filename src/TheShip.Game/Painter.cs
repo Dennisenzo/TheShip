@@ -614,6 +614,12 @@ internal sealed class Painter
         // Fonts for this scale: 1 baked pixel is 1 device pixel. A stale font (a window drag) is stretched to the layout size.
         var fresh = Math.Abs(_fontScale - Scale) <= 1e-4f;
         var k = fresh ? 1f / Scale : family.Size / (float)pixels;
+        if (shown.IndexOf('\n') < 0)
+        {
+            // One line (nearly every call): no split, no allocation.
+            RunLine(baked.Font, baked.Advance, family.Advance, k, fresh, shown, x, y, color);
+            return;
+        }
         var row = 0;
         foreach (var line in shown.Split('\n'))
         {

@@ -388,7 +388,7 @@ public sealed partial class ShipGame
         var boxes = standing.Select(m => new PlanBox(m.PlanX, m.PlanY, -8, -9, _p.Small.MeasureString(m.Person.Name.ToUpperInvariant()).X + 28, 18)).ToList();
         if (v.GetSection("core") is { } youSection)
             boxes.Add(new PlanBox(youSection.Spot.X - 24, youSection.Spot.Y + 30, -_p.SmallWidth * 1.5f, 0, _p.SmallWidth * 3, 16));
-        var fit = PlanLayout.Compute(v.Sections, shownFaults.Select(f => new PlanFault(f.Index, f.Section.Id, f.Slot, _p.Small.MeasureString(f.Label).X)).ToList(),
+        var fit = PlanLayout.Cached(v.Sections, shownFaults.Select(f => new PlanFault(f.Index, f.Section.Id, f.Slot, _p.Small.MeasureString(f.Label).X)).ToList(),
             boxes, new RectF(rect.X + 4 + ExhaustPx, rect.Y + 34, rect.Width - 8 - ExhaustPx, rect.Height - 40), _p.SmallWidth);
         var k = fit.K;
         Vector2 P(float px, float py) { var (x, y) = fit.P(px, py); return new Vector2(x, y); }

@@ -128,4 +128,22 @@ public class PlanLayoutTests
             Assert.True(r.K > 0.8f, $"seed {seed}: the plan shrank to {r.K}");
         }
     }
+    [Fact]
+    public void The_cached_layout_is_kept_while_its_inputs_are_equal_and_redone_when_one_changes()
+    {
+        var sections = ShipPlan.Sections();
+        var area = new RectF(362, 106, 856, 416);
+        List<PlanFault> Faults(float width) => new() { new PlanFault(1, "helm", 0, width), new PlanFault(2, "coolant", 0, 24 * Char) };
+        var boxes = new List<PlanBox> { new(200, 260, -8, -9, 70, 18) };
+        var first = PlanLayout.Cached(sections, Faults(30 * Char), boxes, area, Char);
+        // New lists with equal contents (as the bridge builds every frame): the same result.
+        Assert.Same(first, PlanLayout.Cached(sections, Faults(30 * Char), boxes.ToList(), area, Char));
+        // A label's hours changed its width, a person moved, the panel moved: laid out again, as Compute would.
+        var wider = PlanLayout.Cached(sections, Faults(34 * Char), boxes, area, Char);
+        Assert.NotSame(first, wider);
+        Assert.Equal(PlanLayout.Compute(sections, Faults(34 * Char), boxes, area, Char).Labels.Select(l => l.Text), wider.Labels.Select(l => l.Text));
+        var moved = new List<PlanBox> { new(220, 260, -8, -9, 70, 18) };
+        Assert.NotSame(wider, PlanLayout.Cached(sections, Faults(34 * Char), moved, area, Char));
+        Assert.NotSame(first, PlanLayout.Cached(sections, Faults(30 * Char), boxes, area with { W = 800 }, Char));
+    }
 }
