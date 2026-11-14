@@ -32,6 +32,7 @@
     <Compile Include="..\..\src\TheShip.Game\PixelGrid.cs" Link="PixelGrid.cs" />
     <Compile Include="..\..\src\TheShip.Game\PersonGlyph.cs" Link="PersonGlyph.cs" />
     <Compile Include="..\..\src\TheShip.Game\LineProfile.cs" Link="LineProfile.cs" />
+    <Compile Include="..\..\src\TheShip.Game\LogTones.cs" Link="LogTones.cs" />
   </ItemGroup>
 
 </Project>

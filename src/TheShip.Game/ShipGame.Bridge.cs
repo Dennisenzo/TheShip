@@ -621,7 +621,7 @@ public sealed partial class ShipGame
                 continue;
             _logAppeared.TryAdd(entryIndex, _now);
             var head = entryIndex == _reveal.Shown && _reveal.HeadVisible;
-            var color = LogTones.ColorOf(LogTones.Of(entry.Kind, entry.Text));
+            var color = Painter.LogColor(LogTones.Of(entry.Kind, entry.Text));
             var text = entry.Kind switch
             {
                 LogKind.Ship => "SHIP - " + entry.Text,

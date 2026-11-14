@@ -1,5 +1,4 @@
 using System.Text.RegularExpressions;
-using Microsoft.Xna.Framework;
 using TheShip.Core;
 
 namespace TheShip.Game;
@@ -60,16 +59,6 @@ internal static class LogTones
                 return LogTone.Needs;
         return LogTone.Neutral;
     }
-
-    public static Color ColorOf(LogTone tone) => tone switch
-    {
-        LogTone.Needs => Painter.Accent,
-        LogTone.Danger => Painter.Danger,
-        LogTone.You => Painter.Bright,
-        LogTone.Crew => Painter.Blue,
-        LogTone.Recorded => Painter.Dim,
-        _ => Painter.Ink,
-    };
 
     /// <summary>A fault is in its final stretch when under <see cref="Tuning.FaultFinalShare"/> of its clock is left (red-orange, a fast pulse).</summary>
     public static bool IsFinal(double hoursLeft, double clockHours) => hoursLeft < Tuning.FaultFinalShare * clockHours;

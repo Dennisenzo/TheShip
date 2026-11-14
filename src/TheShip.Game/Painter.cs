@@ -42,6 +42,17 @@ internal sealed class Painter
     public static readonly Color Power = new(140, 122, 78);
     public static readonly Color Dead = new(110, 134, 143);
 
+    /// <summary>The colour of a log line's tone (<see cref="LogTones.Of"/>).</summary>
+    public static Color LogColor(LogTone tone) => tone switch
+    {
+        LogTone.Needs => Accent,
+        LogTone.Danger => Danger,
+        LogTone.You => Bright,
+        LogTone.Crew => Blue,
+        LogTone.Recorded => Dim,
+        _ => Ink,
+    };
+
     private readonly SpriteBatch _batch;
     private readonly Texture2D _pixel;
     private readonly FontSystem _fonts;
