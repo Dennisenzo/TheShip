@@ -66,7 +66,7 @@ internal static class TextLayout
         }
         // A non-breaking space keeps a number with its unit on one line; it is drawn as an ordinary space.
         for (var i = 0; i < lines.Count; i++)
-            lines[i] = lines[i].Replace(' ', ' ');
+            lines[i] = lines[i].Replace('\u00A0', ' ');
         return lines;
     }
 }

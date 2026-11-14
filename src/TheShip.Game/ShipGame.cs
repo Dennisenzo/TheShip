@@ -481,6 +481,8 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     {
         GraphicsDevice.Clear(Painter.Ground);
         var view = View();
+        // The tour renders into targets of other sizes between the window's own frames: its fonts follow the scale at once.
+        _p.SetView(view.Scale, view.X, view.Y, immediate: _options.TourDir is not null);
         _p.Click = _click;
         _p.BeginFrame();
         // Under an overlay the screen is drawn as if the mouse were elsewhere; the overlay then gets the real mouse and click.

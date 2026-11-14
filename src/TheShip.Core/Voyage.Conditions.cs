@@ -187,7 +187,8 @@ public sealed partial class Voyage
     /// <summary>
     /// What met the conditions that were open until this step, in the person's terms ("You found out for yourself that Idris is alive.",
     /// "The ship is waking Idris, as you asked."); null when nothing can be named. Grief: one was met by a death they saw or heard from
-    /// a witness, or their partner's death ended the price of waking them.
+    /// a witness, or their partner's death, which they believe, ended the price of waking them. A partner's death they know nothing of
+    /// is not grief and is not told: the dropped price gets a plain line.
     /// </summary>
     private (string? Text, bool Grief) MetText(CrewMember c, List<JobCondition> met)
     {
@@ -200,7 +201,14 @@ public sealed partial class Voyage
                 if (m.Key == "wake_partner" && c.PartnerId is { } pid && Crew.First(x => x.Id == pid) is var partner)
                 {
                     if (!partner.Alive)
-                        grief = true;
+                    {
+                        // She grieves only for a death she knows of; one she has not heard of is no news to her, and the job
+                        // she set the price on is simply no longer held up (the line must not tell her).
+                        if (c.Beliefs.TryGetValue("alive:" + pid, out var known) && known.Value == "dead")
+                            grief = true;
+                        else
+                            parts.Add("The price you set no longer holds you up.");
+                    }
                     else if (partner.State == CrewState.Thawing)
                         parts.Add("The ship is waking " + partner.Name + ", as you asked.");
                     else if (partner.State == CrewState.Awake)
