@@ -6,7 +6,7 @@ namespace TheShip.Game;
 
 /// <summary>
 /// Dev tool (<c>--tour &lt;dir&gt;</c>): plays one fixed, simple script through the same paths as clicks and typed lines, and saves
-/// screenshots of key moments as PNGs. Frames are rendered into a 1600 x 900 render target, so it works with the window minimized
+/// screenshots of key moments as PNGs. Frames are rendered into a render target (1600 x 900, or <c>--tour-size WxH</c> to see what a window of that size shows), so it works with the window minimized
 /// or the display off (a window capture comes back black then). There is no in-game control for it.
 /// </summary>
 public sealed partial class ShipGame
@@ -56,10 +56,10 @@ public sealed partial class ShipGame
         Exit();
     }
 
-    /// <summary>Render the current screen into a 1600 x 900 target and save it as <c>NN-name.png</c>.</summary>
+    /// <summary>Render the current screen into a target of the tour size (1600 x 900, or <c>--tour-size</c>) and save it as <c>NN-name.png</c>.</summary>
     private void Shoot(string dir, string name)
     {
-        _tourTarget ??= new RenderTarget2D(GraphicsDevice, Painter.ScreenWidth, Painter.ScreenHeight);
+        _tourTarget ??= new RenderTarget2D(GraphicsDevice, _options.TourWidth, _options.TourHeight);
         var click = _click;
         _click = false;
         _p.Mouse = new Vector2(-1000, -1000);
