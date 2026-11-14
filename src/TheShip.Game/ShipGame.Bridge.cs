@@ -57,6 +57,7 @@ public sealed partial class ShipGame
     private void DrawIssues(Voyage v, int x, int top, int width, int bottom)
     {
         _p.Text(_p.Small, "ISSUES AT HAND", x, top, Painter.Dim);
+        _p.Cover(new Rectangle(x, top - 2, width, 20)); // a caption on the bare ground: no stars behind it
         var y = top + 28;
         var inner = width - 28;
         var ix = x + 14;
@@ -732,6 +733,7 @@ public sealed partial class ShipGame
     private void DrawCrew(Voyage v, int x, int top, int width, int bottom)
     {
         _p.Text(_p.Small, "CREW", x, top, Painter.Dim);
+        _p.Cover(new Rectangle(x, top - 2, width, 20)); // the caption band and its hint on the right
         var alone = _target is { State: CrewState.Awake } ? _target : null;
         _p.TextRight(_p.Small, alone is null ? "click a card to speak to one person" : "you speak to " + alone.Name + " alone; repairs go to " + alone.Name,
             x + width, top, alone is null ? Painter.Dim : Painter.Accent);

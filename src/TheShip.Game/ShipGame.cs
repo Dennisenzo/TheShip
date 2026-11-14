@@ -509,7 +509,11 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             var row = 0;
             foreach (var line in Painter.Wrap(_loadingText, (int)((Painter.ScreenWidth - 80) / _p.BodyWidth)))
+            {
+                // The text is on the bare ground: the sky leaves its lines clear.
+                _p.Cover(new Rectangle(36, 38 + 26 * row, (int)(line.Length * _p.BodyWidth) + 8, 26));
                 _p.Text(_p.Body, line, 40, 40 + 26 * row++, _fatal ? Painter.Danger : Painter.Ink);
+            }
         }
         else if (_screen == Screen.Dossier && _dossier is not null)
         {

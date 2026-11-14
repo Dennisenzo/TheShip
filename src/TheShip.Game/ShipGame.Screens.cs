@@ -35,6 +35,8 @@ public sealed partial class ShipGame
             if (over)
                 _p.Hand = true;
             _p.Fill(row, selected ? Painter.Panel : Painter.Fade(Painter.Track, hot));
+            if (!selected)
+                _p.Cover(row); // an unselected row is see-through: no stars behind its text
             _p.Frame(row, selected ? Painter.Wire : Color.Lerp(Painter.Edge, Painter.Wire, hot));
             if (selected)
                 _p.Fill(new Rectangle(row.X, row.Y, 4, row.Height), Painter.Accent);
