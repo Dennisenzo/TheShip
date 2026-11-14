@@ -50,6 +50,10 @@ public class PlanLayoutTests
         }
     }
 
+    /// <summary>Whether two leaders cross or run along each other (their axis-aligned segments touch, grown by a pixel).</summary>
+    private static bool LeadersMeet(PlacedLabel a, PlacedLabel b) =>
+        LeaderRects(a).Any(ra => LeaderRects(b).Any(rb => ra.Intersects(rb, 1)));
+
     [Theory]
     [InlineData(864, 456)]
     [InlineData(1037, 547)]
@@ -70,6 +74,7 @@ public class PlanLayoutTests
                     Assert.False(a.Text.Intersects(b.Text), $"seed {seed}: labels {a.Index} and {b.Index} overlap");
                     foreach (var leader in LeaderRects(b))
                         Assert.False(a.Text.Intersects(leader), $"seed {seed}: leader of {b.Index} runs through label {a.Index}");
+                    Assert.False(LeadersMeet(a, b), $"seed {seed}: leaders of {a.Index} and {b.Index} cross");
                 }
                 Assert.True(a.Text.X >= area.X && a.Text.Right <= area.Right, $"seed {seed}: label {a.Index} leaves the panel");
                 Assert.True(a.Text.Y >= area.Y - 1 && a.Text.Bottom <= area.Bottom + 1, $"seed {seed}: label {a.Index} leaves the panel vertically");
@@ -101,6 +106,9 @@ public class PlanLayoutTests
         var r = PlanLayout.Compute(sections, faults, Array.Empty<PlanBox>(), new RectF(362, 106, 856, 416), Char);
         Assert.All(r.Labels, l => Assert.Equal(0, l.Conflicts));
         Assert.Equal(4, r.Labels.Count);
+        foreach (var a in r.Labels)
+            foreach (var b in r.Labels.Where(b => b.Index > a.Index))
+                Assert.False(LeadersMeet(a, b), $"leaders of {a.Index} and {b.Index} cross");
     }
 
     [Fact]
