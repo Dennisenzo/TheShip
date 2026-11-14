@@ -61,7 +61,7 @@ public sealed partial class ShipGame
         var inner = width - 28;
         var ix = x + 14;
         if (v.Current.Faults.Count == 0 && !Drifting)
-            y = _p.Paragraph(v.Phase == Phase.Ended ? "The voyage is over." : "Nothing needs repair.", x, y, width, Painter.Ink);
+            y = DrawNoIssues(v, x, y, width);
 
         // One fault gets a full card; two or more get compact cards, sized by how many there are, that always fit the column (IssueCardLayout).
         var compact = v.Current.Faults.Count >= 2;
@@ -233,23 +233,35 @@ public sealed partial class ShipGame
     private static string Patient(Voyage v, Fault f) =>
         f.Kind == "illness" && f.SubjectId is { } sid && v.Find(sid) is { } p ? "Patient: " + p.Name + ". " : "";
 
-    /// <summary>The words cut to fit <paramref name="maxLines"/> lines of <paramref name="width"/> pixels, with ".." where they were cut.</summary>
-    private string FitLines(string text, int width, int maxLines)
-    {
-        if (_p.Lines(text, width) <= maxLines)
-            return text;
-        var words = text.Split(' ').ToList();
-        while (words.Count > 1 && _p.Lines(string.Join(' ', words) + "..", width) > maxLines)
-            words.RemoveAt(words.Count - 1);
-        // No punctuation before the cut mark ("seal,.." or "seal..."): the mark ends the words.
-        return string.Join(' ', words).TrimEnd('.', ',', ';', ':') + "..";
-    }
+    /// <summary>The words cut at a word boundary to fit <paramref name="maxLines"/> lines of <paramref name="width"/> pixels, ending in an ellipsis (<see cref="CardLayout.CutToLines"/>).</summary>
+    private string FitLines(string text, int width, int maxLines) =>
+        CardLayout.CutToLines(text, (int)(width / _p.SmallWidth), maxLines);
 
-    /// <summary>The text cut to fit one line of <paramref name="width"/> pixels in a font whose characters are <paramref name="charWidth"/> wide.</summary>
-    private static string Clip(string text, int width, float charWidth)
+    /// <summary>The text cut at a word boundary to fit one line of <paramref name="width"/> pixels in a font whose characters are <paramref name="charWidth"/> wide (<see cref="CardLayout.CutAtWord"/>).</summary>
+    private static string Clip(string text, int width, float charWidth) =>
+        CardLayout.CutAtWord(text, Math.Max(4, (int)(width / charWidth)));
+
+    /// <summary>
+    /// The calm panel for an alert with nothing to repair: the plain fact, then what to do next (the next-step line less its first
+    /// sentence). Returns the y below it.
+    /// </summary>
+    private int DrawNoIssues(Voyage v, int x, int y, int width)
     {
-        var room = Math.Max(4, (int)(width / charWidth));
-        return text.Length <= room ? text : text[..(room - 2)] + "..";
+        var ended = v.Phase == Phase.Ended;
+        var next = ended ? "" : NextStep(v);
+        const string lead = "Nothing needs repair. ";
+        if (next.StartsWith(lead, StringComparison.Ordinal))
+            next = next[lead.Length..];
+        else if (next == "Nothing needs repair.")
+            next = "";
+        var rows = next.Length == 0 ? 0 : _p.Lines(next, width - 28);
+        var panel = new Rectangle(x, y, width, 20 + 24 + (rows > 0 ? 6 + rows * 19 : 0) + 16);
+        _p.Box(panel, Painter.Edge);
+        _p.Text(_p.Body, ended ? "The voyage is over." : "Nothing needs repair.", x + 14, y + 16, Painter.Ink);
+        if (rows > 0)
+            _p.Paragraph(next, x + 14, y + 20 + 24 + 6, width - 28, Painter.Dim);
+        _p.Cover(panel);
+        return panel.Bottom + IssueCardLayout.Gap;
     }
 
     /// <summary>
@@ -266,7 +278,10 @@ public sealed partial class ShipGame
         if (f.Resolved)
         {
             var done = f.State switch { FaultState.Repaired => "REPAIRED", FaultState.Patched => "PATCHED", _ => "LOST" };
-            _p.Text(_p.Small, Clip(tag + " - " + done + " - " + IssueCardLayout.CardName(f), inner, _p.SmallWidth), ix, y + 6, Painter.Dim);
+            var doneLine = tag + " - " + done + " - " + IssueCardLayout.CardName(f);
+            var doneShown = Clip(doneLine, inner, _p.SmallWidth);
+            _p.Text(_p.Small, doneShown, ix, y + 6, Painter.Dim);
+            _p.Tip(new Rectangle(x, cardTop, width, IssueCardLayout.ResolvedRow), doneShown == doneLine ? "" : doneLine);
             _p.Frame(new Rectangle(x, cardTop, width, IssueCardLayout.ResolvedRow), Painter.Edge);
             _p.Cover(new Rectangle(x, cardTop, width, IssueCardLayout.ResolvedRow));
             return cardTop + IssueCardLayout.ResolvedRow + IssueCardLayout.Gap;
@@ -276,7 +291,9 @@ public sealed partial class ShipGame
         _p.Text(_p.Small, tag + " - " + state + (f.Critical ? " - CRITICAL" : ""), ix, y, Painter.Accent);
         _p.TextRight(_p.Body, Voyage.Hours(ShownLeft(v, f)), x + width - 14, y - 2, LogTones.IsFinal(ShownLeft(v, f), f.ClockHours) ? Painter.Danger : Painter.Bright);
         y += 20;
-        _p.Text(_p.Body, Clip(IssueCardLayout.CardName(f), inner, _p.BodyWidth), ix, y, Painter.Bright);
+        var cardName = IssueCardLayout.CardName(f);
+        var shownName = Clip(cardName, inner, _p.BodyWidth);
+        _p.Text(_p.Body, shownName, ix, y, Painter.Bright);
         y += 22;
         // The lines below the name: the needs, the verdict (always whole, on its own line), who is on it, and the danger or exposure line.
         var where = v.GetSection(f.Section)?.Name ?? "";
@@ -285,21 +302,33 @@ public sealed partial class ShipGame
             : v.CauseKnown(f) is { } cause ? "Cause: " + cause + "."
             : f.ExposureFact is { } seen ? "Whoever works here learns " + v.GetFact(seen).Label + "." : "";
         var workers = v.Awake.Where(c => c.WorkingOn == f.Id).Select(c => c.Name).ToList();
+        var columns = (int)(inner / _p.SmallWidth);
         var split = IssueCardLayout.Split(shown, _p.Lines(needs, inner), extra.Length == 0 ? 0 : _p.Lines(extra, inner), workers.Count > 0);
+        // A "Cause:" or "Known:" line that would be cut does not show half: it moves to the tooltip, and its line goes back to the needs text.
+        var extraMoved = extra.Length > 0 && (split.Extra == 0 || CardLayout.NeedsCut(extra, columns, split.Extra));
+        if (extraMoved)
+            split = IssueCardLayout.Split(shown, _p.Lines(needs, inner), 0, workers.Count > 0);
         var verdict = Glue(v.EarliestDoneText(f));
         // The card is as tall as its text (never more than the per-count maximum), with the buttons right below it.
         var textLines = split.Needs + _p.Lines(verdict, inner) + (split.Workers ? 1 : 0) + split.Extra;
         var height = Math.Min(IssueCardLayout.OpenCardHeight(shown), IssueCardLayout.CardTop + textLines * IssueCardLayout.LineHeight + IssueCardLayout.CardBottom);
         y = _p.Paragraph(FitLines(needs, inner, split.Needs), ix, y, inner, Painter.Dim);
         y = _p.Paragraph(verdict, ix, y, inner, Painter.Ink);
+        var workersLine = "";
         if (split.Workers)
         {
             var line = string.Join(" and ", workers) + (workers.Count == 1 ? " is" : " are") + " on it"
                        + (workers.Count < f.People ? " (" + workers.Count + " of " + f.People + ")" : "") + ".";
+            workersLine = line;
             y = _p.Paragraph(FitLines(line, inner, 1), ix, y, inner, Painter.Ink);
         }
         if (split.Extra > 0)
             _p.Paragraph(FitLines(extra, inner, split.Extra), ix, y, inner, Painter.Dim);
+        // The full text is the card's tooltip whenever any of it was cut or moved (the buttons keep their own tips, asked for after).
+        var cut = shownName != cardName || extraMoved || CardLayout.NeedsCut(needs, columns, split.Needs)
+                  || (workersLine.Length > 0 && CardLayout.NeedsCut(workersLine, columns, 1));
+        if (cut)
+            _p.Tip(new Rectangle(x, cardTop, width, height), string.Join(Environment.NewLine, new[] { cardName, needs, verdict, workersLine, extra }.Where(t => t.Length > 0)));
         WorkButtons(v, f, ix, cardTop + height - 8 - 34, (inner - 8) / 2, 34, x + width + 8);
         // Progress runs along the top edge of the card.
         if (f.State == FaultState.InRepair)
@@ -697,19 +726,27 @@ public sealed partial class ShipGame
             x + width, top, alone is null ? Painter.Dim : Painter.Accent);
         var up = v.Crew.Count(c => c.State is CrewState.Awake or CrewState.Thawing);
         var y = top + 28;
+        var items = Waiting(v, _target).ToList();
+        var deadCount = v.Crew.Count(c => ShownState(c) == CrewState.Dead);
+        var column = CardLayout.Crew(bottom - y, v.Crew.Count - deadCount, deadCount, items.Count == 0);
         foreach (var c in v.Crew)
         {
-            var card = new Rectangle(x, y, width, 86);
+            if (ShownState(c) == CrewState.Dead)
+            {
+                DrawDeadStrip(c, x, y, width);
+                y += CardLayout.StripHeight + CardLayout.CrewGap;
+                continue;
+            }
+            var card = new Rectangle(x, y, width, column.CardHeight);
             var selected = _target == c;
             var over = _p.Over(card);
             if (over)
             {
                 _hotCrewNext = c.Id;
-                if (c.Alive)
-                    _p.Hand = true;
+                _p.Hand = true;
             }
             // The card lights up under the mouse, and with its pod or marker on the plan.
-            var lit = _p.Ease("crew:" + c.Id, (over && c.Alive) || _hotCrew == c.Id ? 1f : 0f);
+            var lit = _p.Ease("crew:" + c.Id, over || _hotCrew == c.Id ? 1f : 0f);
             _p.Box(card, Color.Lerp(c.State is CrewState.Awake or CrewState.Thawing ? Painter.Wire : Painter.Edge, Painter.Bright, lit));
             if (selected)
             {
@@ -718,43 +755,20 @@ public sealed partial class ShipGame
             }
             // While the years roll the card keeps the state from before the drift, as the pod does (ShownState).
             var shown = ShownState(c);
-            var ink = shown == CrewState.Dead ? Painter.Dim : shown == CrewState.Awake ? Painter.Bright : Painter.Ink;
-            var stateInk = shown == CrewState.Dead ? Painter.Danger : ink;
+            var ink = shown == CrewState.Awake ? Painter.Bright : Painter.Ink;
             _p.Text(_p.Body, c.Name, x + 12, y + 8, ink);
             _p.Text(_p.Small, c.Role + ", " + N(ShownAge(c)), x + 20 + c.Name.Length * _p.BodyWidth, y + 10, Painter.Dim);
             var state = shown switch
             {
                 CrewState.Asleep => "asleep, " + c.Thaws + (c.Thaws == 1 ? " thaw" : " thaws"),
                 CrewState.Thawing => "thawing, " + Voyage.Hours(ShownThawLeft(v, c)),
-                CrewState.Awake => "AWAKE " + N(ShownHoursAwake(c) / 24) + " d" + (c.WorkingOn != null ? ", working" : ""),
-                _ => "dead",
+                _ => "AWAKE " + N(ShownHoursAwake(c) / 24) + " d" + (c.WorkingOn != null ? ", working" : ""),
             };
-            _p.Text(_p.Small, state, x + 12, y + 36, stateInk);
-            if (shown != CrewState.Dead)
-            {
-                // A change flashes and shows its size, but not before the line that explains it is in the log.
-                var hold = _transition is not null || LinePending(v, c);
-                var trust = Track("trust:" + c.Id, c.Trust, hold, out var trustFlash, out var trustDelta);
-                var morale = Track("morale:" + c.Id, c.Morale, hold, out var moraleFlash, out var moraleDelta);
-                var band = BandOf(trust);
-                var tx = x + 12f;
-                var trustText = "trust " + N(trust) + " " + CrewMember.BandText(band);
-                _p.Text(_p.Small, trustText, tx, y + 62, Color.Lerp(Painter.Dim, Painter.Bright, trustFlash));
-                _p.Tip(new Rectangle(x + 8, y + 58, (int)(trustText.Length * _p.SmallWidth) + 8, 24), Manner(band));
-                tx += (trustText.Length + 1) * _p.SmallWidth;
-                if (trustDelta.Length > 0)
-                {
-                    _p.Text(_p.Small, trustDelta, tx, y + 62, Painter.Accent);
-                    tx += (trustDelta.Length + 1) * _p.SmallWidth;
-                }
-                var moraleText = "morale " + N(morale);
-                _p.Text(_p.Small, moraleText, tx + _p.SmallWidth, y + 62, Color.Lerp(Painter.Dim, Painter.Bright, moraleFlash));
-                if (moraleDelta.Length > 0)
-                    _p.Text(_p.Small, moraleDelta, tx + (moraleText.Length + 2) * _p.SmallWidth, y + 62, Painter.Accent);
-            }
+            _p.Text(_p.Small, state, x + 12, y + 28, ink);
+            DrawCrewMeters(v, c, x + 12, y + card.Height - 40, width - 24);
 
-            var file = new Rectangle(x + width - 12 - 52, y + 18, 52, 40);
-            var act = new Rectangle(file.X - 8 - 76, y + 18, 76, 40);
+            var file = new Rectangle(x + width - 12 - 52, y + 10, 52, 32);
+            var act = new Rectangle(file.X - 8 - 76, y + 10, 76, 32);
             var person = c;
             if (_p.Button(file, "FILE", tip: "The dossier: who " + c.Name + " is, what they know and what you told them."))
                 Do(() =>
@@ -785,12 +799,19 @@ public sealed partial class ShipGame
                 if (_p.Button(act, v.Lockouts.Bay ? "BAY TAKEN" : can ? "SLEEP" : "in " + days + " d", can && !ended && !v.Lockouts.Bay, tip: sleepTip))
                     Act("ask " + person.Name + " to sleep", () => v.AskSleep(person));
             }
-            if (c.Alive && _p.Hit(card) && !_p.Over(file) && !_p.Over(act))
+            if (_p.Hit(card) && !_p.Over(file) && !_p.Over(act))
                 Do(() => _target = _target == person ? null : person);
-            y += 94;
+            y += column.CardHeight + CardLayout.CrewGap;
         }
 
-        var waiting = new Rectangle(x, y + 4, width, bottom - y - 4);
+        var waiting = new Rectangle(x, y + 4, width, Math.Min(column.WaitingHeight, bottom - y - 4));
+        if (items.Count == 0)
+        {
+            // Nothing waits on the player: a calm strip, and the room goes to the cards above.
+            _p.Box(waiting, Painter.Edge);
+            _p.Text(_p.Small, "Nothing waits on you.", x + 12, waiting.Y + (waiting.Height - 16) / 2, Painter.Dim);
+            return;
+        }
         if (waiting.Height < 60)
             return;
         _p.Box(waiting, Painter.Edge);
@@ -801,7 +822,7 @@ public sealed partial class ShipGame
             _p.TextRight(_p.Small, "select a person for stakes", x + width - 12, waiting.Y + 10, Painter.Dim);
         var wy = waiting.Y + 36;
         var limit = waiting.Bottom - 22;
-        foreach (var (who, item, tip) in Waiting(v, _target))
+        foreach (var (who, item, tip) in items)
         {
             // An item that doesn't fit is left out; a shorter one after it may still fit.
             var rows = _p.Lines(item, width - 24);
@@ -825,6 +846,65 @@ public sealed partial class ShipGame
                 _p.Tip(row, tip);
             wy = _p.Paragraph(item, x + 12, wy, width - 24, Painter.Ink) + 4;
         }
+    }
+
+    /// <summary>A dead person: one line (name, role, "dead", FILE) so the living cards have the room.</summary>
+    private void DrawDeadStrip(CrewMember c, int x, int y, int width)
+    {
+        var strip = new Rectangle(x, y, width, CardLayout.StripHeight);
+        _p.Box(strip, Painter.Edge);
+        _p.Text(_p.Body, c.Name, x + 12, y + 6, Painter.Dim);
+        _p.Text(_p.Small, c.Role + ", " + N(ShownAge(c)), x + 20 + c.Name.Length * _p.BodyWidth, y + 8, Painter.Dim);
+        var file = new Rectangle(x + width - 12 - 52, y + 4, 52, CardLayout.StripHeight - 8);
+        _p.TextRight(_p.Small, "dead", file.X - 12, y + 8, Painter.Danger);
+        var person = c;
+        if (_p.Button(file, "FILE", tip: "The dossier: who " + c.Name + " was, what they knew and what you told them."))
+            Do(() =>
+            {
+                _dossier = person;
+                _screen = Screen.Dossier;
+            });
+    }
+
+    private static readonly double[] TrustEdges = { 0, 15, 30, 60, 100 };
+    private static readonly double[] MoraleEdges = { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 };
+
+    /// <summary>
+    /// Trust and morale as two thin segmented meters side by side with their numbers (a change flashes and shows its size, but not before
+    /// the line that explains it is in the log). Trust has the dossier's four bands as segments, in the band's ink; the band's name and
+    /// manner are the tooltip. Morale is ten equal parts.
+    /// </summary>
+    private void DrawCrewMeters(Voyage v, CrewMember c, int x, int y, int width)
+    {
+        var hold = _transition is not null || LinePending(v, c);
+        var trust = Track("trust:" + c.Id, c.Trust, hold, out var trustFlash, out var trustDelta);
+        var morale = Track("morale:" + c.Id, c.Morale, hold, out var moraleFlash, out var moraleDelta);
+        var band = BandOf(trust);
+        const int gutter = 14;
+        var half = (width - gutter) / 2;
+        var moraleX = x + half + gutter;
+
+        _p.Text(_p.Small, "trust " + N(trust), x, y, Color.Lerp(Painter.Dim, Painter.Bright, trustFlash));
+        if (trustDelta.Length > 0)
+            _p.Text(_p.Small, trustDelta, x + (7 + N(trust).Length) * _p.SmallWidth, y, Painter.Accent);
+        _p.Text(_p.Small, "morale " + N(morale), moraleX, y, Color.Lerp(Painter.Dim, Painter.Bright, moraleFlash));
+        if (moraleDelta.Length > 0)
+            _p.Text(_p.Small, moraleDelta, moraleX + (8 + N(morale).Length) * _p.SmallWidth, y, Painter.Accent);
+
+        var barY = y + 20;
+        var inkTrust = BandInk(band);
+        foreach (var seg in CardLayout.Segments(half, 2, TrustEdges, trust))
+        {
+            _p.Fill(new Rectangle(x + seg.X, barY, seg.Width, 6), Painter.Track);
+            _p.Fill(new Rectangle(x + seg.X, barY, seg.Fill, 6), inkTrust);
+        }
+        foreach (var seg in CardLayout.Segments(half, 2, MoraleEdges, morale))
+        {
+            _p.Fill(new Rectangle(moraleX + seg.X, barY, seg.Width, 6), Painter.Track);
+            _p.Fill(new Rectangle(moraleX + seg.X, barY, seg.Fill, 6), Painter.Ink);
+        }
+        _p.Tip(new Rectangle(x - 4, y - 2, half + 8, 32), "Trust in you: " + N(trust) + " of 100, " + CrewMember.BandText(band) + ". " + Manner(band));
+        _p.Tip(new Rectangle(moraleX - 4, y - 2, half + 8, 32), "Morale: " + N(morale) + " of 100. How " + c.Name + " is holding up.");
     }
 
     /// <summary>The accusation item in two or three rows; <see cref="Voyage.AccusationText"/> is its tooltip.</summary>
