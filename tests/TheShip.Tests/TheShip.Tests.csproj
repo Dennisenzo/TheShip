@@ -28,6 +28,7 @@
     <Compile Include="..\..\src\TheShip.Game\PcmFeed.cs" Link="PcmFeed.cs" />
     <Compile Include="..\..\src\TheShip.Game\LogReveal.cs" Link="LogReveal.cs" />
     <Compile Include="..\..\src\TheShip.Game\TextLayout.cs" Link="TextLayout.cs" />
+    <Compile Include="..\..\src\TheShip.Game\CardLayout.cs" Link="CardLayout.cs" />
     <Compile Include="..\..\src\TheShip.Game\Motion.cs" Link="Motion.cs" />
     <Compile Include="..\..\src\TheShip.Game\PixelGrid.cs" Link="PixelGrid.cs" />
     <Compile Include="..\..\src\TheShip.Game\PersonGlyph.cs" Link="PersonGlyph.cs" />
