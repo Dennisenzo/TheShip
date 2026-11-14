@@ -30,6 +30,9 @@ internal static class Motion
     /// <summary>With this many lines waiting behind the one typing, everything is shown at once.</summary>
     public const int BacklogInstant = 6;
 
+    /// <summary>Whether animation runs at a fixed time: only in a tour (<c>--tour</c>) given <c>--tour-time</c>, never in play.</summary>
+    public static bool FixedTime(string? tourDir, double? tourTime) => tourDir is not null && tourTime is not null;
+
     /// <summary>True when nothing should move (the tour).</summary>
     public static bool Still => Speed <= 0f;
 

@@ -104,4 +104,32 @@ public class LineProfileTests
         Assert.Equal(runs[0].From, runs[0].To);
         Assert.Equal(6f, runs[0].From, 4);
     }
+    [Fact]
+    public void Only_small_discs_get_their_own_texture_so_the_cache_stays_bounded()
+    {
+        // The planet is 156 layout px: at any window width it goes to the shared texture, never to a cached one per width.
+        Assert.True(LineProfile.OwnDisc(2));
+        Assert.True(LineProfile.OwnDisc(LineProfile.MaxOwnDisc));
+        Assert.False(LineProfile.OwnDisc(LineProfile.MaxOwnDisc + 1));
+        Assert.False(LineProfile.OwnDisc(156));
+        // Every own disc texture together stays small (premultiplied RGBA, 4 bytes a texel).
+        long bytes = 0;
+        for (var w = 1; w <= LineProfile.MaxOwnDisc; w++)
+            bytes += 4L * LineProfile.Texels(w) * LineProfile.Texels(w);
+        Assert.True(bytes < 16_000_000, bytes.ToString());
+    }
+
+    [Fact]
+    public void The_shared_big_disc_is_full_in_the_middle_and_empty_in_the_corners()
+    {
+        const int n = LineProfile.BigDiscTexels;
+        var data = LineProfile.BigDisc();
+        Assert.Equal(n * n, data.Length);
+        Assert.Equal(1f, data[n / 2 * n + n / 2]);
+        Assert.Equal(0f, data[0]);
+        Assert.Equal(0f, data[n * n - 1]);
+        // The edge falls off within a texel or two of the disc's radius, (n - 2) / 2.
+        Assert.Equal(1f, data[n / 2 * n + 3]);
+        Assert.Equal(0f, data[n / 2 * n]);
+    }
 }

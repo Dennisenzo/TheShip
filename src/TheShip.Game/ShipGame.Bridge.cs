@@ -57,6 +57,7 @@ public sealed partial class ShipGame
     private void DrawIssues(Voyage v, int x, int top, int width, int bottom)
     {
         _p.Text(_p.Small, "ISSUES AT HAND", x, top, Painter.Dim);
+        _p.Cover(new Rectangle(x, top - 2, width, 20)); // a caption on the bare ground: no stars behind it
         var y = top + 28;
         var inner = width - 28;
         var ix = x + 14;
@@ -388,7 +389,7 @@ public sealed partial class ShipGame
         var boxes = standing.Select(m => new PlanBox(m.PlanX, m.PlanY, -8, -9, _p.Small.MeasureString(m.Person.Name.ToUpperInvariant()).X + 28, 18)).ToList();
         if (v.GetSection("core") is { } youSection)
             boxes.Add(new PlanBox(youSection.Spot.X - 24, youSection.Spot.Y + 30, -_p.SmallWidth * 1.5f, 0, _p.SmallWidth * 3, 16));
-        var fit = PlanLayout.Compute(v.Sections, shownFaults.Select(f => new PlanFault(f.Index, f.Section.Id, f.Slot, _p.Small.MeasureString(f.Label).X)).ToList(),
+        var fit = PlanLayout.Cached(v.Sections, shownFaults.Select(f => new PlanFault(f.Index, f.Section.Id, f.Slot, _p.Small.MeasureString(f.Label).X)).ToList(),
             boxes, new RectF(rect.X + 4 + ExhaustPx, rect.Y + 34, rect.Width - 8 - ExhaustPx, rect.Height - 40), _p.SmallWidth);
         var k = fit.K;
         Vector2 P(float px, float py) { var (x, y) = fit.P(px, py); return new Vector2(x, y); }
@@ -732,6 +733,7 @@ public sealed partial class ShipGame
     private void DrawCrew(Voyage v, int x, int top, int width, int bottom)
     {
         _p.Text(_p.Small, "CREW", x, top, Painter.Dim);
+        _p.Cover(new Rectangle(x, top - 2, width, 20)); // the caption band and its hint on the right
         var alone = _target is { State: CrewState.Awake } ? _target : null;
         _p.TextRight(_p.Small, alone is null ? "click a card to speak to one person" : "you speak to " + alone.Name + " alone; repairs go to " + alone.Name,
             x + width, top, alone is null ? Painter.Dim : Painter.Accent);

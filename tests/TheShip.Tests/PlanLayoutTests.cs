@@ -50,6 +50,10 @@ public class PlanLayoutTests
         }
     }
 
+    /// <summary>Whether two leaders cross or run along each other (their axis-aligned segments touch, grown by a pixel).</summary>
+    private static bool LeadersMeet(PlacedLabel a, PlacedLabel b) =>
+        LeaderRects(a).Any(ra => LeaderRects(b).Any(rb => ra.Intersects(rb, 1)));
+
     [Theory]
     [InlineData(864, 456)]
     [InlineData(1037, 547)]
@@ -70,6 +74,7 @@ public class PlanLayoutTests
                     Assert.False(a.Text.Intersects(b.Text), $"seed {seed}: labels {a.Index} and {b.Index} overlap");
                     foreach (var leader in LeaderRects(b))
                         Assert.False(a.Text.Intersects(leader), $"seed {seed}: leader of {b.Index} runs through label {a.Index}");
+                    Assert.False(LeadersMeet(a, b), $"seed {seed}: leaders of {a.Index} and {b.Index} cross");
                 }
                 Assert.True(a.Text.X >= area.X && a.Text.Right <= area.Right, $"seed {seed}: label {a.Index} leaves the panel");
                 Assert.True(a.Text.Y >= area.Y - 1 && a.Text.Bottom <= area.Bottom + 1, $"seed {seed}: label {a.Index} leaves the panel vertically");
@@ -101,6 +106,9 @@ public class PlanLayoutTests
         var r = PlanLayout.Compute(sections, faults, Array.Empty<PlanBox>(), new RectF(362, 106, 856, 416), Char);
         Assert.All(r.Labels, l => Assert.Equal(0, l.Conflicts));
         Assert.Equal(4, r.Labels.Count);
+        foreach (var a in r.Labels)
+            foreach (var b in r.Labels.Where(b => b.Index > a.Index))
+                Assert.False(LeadersMeet(a, b), $"leaders of {a.Index} and {b.Index} cross");
     }
 
     [Fact]
@@ -127,5 +135,23 @@ public class PlanLayoutTests
             Assert.True(r.HullTop >= area.Y - 0.5f && bottom <= area.Bottom + 0.5f, $"seed {seed}: the hull leaves the area");
             Assert.True(r.K > 0.8f, $"seed {seed}: the plan shrank to {r.K}");
         }
+    }
+    [Fact]
+    public void The_cached_layout_is_kept_while_its_inputs_are_equal_and_redone_when_one_changes()
+    {
+        var sections = ShipPlan.Sections();
+        var area = new RectF(362, 106, 856, 416);
+        List<PlanFault> Faults(float width) => new() { new PlanFault(1, "helm", 0, width), new PlanFault(2, "coolant", 0, 24 * Char) };
+        var boxes = new List<PlanBox> { new(200, 260, -8, -9, 70, 18) };
+        var first = PlanLayout.Cached(sections, Faults(30 * Char), boxes, area, Char);
+        // New lists with equal contents (as the bridge builds every frame): the same result.
+        Assert.Same(first, PlanLayout.Cached(sections, Faults(30 * Char), boxes.ToList(), area, Char));
+        // A label's hours changed its width, a person moved, the panel moved: laid out again, as Compute would.
+        var wider = PlanLayout.Cached(sections, Faults(34 * Char), boxes, area, Char);
+        Assert.NotSame(first, wider);
+        Assert.Equal(PlanLayout.Compute(sections, Faults(34 * Char), boxes, area, Char).Labels.Select(l => l.Text), wider.Labels.Select(l => l.Text));
+        var moved = new List<PlanBox> { new(220, 260, -8, -9, 70, 18) };
+        Assert.NotSame(wider, PlanLayout.Cached(sections, Faults(34 * Char), moved, area, Char));
+        Assert.NotSame(first, PlanLayout.Cached(sections, Faults(30 * Char), boxes, area with { W = 800 }, Char));
     }
 }

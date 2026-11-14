@@ -70,7 +70,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         // The tour's screenshots must not depend on timing: nothing moves while it runs.
         Motion.Speed = options.TourDir is null ? 1f : 0f;
         // The sky is on in a tour only with --tour-time, so the shots of earlier steps stay comparable.
-        _backdrop.Enabled = options.TourDir is null || options.TourTime is not null;
+        _backdrop.Enabled = options.TourDir is null || options.FixedTime;
         _graphics = new GraphicsDeviceManager(this)
         {
             PreferredBackBufferWidth = Painter.ScreenWidth,
@@ -280,7 +280,7 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
     protected override void Update(GameTime gameTime)
     {
         // --tour-time: the tour runs at one fixed animation time, so animated things are shot at a fixed phase.
-        _now = _options.TourDir is not null && _options.TourTime is { } fixedTime ? fixedTime : gameTime.TotalGameTime.TotalSeconds;
+        _now = _options is { FixedTime: true, TourTime: { } fixedTime } ? fixedTime : gameTime.TotalGameTime.TotalSeconds;
         if (_p != null)
             _p.Now = _now;
         if (_loading is { IsCompleted: true } done)
@@ -509,7 +509,11 @@ public sealed partial class ShipGame : Microsoft.Xna.Framework.Game
         {
             var row = 0;
             foreach (var line in Painter.Wrap(_loadingText, (int)((Painter.ScreenWidth - 80) / _p.BodyWidth)))
+            {
+                // The text is on the bare ground: the sky leaves its lines clear.
+                _p.Cover(new Rectangle(36, 38 + 26 * row, (int)(line.Length * _p.BodyWidth) + 8, 26));
                 _p.Text(_p.Body, line, 40, 40 + 26 * row++, _fatal ? Painter.Danger : Painter.Ink);
+            }
         }
         else if (_screen == Screen.Dossier && _dossier is not null)
         {

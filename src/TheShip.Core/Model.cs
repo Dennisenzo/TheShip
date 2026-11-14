@@ -416,3 +416,9 @@ public sealed class LogEntry
 }
 
 public enum Phase { Alert, Aftermath, Ended }
+
+/// <summary>
+/// The ship at the end of a drift, before the next alert starts (its scripted events, such as alert 2's pod death, come after):
+/// the numbers and deaths of the drift's own report line.
+/// </summary>
+public sealed record DriftOutcome(double Stores, int Parts, int PodWear, int Alive, IReadOnlyList<string> Deaths);

@@ -58,6 +58,29 @@ internal static class PlanLayout
     public const float JogStep = 24f;
     public const int JogSteps = 16;
 
+    [ThreadStatic] private static PlanLayoutInputs? _lastInputs;
+    [ThreadStatic] private static PlanLayoutResult? _lastResult;
+
+    /// <summary>
+    /// <see cref="Compute"/>, kept from the last call while its inputs are the same (the bridge draws the plan every frame, and the layout
+    /// changes only when a fault, a label's hours, a person standing about or the panel changes). One cache per thread (the game draws on one).
+    /// </summary>
+    public static PlanLayoutResult Cached(IReadOnlyList<Section> sections, IReadOnlyList<PlanFault> faults, IReadOnlyList<PlanBox> boxes, RectF area, float charWidth, float lineHeight = 16f)
+    {
+        var inputs = new PlanLayoutInputs(sections, faults.ToArray(), boxes.ToArray(), area, charWidth, lineHeight);
+        if (_lastResult is { } kept && inputs.Same(_lastInputs))
+            return kept;
+        _lastInputs = inputs;
+        return _lastResult = Compute(sections, faults, boxes, area, charWidth, lineHeight);
+    }
+
+    /// <summary>What a layout depends on. Sections are compared by reference: their geometry is fixed for a voyage.</summary>
+    private sealed record PlanLayoutInputs(IReadOnlyList<Section> Sections, PlanFault[] Faults, PlanBox[] Boxes, RectF Area, float CharWidth, float LineHeight)
+    {
+        public bool Same(PlanLayoutInputs? o) => o is not null && ReferenceEquals(Sections, o.Sections) && Area == o.Area && CharWidth == o.CharWidth
+                                                 && LineHeight == o.LineHeight && Faults.AsSpan().SequenceEqual(o.Faults) && Boxes.AsSpan().SequenceEqual(o.Boxes);
+    }
+
     /// <summary>The plan's fit and layout inside <paramref name="area"/> (the part of the panel below its header).</summary>
     public static PlanLayoutResult Compute(IReadOnlyList<Section> sections, IReadOnlyList<PlanFault> faults, IReadOnlyList<PlanBox> boxes, RectF area, float charWidth, float lineHeight = 16f)
     {
@@ -72,15 +95,39 @@ internal static class PlanLayout
         {
             var ox0 = Ox(area, k);
             // Each fault leaves its section up or down (preferably the nearer side); the section names keep clear of that run.
-            // A fault whose label finds no free place on its side is turned round and everything is placed again.
+            // A fault whose label finds no free place on its side is turned round and everything is placed again. If it was turned
+            // already, it goes back to its own side and is placed first (the labels before it had taken every way out); the
+            // placement with the fewest conflicts is kept.
             var turns = new HashSet<int>();
+            var order = Enumerable.Range(0, faults.Count).ToList();
+            var reorders = 0;
+            placed = null!;
+            names = null!;
+            var bestConflicts = int.MaxValue;
             while (true)
             {
-                names = PlaceNames(sections, faults, ToAbove(sections, faults, turns), boxes, k, ox0, hullH * k, charWidth, lineHeight);
-                placed = PlaceLabels(sections, faults, ToAbove(sections, faults, turns), names, area, k, ox0, hullH * k, lineHeight);
-                var bad = placed.Labels.FindIndex(l => l.Conflicts > 0);
-                if (bad < 0 || !turns.Add(placed.Labels[bad].Index) || turns.Count > faults.Count)
+                var above = ToAbove(sections, faults, turns);
+                var tryNames = PlaceNames(sections, faults, above, boxes, k, ox0, hullH * k, charWidth, lineHeight);
+                var tryPlaced = PlaceLabels(sections, faults, above, tryNames, area, k, ox0, hullH * k, lineHeight, order);
+                var conflicts = tryPlaced.Labels.Sum(l => l.Conflicts);
+                if (conflicts < bestConflicts)
+                {
+                    (placed, names, bestConflicts) = (tryPlaced, tryNames, conflicts);
+                }
+                var bad = tryPlaced.Labels.FindIndex(l => l.Conflicts > 0);
+                if (bad < 0)
                     break;
+                var index = tryPlaced.Labels[bad].Index;
+                if (turns.Add(index) && turns.Count <= faults.Count)
+                    continue;
+                if (++reorders > faults.Count)
+                    break;
+                turns.Remove(index);
+                var at = order.FindIndex(i => faults[i].Index == index);
+                if (at <= 0)
+                    break;
+                order.Insert(0, order[at]);
+                order.RemoveAt(at + 1);
             }
             var need = (placed.Above + placed.Below) * RowHeight + (placed.Above > 0 ? RowGap : 0) + (placed.Below > 0 ? RowGap : 0);
             var fit = Math.Min(kw, (area.H - need) / hullH);
@@ -124,13 +171,16 @@ internal static class PlanLayout
 
     private sealed record Placement(List<PlacedLabel> Labels, int Above, int Below);
 
-    /// <summary>Places the labels with the hull's top edge at y = 0 (the caller shifts them). Rows above have negative y.</summary>
-    private static Placement PlaceLabels(IReadOnlyList<Section> sections, IReadOnlyList<PlanFault> faults, bool[] aboveOf, Dictionary<string, RectF> names, RectF area, float k, float ox, float hullPx, float lineHeight)
+    /// <summary>
+    /// Places the labels with the hull's top edge at y = 0 (the caller shifts them), in <paramref name="order"/> (positions in
+    /// <paramref name="faults"/>), each clear of those placed before it. Rows above have negative y. The labels come back in the faults' order.
+    /// </summary>
+    private static Placement PlaceLabels(IReadOnlyList<Section> sections, IReadOnlyList<PlanFault> faults, bool[] aboveOf, Dictionary<string, RectF> names, RectF area, float k, float ox, float hullPx, float lineHeight, IReadOnlyList<int> order)
     {
         var placed = new List<PlacedLabel>();
         var usedAbove = 0;
         var usedBelow = 0;
-        for (var fi = 0; fi < faults.Count; fi++)
+        foreach (var fi in order)
         {
             var f = faults[fi];
             var s = sections.FirstOrDefault(x => x.Id == f.SectionId);
@@ -170,7 +220,8 @@ internal static class PlanLayout
             else
                 usedBelow = Math.Max(usedBelow, RowOf(best, hullPx) + 1);
         }
-        return new Placement(placed, usedAbove, usedBelow);
+        var position = Enumerable.Range(0, faults.Count).ToDictionary(i => faults[i].Index);
+        return new Placement(placed.OrderBy(l => position[l.Index]).ToList(), usedAbove, usedBelow);
     }
 
     private static float RowCentre(bool above, int row, float hullPx) =>
@@ -222,8 +273,14 @@ internal static class PlanLayout
                 if (o.Text.Intersects(r, 2) || o.Diamond.Intersects(r))
                     n++;
             foreach (var r in LeaderRects(o))
+            {
                 if (c.Diamond.Intersects(r))
                     n++;
+                // Two leaders must not cross or run along each other (segments are axis-aligned: a crossing is a touch, grown by a pixel).
+                foreach (var m in mine)
+                    if (m.Intersects(r, 1))
+                        n++;
+            }
         }
         return n;
     }

@@ -35,6 +35,8 @@ public sealed partial class ShipGame
             if (over)
                 _p.Hand = true;
             _p.Fill(row, selected ? Painter.Panel : Painter.Fade(Painter.Track, hot));
+            if (!selected)
+                _p.Cover(row); // an unselected row is see-through: no stars behind its text
             _p.Frame(row, selected ? Painter.Wire : Color.Lerp(Painter.Edge, Painter.Wire, hot));
             if (selected)
                 _p.Fill(new Rectangle(row.X, row.Y, 4, row.Height), Painter.Accent);
@@ -192,13 +194,13 @@ public sealed partial class ShipGame
             _p.Fill(new Rectangle(x, head, width, 1), Painter.Edge);
             head += 16;
         }
-        _p.Text(_p.Small, "WHAT " + c.Name.ToUpperInvariant() + " KNOWS", x, head, Painter.Dim);
+        _p.Text(_p.Small, ScreenRules.KnowsHeading(c.Name, c.Alive), x, head, Painter.Dim);
         _p.TextRight(_p.Small, "HOW, YEAR", x + width, head, Painter.Dim);
         var y = head + 30;
         var limit = rect.Bottom - 16 - (c.Doubts.Count > 0 ? 90 : 0);
         var textWidth = width - 190;
         if (c.Beliefs.Count == 0)
-            _p.Text(_p.Small, "Nothing yet.", x, y, Painter.Ink);
+            _p.Text(_p.Small, ScreenRules.KnowsNothing(c.Alive), x, y, Painter.Ink);
         foreach (var (key, belief) in c.Beliefs.OrderByDescending(b => b.Value.Year))
         {
             if (!v.HasFact(key))
@@ -698,9 +700,8 @@ public sealed partial class ShipGame
             }
     }
 
-    /// <summary>A filled disc (a round-capped line of no length), for the planet.</summary>
-    private void Disc(Vector2 centre, float diameter, Color color) =>
-        _p.Line(centre - new Vector2(0.01f, 0), centre, color, diameter);
+    /// <summary>A filled disc, for the planet (one shared texture scaled, so a window drag builds nothing).</summary>
+    private void Disc(Vector2 centre, float diameter, Color color) => _p.FilledDisc(centre, diameter, color);
 
     /// <summary>
     /// The picture over the ending's name. Landfall: the hull lit, a planet ahead with a pale rim. Adrift: the hull alone, dim and turned,
@@ -718,7 +719,7 @@ public sealed partial class ShipGame
                 var planet = new Vector2(area.X + area.Width / 2f + 240, area.Y + area.Height / 2f + 6);
                 const float radius = 78f;
                 Disc(planet, radius * 2, Painter.Fade(Painter.Blue, 0.55f));
-                Disc(planet + new Vector2(radius * 0.07f, radius * 0.05f), radius * 2 * 0.95f, new Color(14, 30, 38));
+                Disc(planet + new Vector2(radius * 0.07f, radius * 0.05f), radius * 2 * 0.95f, Painter.Night);
                 for (var i = -1; i <= 1; i++)
                 {
                     var arc = new List<Vector2>();

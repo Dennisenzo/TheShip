@@ -14,7 +14,7 @@ public sealed partial class ShipGame
         var drift = _tourDrift ?? (_transition is { Kind: SkipKind.Drift, Beat: 0 } t
             ? MathF.Sin(Motion.Progress(_now, t.Start, Motion.DriftRoll) * MathF.PI)
             : 0f);
-        _backdrop.Step(_now, mood, drift, _options.TourTime is not null);
+        _backdrop.Step(_now, mood, drift, _options.FixedTime);
         _backdrop.Draw(_p);
     }
 }

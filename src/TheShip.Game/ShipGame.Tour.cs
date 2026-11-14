@@ -298,7 +298,7 @@ public sealed partial class ShipGame
                 Act("ask " + person.Name + " to sleep", () => v.AskSleep(person));
             }
             foreach (var w in Settle()) yield return w;
-            if (_options.TourTime is not null)
+            if (_options.FixedTime)
             {
                 // The drift transition itself does not run in a tour: show the sky at the height of the roll.
                 _tourDrift = 1f;

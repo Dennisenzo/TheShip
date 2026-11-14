@@ -22,7 +22,7 @@ public sealed partial class ShipGame
     /// </summary>
     private double PlanClock()
     {
-        if (Motion.Still && _options.TourTime is null)
+        if (Motion.Still && !_options.FixedTime)
             return 0;
         return _transition is { } t ? t.Start : _p.Now;
     }
@@ -75,7 +75,7 @@ public sealed partial class ShipGame
         var hullGlow = PlanLight.HullGlow(low, t);
         _p.Poly(glowPoints, Painter.Fade(Painter.Blue, 0.09f * hullGlow), 5f);
 
-        // Engine exhaust at the stern (left): five lines licking out, fading outward.
+        // Engine exhaust at the stern (left): four lines licking out, fading outward.
         var ys = new[] { 160f, 205f, 265f, 310f };
         for (var i = 0; i < ys.Length; i++)
         {
