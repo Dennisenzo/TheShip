@@ -18,7 +18,7 @@ dotnet run --project src/TheShip.Game -- [--seed <n>] [--llm <file.gguf>] [--gpu
 
 - The game needs a GGUF model in `src/TheShip.Game/Content/Models/llm/` (or `--llm`). Without one it shows what is missing and starts no voyage.
 - Models: see the README.txt in that folder.
-- `--tour <dir>` (dev tool, `ShipGame.Tour.cs`): plays a fixed script (wake the best-qualified sleepers, answer the wake question, repair, advance, sleep, drift through all alerts) and saves PNGs of key moments plus `tour.txt` (with the session log path) to `<dir>`, then exits. Frames are rendered into a render target of `--tour-size <w>x<h>` (default 1600 x 900; use 1920x1080 or 2560x1440 to see what a maximized window shows), so it works while minimized or with the display off. Use `--seed` for the run and `--llm <abs path>` in a worktree.
+- `--tour-time <s>` fixes the tour's animation time (and turns the sky on in the shots; see GRAPHICS-PLAN step 7). `--tour <dir>` (dev tool, `ShipGame.Tour.cs`): plays a fixed script (wake the best-qualified sleepers, answer the wake question, repair, advance, sleep, drift through all alerts) and saves PNGs of key moments plus `tour.txt` (with the session log path) to `<dir>`, then exits. Frames are rendered into a render target of `--tour-size <w>x<h>` (default 1600 x 900; use 1920x1080 or 2560x1440 to see what a maximized window shows), so it works while minimized or with the display off. Use `--seed` for the run and `--llm <abs path>` in a worktree.
 
 ## Layout
 

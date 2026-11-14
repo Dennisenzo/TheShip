@@ -184,6 +184,8 @@ internal sealed class Painter
     /// <summary>Call at the start of a frame's drawing.</summary>
     public void BeginFrame()
     {
+        (_covered, _coveredNow) = (_coveredNow, _covered);
+        _coveredNow.Clear();
         _tip = null;
         Hand = false;
         Denied = false;
@@ -247,9 +249,63 @@ internal sealed class Painter
     public void Box(Rectangle r, Color edge)
     {
         Fill(r, Panel);
+        // A faint light falling from the top edge, about 20 px deep (not on a panel too low to hold it).
+        var depth = Math.Min(TopLightDepth, r.Height / 2);
+        if (depth > 2)
+            Image(TopLight(), new Rectangle(r.X + 1, r.Y + 1, r.Width - 2, depth), Fade(Bright, TopLightAlpha));
         Frame(r, edge);
         // A 1 px light edge just inside the top: the panel catches the light.
         Fill(new Rectangle(r.X + 1, r.Y + 1, r.Width - 2, 1), Fade(Bright, 0.07f));
+    }
+
+    private List<Rectangle> _covered = new();
+    private List<Rectangle> _coveredNow = new();
+
+    /// <summary>Marks an area that holds text on the bare ground (an unfilled card): the sky leaves it clear, from the next frame on.</summary>
+    public void Cover(Rectangle r) => _coveredNow.Add(r);
+
+    /// <summary>The areas marked by <see cref="Cover"/> in the frame before this one.</summary>
+    public IReadOnlyList<Rectangle> Covered => _covered;
+
+    public const int TopLightDepth = 20;
+    public const float TopLightAlpha = 0.045f;
+    private Texture2D? _topLight;
+
+    /// <summary>A 1 x 20 premultiplied white gradient, full at the top and nothing at the bottom.</summary>
+    private Texture2D TopLight()
+    {
+        if (_topLight is not null)
+            return _topLight;
+        var texels = new Color[TopLightDepth];
+        for (var i = 0; i < texels.Length; i++)
+        {
+            var a = 1f - (i + 0.5f) / texels.Length;
+            var v = (byte)Math.Round(a * a * 255f);
+            texels[i] = new Color(v, v, v, v);
+        }
+        _topLight = new Texture2D(_pixel.GraphicsDevice, 1, TopLightDepth);
+        _topLight.SetData(texels);
+        return _topLight;
+    }
+
+    /// <summary>The graphics device, for textures made by other drawing code.</summary>
+    public GraphicsDevice Device => _pixel.GraphicsDevice;
+
+    /// <summary>A premultiplied texture stretched over a layout rectangle (tint = colour x opacity).</summary>
+    public void Image(Texture2D texture, Rectangle r, Color tint) =>
+        _batch.Draw(texture, new Vector2(r.X, r.Y), null, tint, 0f, Vector2.Zero, new Vector2((float)r.Width / texture.Width, (float)r.Height / texture.Height), SpriteEffects.None, 0f);
+
+    /// <summary>
+    /// A soft dot centred on a layout point, <paramref name="deviceWidth"/> x <paramref name="deviceHeight"/> device pixels (plus <paramref name="stretch"/>
+    /// layout pixels of width for a streak), snapped to whole device pixels so it is the same size at any window size.
+    /// </summary>
+    public void Stamp(Texture2D texture, float x, float y, int deviceWidth, int deviceHeight, float stretch, Color tint)
+    {
+        var w = deviceWidth + (int)MathF.Round(stretch * Scale);
+        var left = (int)MathF.Round(OriginX + x * Scale - w / 2f);
+        var top = (int)MathF.Round(OriginY + y * Scale - deviceHeight / 2f);
+        _batch.Draw(texture, new Vector2(PixelGrid.Layout(left, Scale, OriginX), PixelGrid.Layout(top, Scale, OriginY)), null, tint, 0f, Vector2.Zero,
+            new Vector2(w / Scale / texture.Width, deviceHeight / Scale / texture.Height), SpriteEffects.None, 0f);
     }
 
     private readonly Dictionary<int, Texture2D> _cross = new();
