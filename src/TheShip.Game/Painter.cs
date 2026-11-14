@@ -41,6 +41,8 @@ internal sealed class Painter
     public static readonly Color Blue = new(124, 196, 232);
     public static readonly Color Power = new(140, 122, 78);
     public static readonly Color Dead = new(110, 134, 143);
+    /// <summary>The planet's dark side on the Landfall ending: a deep blue, under the pale rim.</summary>
+    public static readonly Color Night = new(14, 30, 38);
 
     /// <summary>The colour of a log line's tone (<see cref="LogTones.Of"/>).</summary>
     public static Color LogColor(LogTone tone) => tone switch

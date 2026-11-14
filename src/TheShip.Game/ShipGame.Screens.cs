@@ -717,7 +717,7 @@ public sealed partial class ShipGame
                 var planet = new Vector2(area.X + area.Width / 2f + 240, area.Y + area.Height / 2f + 6);
                 const float radius = 78f;
                 Disc(planet, radius * 2, Painter.Fade(Painter.Blue, 0.55f));
-                Disc(planet + new Vector2(radius * 0.07f, radius * 0.05f), radius * 2 * 0.95f, new Color(14, 30, 38));
+                Disc(planet + new Vector2(radius * 0.07f, radius * 0.05f), radius * 2 * 0.95f, Painter.Night);
                 for (var i = -1; i <= 1; i++)
                 {
                     var arc = new List<Vector2>();
