@@ -19,7 +19,7 @@ internal sealed class Painter
     public static readonly Color Room = new(15, 26, 31);
     public static readonly Color Edge = new(35, 53, 61);
     public static readonly Color Track = new(27, 42, 48);
-    public static readonly Color Faint = new(34, 55, 63);
+    public static readonly Color Faint = new(40, 64, 73);
     public static readonly Color Hull = new(44, 70, 80);
     public static readonly Color Wire = new(108, 151, 164);
     public static readonly Color Dim = new(157, 182, 189);
@@ -227,47 +227,191 @@ internal sealed class Painter
         Frame(r, edge);
     }
 
-    public void Line(Vector2 a, Vector2 b, Color color, float thickness = 1.5f)
+    private readonly Dictionary<int, Texture2D> _cross = new();
+    private readonly Dictionary<int, Texture2D> _discs = new();
+
+    /// <summary>
+    /// A soft line from <paramref name="a"/> to <paramref name="b"/> with round ends. The thickness is <c>max(1, round(thickness x scale))</c>
+    /// device pixels, as for <see cref="Frame"/>; the edges fall off over one pixel at any angle (<see cref="LineProfile"/>), so a diagonal does not stair-step.
+    /// A horizontal or vertical line is snapped to whole pixels and drawn flat, like a frame.
+    /// </summary>
+    public void Line(Vector2 a, Vector2 b, Color color, float thickness = 1.5f) => SoftLine(a, b, color, PixelGrid.Thickness(thickness, Scale), true);
+
+    private void SoftLine(Vector2 a, Vector2 b, Color color, int width, bool caps)
     {
         var d = b - a;
         var length = d.Length();
+        var round = caps && width >= 2;
         if (length < 0.01f)
+        {
+            if (round)
+                Disc(a, color, width);
             return;
-        _batch.Draw(_pixel, a, null, color, MathF.Atan2(d.Y, d.X), new Vector2(0f, 0.5f), new Vector2(length, thickness), SpriteEffects.None, 0f);
+        }
+        if (Math.Abs(d.Y) < 1e-3f || Math.Abs(d.X) < 1e-3f)
+        {
+            var (from, to) = FlatLine(a, b, color, width, caps);
+            if (round)
+            {
+                Disc(from, color, width);
+                Disc(to, color, width);
+            }
+            return;
+        }
+        var unit = d / length;
+        if (caps && !round)
+        {
+            // A one-pixel line has no disc; it runs half a pixel past its ends so two lines meeting at a corner leave no notch.
+            var half = 0.5f / Scale;
+            a -= unit * half;
+            length += 2 * half;
+        }
+        var n = LineProfile.Texels(width);
+        var texture = Cross(width);
+        _batch.Draw(texture, a, null, color, MathF.Atan2(d.Y, d.X), new Vector2(0f, n / 2f),
+            new Vector2(length, LineProfile.Extent(width) / Scale / n), SpriteEffects.None, 0f);
+        if (round)
+        {
+            Disc(a, color, width);
+            Disc(b, color, width);
+        }
     }
 
-    public void Dashed(Vector2 a, Vector2 b, Color color, float dash = 7f, float gap = 5f, float thickness = 1.5f, float offset = 0f)
+    /// <summary>A horizontal or vertical line as a snapped rectangle of <paramref name="width"/> device pixels across the middle of the line.</summary>
+    /// <returns>The two ends of the rectangle's middle line, in layout units, on the device pixels it was snapped to (where a round cap belongs).</returns>
+    private (Vector2 From, Vector2 To) FlatLine(Vector2 a, Vector2 b, Color color, int width, bool caps)
+    {
+        var horizontal = Math.Abs(b.Y - a.Y) < 1e-3f;
+        var from = horizontal ? Math.Min(a.X, b.X) : Math.Min(a.Y, b.Y);
+        var to = horizontal ? Math.Max(a.X, b.X) : Math.Max(a.Y, b.Y);
+        var along = horizontal ? (Scale, OriginX) : (Scale, OriginY);
+        var s0 = PixelGrid.Device(from, along.Item1, along.Item2);
+        var s1 = PixelGrid.Device(to, along.Item1, along.Item2);
+        // A one-pixel line runs through its end pixel; a thicker one gets its round end from the discs.
+        if (caps && width < 2)
+            s1++;
+        var across = horizontal ? (a.Y, OriginY) : (a.X, OriginX);
+        var c0 = PixelGrid.Round(across.Item1 * Scale + across.Item2 - width / 2f);
+        var middle = c0 + width / 2f;
+        if (horizontal)
+        {
+            FillDevice(s0, c0, Math.Max(s1, s0 + 1), c0 + width, color);
+            return (new Vector2(PixelGrid.Layout(s0, Scale, OriginX), (middle - OriginY) / Scale), new Vector2(PixelGrid.Layout(s1, Scale, OriginX), (middle - OriginY) / Scale));
+        }
+        FillDevice(c0, s0, c0 + width, Math.Max(s1, s0 + 1), color);
+        return (new Vector2((middle - OriginX) / Scale, PixelGrid.Layout(s0, Scale, OriginY)), new Vector2((middle - OriginX) / Scale, PixelGrid.Layout(s1, Scale, OriginY)));
+    }
+
+    private void Disc(Vector2 centre, Color color, int width)
+    {
+        var n = LineProfile.Texels(width);
+        _batch.Draw(Discs(width), centre, null, color, 0f, new Vector2(n / 2f), LineProfile.Extent(width) / Scale / n, SpriteEffects.None, 0f);
+    }
+
+    private Texture2D Cross(int width)
+    {
+        if (_cross.TryGetValue(width, out var cached))
+            return cached;
+        var data = LineProfile.Cross(width);
+        var texels = new Color[data.Length];
+        for (var i = 0; i < data.Length; i++)
+        {
+            var v = (byte)Math.Round(data[i] * 255f);
+            texels[i] = new Color(v, v, v, v);
+        }
+        var texture = new Texture2D(_pixel.GraphicsDevice, 1, data.Length);
+        texture.SetData(texels);
+        return _cross[width] = texture;
+    }
+
+    private Texture2D Discs(int width)
+    {
+        if (_discs.TryGetValue(width, out var cached))
+            return cached;
+        var data = LineProfile.Disc(width);
+        var n = LineProfile.Texels(width);
+        var texels = new Color[data.Length];
+        for (var i = 0; i < data.Length; i++)
+        {
+            var v = (byte)Math.Round(data[i] * 255f);
+            texels[i] = new Color(v, v, v, v);
+        }
+        var texture = new Texture2D(_pixel.GraphicsDevice, n, n);
+        texture.SetData(texels);
+        return _discs[width] = texture;
+    }
+
+    /// <summary>
+    /// A rounded bar (a door): a line along the long side of <paramref name="r"/> as thick as the short side, round at both ends. With a
+    /// <paramref name="ring"/> it is an outline of that thickness instead, hollowed with <paramref name="hollow"/> (the same width on every side).
+    /// </summary>
+    public void Capsule(Rectangle r, Color color, float ring = 0f, Color? hollow = null)
+    {
+        var outer = Math.Max(2, PixelGrid.Thickness(Math.Min(r.Width, r.Height), Scale));
+        var half = Math.Min(r.Width, r.Height) / 2f;
+        Vector2 a, b;
+        if (r.Height >= r.Width)
+        {
+            a = new Vector2(r.X + half, r.Y + half);
+            b = new Vector2(r.X + half, r.Bottom - half);
+        }
+        else
+        {
+            a = new Vector2(r.X + half, r.Y + half);
+            b = new Vector2(r.Right - half, r.Y + half);
+        }
+        SoftLine(a, b, color, outer, true);
+        if (ring > 0f && hollow is { } inside)
+        {
+            // Outer and inner widths differ by an even number of pixels, so both sit on the same pixels and the ring is even.
+            var inner = outer - 2 * PixelGrid.Thickness(ring, Scale);
+            if (inner >= 1)
+                SoftLine(a, b, inside, inner, true);
+        }
+    }
+
+    /// <summary>A dashed line with round ends; a positive <paramref name="offset"/> moves the dashes along the line (the coolant crawls).</summary>
+    public void Dashed(Vector2 a, Vector2 b, Color color, float dash = 7f, float gap = 5f, float thickness = 1.5f, float offset = 0f) =>
+        DashRun(a, b, color, dash, gap, thickness, offset);
+
+    private void DashRun(Vector2 a, Vector2 b, Color color, float dash, float gap, float thickness, float shift)
     {
         var d = b - a;
         var length = d.Length();
         if (length < 0.01f)
             return;
         var unit = d / length;
-        // A positive offset moves the dashes along the line (the coolant crawls).
-        var first = offset % (dash + gap);
-        if (first > 0f)
-            first -= dash + gap;
-        for (var at = first; at < length; at += dash + gap)
-        {
-            var from = Math.Max(0f, at);
-            var to = Math.Min(length, at + dash);
-            if (to > from)
-                Line(a + unit * from, a + unit * to, color, thickness);
-        }
+        var width = PixelGrid.Thickness(thickness, Scale);
+        var cap = width >= 2 ? width / 2f / Scale : 0f;
+        foreach (var (from, to) in LineProfile.Dashes(length, dash, gap, shift, cap))
+            SoftLine(a + unit * from, a + unit * to, color, width, true);
     }
 
-    public void Poly(IReadOnlyList<Vector2> points, Color color, float thickness = 1.5f, bool closed = true, bool dashed = false)
+    /// <summary>A dashed polyline (or polygon) with one dash pattern running on round its corners; <paramref name="offset"/> moves the dashes along it.</summary>
+    public void DashedPath(IReadOnlyList<Vector2> points, Color color, float dash = 7f, float gap = 5f, float thickness = 1.5f, float offset = 0f, bool closed = false)
     {
         var count = closed ? points.Count : points.Count - 1;
+        var travelled = 0f;
         for (var i = 0; i < count; i++)
         {
             var a = points[i];
             var b = points[(i + 1) % points.Count];
-            if (dashed)
-                Dashed(a, b, color, 3f, 4f, thickness);
-            else
-                Line(a, b, color, thickness);
+            DashRun(a, b, color, dash, gap, thickness, offset - travelled);
+            travelled += (b - a).Length();
         }
+    }
+
+    /// <summary>A polyline or polygon: soft lines with round joins. A dashed one keeps one dash pattern running round its corners.</summary>
+    public void Poly(IReadOnlyList<Vector2> points, Color color, float thickness = 1.5f, bool closed = true, bool dashed = false)
+    {
+        if (dashed)
+        {
+            DashedPath(points, color, 3f, 4f, thickness, 0f, closed);
+            return;
+        }
+        var count = closed ? points.Count : points.Count - 1;
+        for (var i = 0; i < count; i++)
+            Line(points[i], points[(i + 1) % points.Count], color, thickness);
     }
 
     /// <summary>A diamond outline around a point: the fault marker.</summary>
